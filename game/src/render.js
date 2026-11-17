@@ -9,6 +9,7 @@ import { drawBuoy, drawBuilding, drawCargoShip, drawContainer, drawCrane, drawCr
 import { drawAmmoIcon, drawBanner, drawButton, drawCashIcon, drawDirectionArrow, drawHeart, drawMenuFrame, drawNeonLine, drawObjectiveIcon, drawSpeedIcon, drawTargetRing, drawWantedRow } from './ui-art.js';
 import { drawBoatWake, drawExplosionSprite, drawHarborSkyline, drawNeonLogo, drawPedPhone, drawPedestrian, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet } from './assets.js';
 import { drawJaxPortrait, drawMaraPortrait, drawPortraitSmall } from './portraits.js';
+import { drawBridge } from './drawbridge.js';
 
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
@@ -399,6 +400,7 @@ export function createRenderer(canvas) {
       staticCity = state.city;
     }
     ctx.drawImage(staticLayer, camX - vw / 2, camY - vh / 2, vw, vh, camX - vw / 2, camY - vh / 2, vw, vh);
+    if (inView(2400, 1680, 120)) drawBridge(ctx, state.bridge, state.elapsed);
 
     ctx.fillStyle = 'rgba(190,230,255,0.35)';
     const waterTop = Math.max(0, camY - vh / 2);

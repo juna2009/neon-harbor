@@ -6,6 +6,7 @@ import { BOAT_ACCEL, BOAT_MAX_SPEED, createBoats, nearestBoat, stepBoats } from 
 import { claimPinkTaxi, createArmored, createCollectibles, createMissionState, createPizza, createRace, createTaxi, createWeaponPickups, loadCheckpoint, maxCarHp, repairAtGarage, resprayAtGarage, saveCheckpoint, targetForMission, updateArmored, updateMission, updatePickups, updatePizza, updateRace, updateTaxi } from './missions.js';
 import { addWanted, clearPolice, createPolice, decayWanted, spawnPoliceUnit, stepPolice } from './police.js';
 import { createPedestrians, createTraffic, stepPedestrians, stepTraffic } from './traffic.js';
+import { createBridge, stepBridge } from './drawbridge.js';
 
 export const EVENT_OVER = 1;
 export const EVENT_BUSTED = 2;
@@ -41,7 +42,7 @@ export function createWorld(rng, savedMission) {
     heat: [0, 0, 0],
     upgrades: {},
     ufo: { active: false, timer: 0, seen: false, x: WATER_X + 56, y: 620 },
-    bridge: { up: false, timer: 0, inGap: false },
+    bridge: createBridge(),
     particles: [],
     skids: [],
     floaters: [],
@@ -135,7 +136,7 @@ export function createWorld(rng, savedMission) {
     state.clock = { total: 21 * 60 };
     // Heat is NOT reset here: the city remembers. A game-over restart
     state.ufo = { active: false, timer: 0, seen: false, x: WATER_X + 56, y: 620 };
-    state.bridge = { up: false, timer: 0, inGap: false };
+    state.bridge = createBridge();
     for (const c of state.collectibles) c.taken = false;
     for (const pk of state.pickups) pk.taken = false;
     for (const ped of peds) ped.alive = true;
@@ -578,36 +579,6 @@ export function createWorld(rng, savedMission) {
     p.reserve = w.reserve;
   }
 
-  // Drawbridge: road x=2400, gap y 1640-1720. Jump it at 300+ or swim.
-  function stepBridge(dt) {
-    const b = state.bridge, p = state.player;
-    const c = p.inCar && p.car ? p.car : null;
-    const px = c ? c.x : p.x, py = c ? c.y : p.y, sp = c ? Math.abs(c.speed) : 0;
-    const d = Math.hypot(px - 2400, py - 1680);
-    const inGap = Math.abs(px - 2400) < 40 && py > 1640 && py < 1720;
-    if (!b.up && !inGap && sp > 200 && d < 320 && (state.wanted >= 3 || state.mission.index === 11)) {
-      b.up = true; b.timer = 20;
-      state.events.bridgeAlarm = true;
-      state.mission.dialogue = ['DRAWBRIDGE UP! Jump it — or swim.'];
-      state.mission.dialogueTimer = 5;
-    }
-    if (b.up && ((b.timer -= dt) <= 0 || d > 520)) b.up = false;
-    if (inGap && !b.inGap && b.up) {
-      if (sp >= 300) {
-        state.events.jump = true; state.events.bridgeJump = true;
-        c.speed = Math.sign(c.speed) * 220; // landing scrubs speed
-        addFloater(px, py - 30, 'BRIDGE JUMP!', '#ffd23e');
-      } else {
-        if (c) { spawnExplosion(c.x, c.y); c.alive = false; p.inCar = false; p.car = null; }
-        p.x = 2400; p.y = 1600;
-        p.health = Math.max(10, p.health - 15);
-        state.mission.dialogue = ['Into the harbor! The car is gone.'];
-        state.mission.dialogueTimer = 5;
-      }
-    }
-    b.inGap = inGap;
-  }
-
   function step(dt, input, view) {
     if (state.over) return EVENT_OVER;
     state.elapsed += dt;
@@ -848,7 +819,7 @@ export function createWorld(rng, savedMission) {
     }
     stepPolice(state.police, state, dt, rng, events);
     if (!state.police.heli.active) decayWanted(state, dt);
-    stepBridge(dt);
+    stepBridge(state.bridge, state, dt, { floater: addFloater, explosion: spawnExplosion });
     updateMission(state, dt);
     updateRace(state, dt);
     updateTaxi(state, dt);
