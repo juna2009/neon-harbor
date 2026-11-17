@@ -76,6 +76,12 @@ function runGame() {
   let best = readNumber(BEST_KEY);
   let accumulator = 0;
   let last = performance.now();
+  let ts = 1;
+  let fx = { zoom: 1, sx: 0, sy: 0, ts: 1, bar: 0, warm: 0, cool: 0, explosion: false };
+  let prevWanted = 0;
+  let prevBlackout = false;
+  let prevBurst = 0;
+  let prevInCar = false;
   let settingsIndex = 0;
   let shopIndex = 0;
   let capturingRow = -1;
@@ -100,6 +106,11 @@ function runGame() {
     world.reset();
     world.state.mission.index = Math.min(11, Math.max(0, readNumber(PROGRESS_KEY)));
     accumulator = 0;
+    ts = 1;
+    prevWanted = 0;
+    prevBlackout = false;
+    prevBurst = 0;
+    prevInCar = false;
     screen = SCREEN_PLAY;
     audio.unlock();
     audio.startRadio(settings.station);
@@ -114,6 +125,11 @@ function runGame() {
     if (!loadCheckpoint()) return;
     world.restoreCheckpoint();
     accumulator = 0;
+    ts = 1;
+    prevWanted = world.state.wanted;
+    prevBlackout = !!(world.state.blackout && world.state.blackout.active);
+    prevBurst = world.state.hydrants.filter((h) => h.burst).length;
+    prevInCar = world.state.player.inCar;
     screen = SCREEN_PLAY;
     audio.unlock();
     audio.startRadio(settings.station);
@@ -128,7 +144,8 @@ function runGame() {
     }
     audio.engineOff();
     audio.stopSiren();
-    audio.busted();
+    if (kind === 'wasted') audio.wasted();
+    else audio.busted();
     announce(kind === 'busted' ? 'Busted. The Harbor Police caught Jax.' : 'Wasted. Jax went down in Neon Harbor.');
   }
 
@@ -265,10 +282,23 @@ function runGame() {
 
   function step() {
     if (screen === SCREEN_TITLE) return;
-    const events = world.step(STEP, input, { w: renderer.view.w, h: renderer.view.h });
+    const events = world.step(STEP * ts, input, { w: renderer.view.w, h: renderer.view.h });
     const state = world.state;
+    fx = renderer.updateCinematic(STEP, state);
+    ts = fx.ts;
     if (events & EVENT_OVER) endGame(state.overKind);
     else if (events & EVENT_BUSTED) endGame('busted');
+    if (fx.explosion) audio.bigExplosion();
+    if (state.wanted > prevWanted) audio.wanted();
+    prevWanted = state.wanted;
+    const blackout = !!(state.blackout && state.blackout.active);
+    if (blackout && !prevBlackout) audio.blackout();
+    prevBlackout = blackout;
+    const burst = state.hydrants.filter((h) => h.burst).length;
+    if (burst > prevBurst) audio.waterSpray();
+    prevBurst = burst;
+    if (state.player.inCar && !prevInCar) audio.carHorn();
+    prevInCar = state.player.inCar;
     if (state.events.shot) audio.gunshot();
     if (state.events.enemyShotFired) audio.enemyShot();
     if (state.events.pickup) audio.pickup();
@@ -327,6 +357,7 @@ function runGame() {
   window.__neonHarbor = {
     get state() { return world.state; },
     get screen() { return screen; },
+    get fx() { return fx; },
   };
   requestAnimationFrame(frame);
 }

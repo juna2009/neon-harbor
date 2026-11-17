@@ -1,6 +1,7 @@
 // Neon Harbor — the live minimap.
 import { WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
+import { drawMapGas, drawMapHydrant, drawMapMission, drawMapPlayer, drawMapPolice, drawMapWrench } from './ui-art.js';
 
 export function drawMinimap(ctx, state, x, y, w, h) {
   const sx = w / WORLD_W;
@@ -38,24 +39,12 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   }
   if (state.mission.target) {
     const t = state.mission.target;
-    const r = 4 + Math.sin(state.elapsed * 4) * 1.5;
-    ctx.fillStyle = '#ffd23e';
-    ctx.beginPath();
-    ctx.arc(x + t.x * sx, y + t.y * sy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#0e1420';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    drawMapMission(ctx, x + t.x * sx, y + t.y * sy, 10, state.elapsed);
   }
   const gas = state.gasStation;
-  ctx.fillStyle = '#ffab62';
-  ctx.fillRect(x + (gas.x + gas.w / 2) * sx - 3, y + (gas.y + gas.h / 2) * sy - 3, 6, 6);
-  ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('Gas', x + (gas.x + gas.w / 2) * sx, y + (gas.y + gas.h / 2) * sy - 6);
-  if (state.city.garage) {
-    ctx.fillStyle = '#37e0e6';
-    ctx.fillRect(x + state.city.garage.x * sx - 3, y + state.city.garage.y * sy - 3, 6, 6);
-  }
+  drawMapGas(ctx, x + (gas.x + gas.w / 2) * sx, y + (gas.y + gas.h / 2) * sy, 9);
+  if (state.city.garage) drawMapWrench(ctx, x + state.city.garage.x * sx, y + state.city.garage.y * sy, 9);
+  for (const h of state.hydrants) drawMapHydrant(ctx, x + h.x * sx, y + h.y * sy, 7);
   if (state.city.casino) {
     ctx.fillStyle = '#ffd23e';
     ctx.beginPath();
@@ -92,20 +81,13 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   for (const unit of state.police.units) {
     const ux = unit.kind === 'car' ? unit.car.x : unit.x;
     const uy = unit.kind === 'car' ? unit.car.y : unit.y;
-    if (unit.kind === 'boat') {
-      ctx.fillStyle = '#5aa0ff';
-      ctx.fillRect(x + ux * sx - 2, y + uy * sy - 2, 4, 4);
-    } else if (unit.kind === 'gunman') {
+    if (unit.kind === 'gunman') {
       ctx.fillStyle = '#ff5a3c';
       ctx.beginPath();
       ctx.arc(x + ux * sx, y + uy * sy, 3, 0, Math.PI * 2);
       ctx.fill();
-    } else if (unit.roadblock) {
-      ctx.fillStyle = '#ff3b30';
-      ctx.fillRect(x + ux * sx - 3, y + uy * sy - 3, 6, 6);
     } else {
-      ctx.fillStyle = '#5aa0ff';
-      ctx.fillRect(x + ux * sx - 2, y + uy * sy - 2, 4, 4);
+      drawMapPolice(ctx, x + ux * sx, y + uy * sy, unit.roadblock ? 6 : 4, !!unit.roadblock);
     }
   }
   if (state.police.heli && state.police.heli.active) {
@@ -140,19 +122,6 @@ export function drawMinimap(ctx, state, x, y, w, h) {
     ctx.stroke();
   }
   const p = state.player;
-  ctx.save();
-  ctx.translate(x + p.x * sx, y + p.y * sy);
-  ctx.rotate(p.angle);
-  ctx.fillStyle = '#ffd23e';
-  ctx.beginPath();
-  ctx.moveTo(6, 0);
-  ctx.lineTo(-4, -4);
-  ctx.lineTo(-4, 4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  ctx.restore();
+  drawMapPlayer(ctx, x + p.x * sx, y + p.y * sy, 10, p.angle);
   ctx.restore();
 }

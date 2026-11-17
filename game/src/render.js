@@ -3,6 +3,12 @@ import { COLORS, PLAYER, UPGRADES, WEAPONS, WORLD_H, WORLD_W } from './config.js
 import { WATER_X, districtAt } from './city.js';
 import { currentObjective, garageHot } from './missions.js';
 import { drawMinimap } from './minimap.js';
+import { createCinematic } from './cinematic.js';
+import { drawBuildingShadow, drawDayTint, drawLightPool, drawLightning, drawWetReflection } from './lighting.js';
+import { drawBuoy, drawCargoShip, drawContainer, drawCrane, drawCrosswalk, drawHydrant, drawLamp, drawPier, drawSign, drawTree } from './props.js';
+import { drawAmmoIcon, drawBanner, drawButton, drawCashIcon, drawDirectionArrow, drawHeart, drawMenuFrame, drawNeonLine, drawObjectiveIcon, drawSpeedIcon, drawStar, drawTargetRing } from './ui-art.js';
+import { drawBoatWake, drawExplosionSprite, drawHarborSkyline, drawNeonLogo, drawPedPhone, drawPedestrian, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet } from './assets.js';
+import { drawJaxPortrait, drawMaraPortrait, drawPortraitSmall } from './portraits.js';
 
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
@@ -113,6 +119,17 @@ function drawCarShape(ctx, car, night) {
   ctx.restore();
 }
 
+function drawTrafficCar(ctx, car, night) {
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(car.x + 2, car.y + 3, car.length / 2 + 2, car.width / 2 + 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (car.pink) drawPinkTaxi(ctx, car.x, car.y, car.angle);
+  else if (car.body === 'van') drawVan(ctx, car.x, car.y, car.angle, car.color);
+  else if (car.body === 'sedan' || car.body === 'hatch') drawSportCar(ctx, car.x, car.y, car.angle, car.color);
+  else drawCarShape(ctx, car, night);
+}
+
 function drawPerson(ctx, x, y, angle, ped, walkPhase) {
   const radius = ped.build === 'wide' ? 11 : 9;
   const bob = Math.sin(walkPhase) * 1.5;
@@ -163,36 +180,6 @@ function drawPerson(ctx, x, y, angle, ped, walkPhase) {
   ctx.restore();
 }
 
-function drawBoatShape(ctx, boat) {
-  ctx.save();
-  ctx.translate(boat.x, boat.y);
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.beginPath();
-  ctx.ellipse(2, 3, 30, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.rotate(boat.angle);
-  ctx.fillStyle = boat.color || '#e8e4d8';
-  ctx.beginPath();
-  ctx.moveTo(28, 0);
-  ctx.lineTo(16, -10);
-  ctx.lineTo(-24, -10);
-  ctx.lineTo(-28, -6);
-  ctx.lineTo(-28, 6);
-  ctx.lineTo(-24, 10);
-  ctx.lineTo(16, 10);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.fillRect(-24, -10, 40, 3);
-  ctx.fillStyle = '#bfe6ff';
-  ctx.fillRect(2, -7, 10, 14);
-  ctx.fillStyle = '#20242a';
-  ctx.fillRect(-14, -7, 12, 14);
-  ctx.fillStyle = '#14181f';
-  ctx.fillRect(-32, -5, 6, 10);
-  ctx.restore();
-}
-
 function drawPlayer(ctx, p, state) {
   const bob = Math.sin(p.runPhase) * 1.5;
   ctx.save();
@@ -238,9 +225,26 @@ export function createRenderer(canvas) {
   const view = { w: 1280, h: 800, scale: 1 };
   const fonts = new Map();
   const glowSprite = makeGlowSprite(128, 'rgba(255,255,255,0.9)', 'rgba(255,255,255,0)');
-  const vignetteSprite = makeGlowSprite(512, 'rgba(0,0,0,0)', 'rgba(0,0,0,0.55)');
+  const cine = createCinematic();
+  let fx = { zoom: 1, sx: 0, sy: 0, ts: 1, bar: 0, warm: 0, cool: 0, explosion: false };
+  let prevFlames = 0;
   let staticLayer = null;
   let staticCity = null;
+
+  function updateCinematic(dt, state) {
+    let flames = 0;
+    for (const pt of state.particles) if (pt.kind === 'flame') flames += 1;
+    const d = districtAt(state.city, state.player.x, state.player.y);
+    fx = cine.update(dt, {
+      shot: !!state.events.shot, crash: !!state.events.crash,
+      explosion: flames > prevFlames, mission: !!state.events.missionComplete,
+      dialogue: state.mission.dialogueTimer > 0,
+      busted: state.overKind === 'busted', wasted: state.overKind === 'wasted',
+    }, { daylight: state.daylight, district: d.name.toLowerCase().replace(' ', ''), blackout: !!(state.blackout && state.blackout.active) });
+    fx.explosion = flames > prevFlames;
+    prevFlames = flames;
+    return fx;
+  }
 
   function buildStaticLayer(city) {
     const c = document.createElement('canvas');
@@ -253,14 +257,10 @@ export function createRenderer(canvas) {
     }
     g.fillStyle = COLORS.water;
     g.fillRect(WATER_X, 0, WORLD_W - WATER_X, WORLD_H);
-    g.fillStyle = '#8a6f4d';
-    g.fillRect(city.docks.x, city.docks.y, city.docks.w, city.docks.h);
-    g.fillStyle = '#6b5638';
-    for (let y = city.docks.y + 10; y < city.docks.y + city.docks.h; y += 28) {
-      g.fillRect(city.docks.x, y, city.docks.w, 3);
-    }
-    g.fillStyle = '#8a6f4d';
-    g.fillRect(city.marina.x, city.marina.y, city.marina.w, city.marina.h);
+    drawPier(g, city.docks.x, city.docks.y, city.docks.w, city.docks.h);
+    for (let i = 0; i < 3; i += 1) drawContainer(g, city.docks.x + 8, city.docks.y + 12 + i * 56, 60, 44, i);
+    drawCrane(g, city.docks.x + 96, city.docks.y + 262, 150);
+    drawPier(g, city.marina.x, city.marina.y, city.marina.w, city.marina.h);
     g.fillStyle = '#ffffff';
     g.beginPath();
     g.moveTo(city.marina.x + 100, city.marina.y + 60);
@@ -281,32 +281,19 @@ export function createRenderer(canvas) {
     for (const ry of city.roadsH) {
       for (let x = 0; x < WATER_X; x += 64) g.fillRect(x + 12, ry - 2, 32, 4);
     }
-    g.fillStyle = 'rgba(255,255,255,0.75)';
     for (const pt of city.intersections) {
-      for (let i = -3; i <= 3; i += 1) {
-        g.fillRect(pt.x + i * 10 - 3, pt.y - 46, 6, 12);
-        g.fillRect(pt.x + i * 10 - 3, pt.y + 34, 6, 12);
-        g.fillRect(pt.x - 46, pt.y + i * 10 - 3, 12, 6);
-        g.fillRect(pt.x + 34, pt.y + i * 10 - 3, 12, 6);
-      }
+      drawCrosswalk(g, pt.x - 46, pt.y - 46, 92, 12, 0);
+      drawCrosswalk(g, pt.x - 46, pt.y + 34, 92, 12, 0);
+      drawCrosswalk(g, pt.x - 46, pt.y - 46, 12, 92, 1);
+      drawCrosswalk(g, pt.x + 34, pt.y - 46, 12, 92, 1);
     }
     for (const park of city.parks) {
       g.fillStyle = COLORS.park;
       g.fillRect(park.x, park.y, park.w, park.h);
     }
-    for (const tree of city.trees) {
-      g.fillStyle = 'rgba(0,0,0,0.3)';
-      g.beginPath();
-      g.arc(tree.x + 3, tree.y + 4, tree.r, 0, Math.PI * 2);
-      g.fill();
-      g.fillStyle = COLORS.tree;
-      g.beginPath();
-      g.arc(tree.x, tree.y, tree.r, 0, Math.PI * 2);
-      g.fill();
-    }
+    for (const tree of city.trees) drawTree(g, tree.x, tree.y, tree.r, (tree.x + tree.y) % 2);
     for (const b of city.buildings) {
-      g.fillStyle = '#20242a';
-      g.fillRect(b.x - 3, b.y - 3 + b.height * 3, b.w + 6, b.h + 6);
+      drawBuildingShadow(g, b, { dx: 1, dy: 1 });
       g.fillStyle = b.color;
       g.fillRect(b.x, b.y, b.w, b.h);
       g.strokeStyle = b.neon;
@@ -378,7 +365,7 @@ export function createRenderer(canvas) {
   }
 
   function drawWorld(state) {
-    const zoom = state.zoom || 1;
+    const zoom = (state.zoom || 1) * fx.zoom;
     const vw = view.w / zoom;
     const vh = view.h / zoom;
     let camX = state.camera.x;
@@ -389,6 +376,8 @@ export function createRenderer(canvas) {
       camX += (Math.random() - 0.5) * state.shake;
       camY += (Math.random() - 0.5) * state.shake;
     }
+    camX += fx.sx;
+    camY += fx.sy;
     const ox = view.w / 2 - camX * zoom;
     const oy = view.h / 2 - camY * zoom;
     const blackout = !!(state.blackout && state.blackout.active);
@@ -415,6 +404,11 @@ export function createRenderer(canvas) {
       const drift = Math.sin(state.elapsed * 1.6 + y * 0.02) * 26;
       ctx.fillRect(WATER_X + 12 + drift, y + 30, 60, 4);
       ctx.fillRect(WATER_X + 40 - drift, y + 70, 44, 4);
+    }
+    if (inView(WATER_X + 60, 500, 140)) drawCargoShip(ctx, WATER_X + 12, 500, 90, 30, 0);
+    for (let i = 0; i < 3; i += 1) {
+      const by = 900 + i * 300 + Math.sin(state.elapsed * 1.5 + i) * 4;
+      if (inView(WATER_X + 30, by, 20)) drawBuoy(ctx, WATER_X + 30, by, 8);
     }
 
     for (const w of state.wet) {
@@ -451,9 +445,10 @@ export function createRenderer(canvas) {
     ctx.fillStyle = '#263948'; ctx.fillRect(gas.x - 2, gas.y + gas.h - 80, 34, 44);
     ctx.fillStyle = '#a6ffb6'; ctx.font = 'bold 24px sans-serif'; ctx.fillText('$', gas.x + 15, gas.y + gas.h - 49);
     for (const h of state.hydrants) {
-      ctx.fillStyle = h.burst ? '#643b3c' : '#d94743'; ctx.fillRect(h.x - 4, h.y - 10, 8, 12);
-      ctx.fillRect(h.x - 8, h.y - 6, 16, 4);
-      ctx.fillStyle = '#892b34'; ctx.fillRect(h.x - 5, h.y - 12, 10, 4);
+      if (h.burst) ctx.globalAlpha = 0.55;
+      drawHydrant(ctx, h.x, h.y);
+      ctx.globalAlpha = 1;
+      if (h.burst && h.jetTimer > 0) drawWaterJet(ctx, h.x, h.y - 8, 46, 1 - h.jetTimer / 10);
     }
 
     const city = state.city;
@@ -490,11 +485,7 @@ export function createRenderer(canvas) {
           ctx.globalAlpha = 1;
         } else {
           ctx.fillText('★ CASINO ★', cz.x, cz.y - 108);
-          if (night > 0.4) {
-            ctx.globalAlpha = (night - 0.4) * 0.6;
-            ctx.drawImage(glowSprite, cz.x - 90, cz.y - 110, 180, 180);
-            ctx.globalAlpha = 1;
-          }
+          if (night > 0.4) drawLightPool(ctx, cz.x, cz.y - 20, 90, '#ffd23e', (night - 0.4) * 0.6);
         }
       }
     }
@@ -538,6 +529,7 @@ export function createRenderer(canvas) {
       ctx.textAlign = 'center';
       ctx.fillText(hot ? 'GARAGE — CLOSED · district too hot' : 'GARAGE $150 · G repair / respray · U shop', garage.x, garage.y - 40);
       ctx.fillText('G', garage.x, garage.y + 6);
+      drawSign(ctx, garage.x + 56, garage.y - 30, 1);
     }
 
     if (state.pizza) {
@@ -598,10 +590,14 @@ export function createRenderer(canvas) {
 
     for (const b of state.city.buildings) {
       if (!inView(b.x + b.w / 2, b.y + b.h / 2, Math.max(b.w, b.h))) continue;
-      if (!blackout && night > 0.4) {
-        ctx.globalAlpha = (night - 0.4) * 0.5;
-        ctx.drawImage(glowSprite, b.x - 20, b.y - 20, b.w + 40, b.h + 40);
-        ctx.globalAlpha = 1;
+      if (!blackout && night > 0.4) drawLightPool(ctx, b.x + b.w / 2, b.y + b.h / 2, Math.max(b.w, b.h) / 2 + 20, b.neon, (night - 0.4) * 0.5);
+      if (state.weather && state.weather.rain) drawWetReflection(ctx, b.x + b.w / 2, b.y + b.h, 44, b.neon, 0.8);
+    }
+    if (night > 0.3 && !blackout) {
+      for (const pt of city.intersections) {
+        if ((pt.x + pt.y) % 640 !== 0 || !inView(pt.x + 48, pt.y - 48, 60)) continue;
+        drawLamp(ctx, pt.x + 48, pt.y - 48, night);
+        drawLightPool(ctx, pt.x + 48, pt.y - 48, 60, '#ffd23e', 0.25 * night);
       }
     }
 
@@ -677,34 +673,29 @@ export function createRenderer(canvas) {
     if (state.mission.target) {
       const t = state.mission.target;
       if (inView(t.x, t.y, 60)) {
-        const pulse = 1 + Math.sin(state.elapsed * 4) * 0.15;
-        ctx.strokeStyle = COLORS.neonYellow;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(t.x, t.y, 26 * pulse, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillStyle = COLORS.neonYellow;
-        ctx.beginPath();
-        ctx.arc(t.x, t.y, 7, 0, Math.PI * 2);
-        ctx.fill();
+        drawTargetRing(ctx, t.x, t.y, 26, state.elapsed);
         ctx.fillStyle = '#0e1420';
         ctx.font = `bold 13px ${FONT}`;
         ctx.textAlign = 'center';
         ctx.fillText(t.label, t.x, t.y - 34);
+      } else {
+        const ax = Math.max(camX - vw / 2 + 40, Math.min(camX + vw / 2 - 40, t.x));
+        const ay = Math.max(camY - vh / 2 + 40, Math.min(camY + vh / 2 - 40, t.y));
+        drawDirectionArrow(ctx, ax, ay, Math.atan2(t.y - ay, t.x - ax), 14);
       }
     }
 
     for (const car of state.traffic.parked) {
-      if (car.alive && inView(car.x, car.y, 60)) drawCarShape(ctx, car, night);
+      if (car.alive && inView(car.x, car.y, 60)) drawTrafficCar(ctx, car, night);
     }
     for (const car of state.traffic.cars) {
-      if (car.alive && inView(car.x, car.y, 60)) drawCarShape(ctx, car, night);
+      if (car.alive && inView(car.x, car.y, 60)) drawTrafficCar(ctx, car, night);
     }
 
     if (state.armored && state.armored.truck) {
       const truck = state.armored.truck;
       if (truck.alive && inView(truck.x, truck.y, 60)) {
-        drawCarShape(ctx, truck, night);
+        drawTrafficCar(ctx, truck, night);
         ctx.fillStyle = '#ffd23e';
         ctx.font = `bold 15px ${FONT}`;
         ctx.textAlign = 'center';
@@ -712,9 +703,12 @@ export function createRenderer(canvas) {
       }
     }
 
-    for (const ped of state.peds) {
+    for (let i = 0; i < state.peds.length; i += 1) {
+      const ped = state.peds[i];
       if (!ped.alive || !inView(ped.x, ped.y, 30)) continue;
-      drawPerson(ctx, ped.x, ped.y, ped.angle, ped, ped.walkPhase);
+      const pa = ped.angle + Math.PI / 2;
+      if (ped.photo > 0) drawPedPhone(ctx, ped.x, ped.y, pa);
+      else drawPedestrian(ctx, ped.x, ped.y, pa, i % 4, ped.walkPhase);
     }
 
     for (const unit of state.police.units) {
@@ -731,17 +725,14 @@ export function createRenderer(canvas) {
           ctx.restore();
           continue;
         }
-        drawCarShape(ctx, unit.car, night);
+        if (unit.car.body === 'van') drawVan(ctx, unit.car.x, unit.car.y, unit.car.angle, unit.car.color);
+        else drawPoliceCar(ctx, unit.car.x, unit.car.y, unit.car.angle);
         const blink = Math.floor(state.elapsed * 6) % 2 === 0;
         ctx.fillStyle = blink ? '#ff3b30' : '#2f6fd0';
         ctx.beginPath();
         ctx.arc(unit.car.x, unit.car.y - 14, 4, 0, Math.PI * 2);
         ctx.fill();
-        if (night > 0.3) {
-          ctx.globalAlpha = 0.5 * night;
-          ctx.drawImage(glowSprite, unit.car.x - 30, unit.car.y - 30, 60, 60);
-          ctx.globalAlpha = 1;
-        }
+        if (night > 0.3) drawLightPool(ctx, unit.car.x, unit.car.y, 30, blink ? '#ff3b30' : '#2f6fd0', 0.5 * night);
       } else if (unit.kind === 'gunman') {
         if (!inView(unit.x, unit.y, 30)) continue;
         const gunman = { ...unit, color: COLORS.gunman, skin: '#c98d5f', pants: '#1c1f24', hat: 0, build: 'wide' };
@@ -777,12 +768,9 @@ export function createRenderer(canvas) {
       if (!boat.alive || !inView(boat.x, boat.y, 120)) continue;
       for (const w of boat.wake) {
         const alpha = Math.max(0, w.life / w.maxLife);
-        ctx.fillStyle = `rgba(230,245,255,${(alpha * 0.5).toFixed(3)})`;
-        ctx.beginPath();
-        ctx.ellipse(w.x, w.y, 14 * alpha + 4, 5, 0, 0, Math.PI * 2);
-        ctx.fill();
+        drawBoatWake(ctx, w.x, w.y, boat.angle, 10 + 14 * alpha);
       }
-      drawBoatShape(ctx, boat);
+      drawSpeedboat(ctx, boat.x, boat.y, boat.angle, boat.color);
       if (boat.kind === 'player') {
         ctx.save();
         ctx.translate(boat.x, boat.y);
@@ -799,12 +787,9 @@ export function createRenderer(canvas) {
       if (unit.kind !== 'boat' || !inView(unit.x, unit.y, 120)) continue;
       for (const w of unit.wake || []) {
         const alpha = Math.max(0, w.life / w.maxLife);
-        ctx.fillStyle = `rgba(230,245,255,${(alpha * 0.5).toFixed(3)})`;
-        ctx.beginPath();
-        ctx.ellipse(w.x, w.y, 14 * alpha + 4, 5, 0, 0, Math.PI * 2);
-        ctx.fill();
+        drawBoatWake(ctx, w.x, w.y, unit.angle, 10 + 14 * alpha);
       }
-      drawBoatShape(ctx, { ...unit, color: '#2f6fd0' });
+      drawSpeedboat(ctx, unit.x, unit.y, unit.angle, '#2f6fd0');
       const blink = Math.floor(state.elapsed * 6) % 2 === 0;
       ctx.fillStyle = blink ? '#ff3b30' : '#2f6fd0';
       ctx.beginPath();
@@ -899,7 +884,10 @@ export function createRenderer(canvas) {
     for (const pt of state.particles) {
       if (!inView(pt.x, pt.y, pt.size * 2 + 20)) continue;
       const alpha = Math.max(0, pt.life / pt.maxLife);
-      if (pt.kind === 'flame' || pt.kind === 'jet') {
+      if (pt.kind === 'flame') {
+        drawExplosionSprite(ctx, pt.x, pt.y, pt.size, 1 - alpha);
+        drawDestructionLight(pt, pt.x, pt.y, 1);
+      } else if (pt.kind === 'jet') {
         drawDestructionLight(pt, pt.x, pt.y, 1);
       } else if (pt.kind === 'flash') {
         ctx.globalAlpha = alpha;
@@ -969,12 +957,7 @@ export function createRenderer(canvas) {
         ctx.stroke();
         ctx.restore();
       }
-      if (p.car.tiresPopped) {
-        ctx.fillStyle = 'rgba(140,140,150,0.55)';
-        ctx.beginPath();
-        ctx.arc(p.car.x - Math.cos(p.car.angle) * 16, p.car.y - Math.sin(p.car.angle) * 16, 7, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      if (p.car.tiresPopped) drawTireSmoke(ctx, p.car.x - Math.cos(p.car.angle) * 16, p.car.y - Math.sin(p.car.angle) * 16, 7, 0.55);
     } else if (!p.inBoat) {
       drawPlayer(ctx, p, state);
     }
@@ -1029,14 +1012,7 @@ export function createRenderer(canvas) {
 
     ctx.restore();
 
-    if (night > 0.05) {
-      ctx.fillStyle = `rgba(10,14,44,${(night * 0.48).toFixed(3)})`;
-      ctx.fillRect(0, 0, view.w, view.h);
-    }
-    if (state.daylight > 0.55 && state.daylight < 0.85) {
-      ctx.fillStyle = 'rgba(255,140,60,0.08)';
-      ctx.fillRect(0, 0, view.w, view.h);
-    }
+    drawDayTint(ctx, view.w, view.h, state.daylight, !!(state.weather && state.weather.storm));
     if (blackout) {
       ctx.fillStyle = 'rgba(2,4,12,0.45)';
       ctx.fillRect(0, 0, view.w, view.h);
@@ -1118,14 +1094,12 @@ export function createRenderer(canvas) {
         ctx.fill();
       }
     }
-    ctx.drawImage(vignetteSprite, 0, 0, view.w, view.h);
-    if (state.weather && state.weather.storm && state.weather.flash > 0) {
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.fillRect(0, 0, view.w, view.h);
-    }
+    cine.drawGrade(ctx, view.w, view.h, fx.warm, fx.cool);
+    let flick = 0;
+    if (state.weather && state.weather.storm && state.weather.flash > 0) flick = drawLightning(ctx, view.w, view.h, state.weather.flash / 2);
     if (state.weather && state.weather.flash > 0 && state.weather.bolt && state.weather.bolt.points) {
       const pts = state.weather.bolt.points;
-      const bx = (x) => (x - camX) * zoom + view.w / 2;
+      const bx = (x) => (x - camX + flick) * zoom + view.w / 2;
       const by = (y) => (y - camY) * zoom + view.h / 2;
       ctx.strokeStyle = '#3b6fe0';
       ctx.lineWidth = 8;
@@ -1145,16 +1119,7 @@ export function createRenderer(canvas) {
 
   function drawStars(ctx2, wanted, x, y) {
     const full = Math.floor(wanted);
-    for (let i = 0; i < 6; i += 1) {
-      const cx = x + i * 26;
-      const filled = i < full;
-      // The 6th star is the military: red, not gold.
-      ctx2.fillStyle = filled ? (i === 5 ? '#ff5a3c' : COLORS.neonYellow) : 'rgba(255,255,255,0.25)';
-      ctx2.font = `bold 22px ${FONT}`;
-      ctx2.textAlign = 'left';
-      ctx2.textBaseline = 'alphabetic';
-      ctx2.fillText('★', cx, y);
-    }
+    for (let i = 0; i < 6; i += 1) drawStar(ctx2, x + i * 26 + 11, y - 8, 11, i < full ? (i === 5 ? 2 : 1) : 0);
   }
 
   function drawHud(state, best, ui) {
@@ -1162,22 +1127,25 @@ export function createRenderer(canvas) {
     const collected = state.collectibles.filter((c) => c.taken).length;
     ctx.fillStyle = 'rgba(14,20,32,0.82)';
     ctx.fillRect(12, 12, 250, 132);
-    text(`$${state.cash}`, 24, 40, 26, COLORS.cash, 'left', 'bold');
+    drawCashIcon(ctx, 22, 29, 11);
+    text(`$${state.cash}`, 40, 40, 26, COLORS.cash, 'left', 'bold');
     text(`Best $${best}`, 150, 40, 15, '#c8cdd6', 'left');
     ctx.fillStyle = '#3a0d0d';
     ctx.fillRect(24, 52, 160, 14);
     ctx.fillStyle = p.health > 30 ? '#4ade80' : '#ef4444';
     ctx.fillRect(24, 52, Math.max(0, 160 * (p.health / 100)), 14);
-    text('HP', 190, 64, 13, '#eef1f5', 'left', 'bold');
+    drawHeart(ctx, 197, 59, 9);
     drawStars(ctx, state.wanted, 24, 96);
     const weapon = WEAPONS[p.weapon];
-    text(`${weapon.name}  ${p.ammo} / ${p.reserve}`, 24, 118, 15, '#eef1f5', 'left');
+    drawAmmoIcon(ctx, 24, 112, 9);
+    text(`${weapon.name}  ${p.ammo} / ${p.reserve}`, 40, 118, 15, '#eef1f5', 'left');
     text(`◆ ${collected}/${state.collectibles.length}`, 24, 138, 14, COLORS.neonYellow, 'left', 'bold');
     if ((p.inCar && p.car) || (p.inBoat && p.boat)) {
       const vehicle = p.inCar ? p.car : p.boat;
       const speed = Math.round(Math.abs(vehicle.speed) * 0.36);
       ctx.fillStyle = 'rgba(14,20,32,0.82)';
       ctx.fillRect(view.w - 188, view.h - 116, 172, 52);
+      drawSpeedIcon(ctx, view.w - 178, view.h - 90, 16, 2.36 + Math.min(1, Math.abs(vehicle.speed) / 540) * 3.14);
       text(`${speed} km/h`, view.w - 28, view.h - 78, 30, '#ffffff', 'right', 'bold');
       if (p.inCar && p.car) {
         const hp = Math.max(0, Math.round(p.car.hp || 0));
@@ -1197,12 +1165,13 @@ export function createRenderer(canvas) {
     text(hints, view.w - 16, view.h - 24, 14, '#c8cdd6', 'right');
     const objective = currentObjective(state);
     ctx.font = `bold 16px ${FONT}`;
-    const ow = Math.min(view.w - 32, ctx.measureText(objective).width + 44);
+    const ow = Math.min(view.w - 32, ctx.measureText(objective).width + 62);
     ctx.fillStyle = 'rgba(14,20,32,0.9)';
     ctx.fillRect(16, view.h - 64, ow, 34);
     ctx.fillStyle = COLORS.neonCyan;
     ctx.fillRect(16, view.h - 64, 4, 34);
-    text(objective, 30, view.h - 41, 16, '#ffffff', 'left', 'bold');
+    drawObjectiveIcon(ctx, 30, view.h - 47, 10);
+    text(objective, 48, view.h - 41, 16, '#ffffff', 'left', 'bold');
     if (ui && ui.stationName) {
       const label = `♪ ${ui.stationName}`;
       ctx.font = `bold 13px ${FONT}`;
@@ -1229,15 +1198,9 @@ export function createRenderer(canvas) {
     ctx.fillStyle = hot ? '#ff8a7a' : COLORS.neonCyan;
     ctx.fillRect((view.w - rw) / 2, 12, 4, 28);
     text(readout, view.w / 2, 31, 15, hot ? '#ff8a7a' : '#ffffff', 'center', 'bold');
-    if (state.wanted >= 6) {
-      const banner = '⚠ MILITARY RESPONSE ⚠';
-      ctx.font = `bold 15px ${FONT}`;
-      const bw = ctx.measureText(banner).width + 28;
-      ctx.fillStyle = 'rgba(120,10,10,0.9)';
-      ctx.fillRect((view.w - bw) / 2, 44, bw, 28);
-      text(banner, view.w / 2, 63, 15, '#ffffff', 'center', 'bold');
-    }
+    if (state.wanted >= 6) drawBanner(ctx, (view.w - 340) / 2, 44, 340, '⚠ MILITARY RESPONSE ⚠', '#ff5a3c');
     if (state.mission.dialogueTimer > 0 && state.mission.dialogue.length > 0) {
+      drawPortraitSmall(ctx, 16, view.h - 236, 'mara', (state.wanted >= 4 || blackout) ? 'worried' : 'alert');
       const line = state.mission.dialogue[0];
       ctx.fillStyle = 'rgba(14,20,32,0.88)';
       ctx.fillRect(16, view.h - 150, Math.min(view.w - 32, 640), 62);
@@ -1257,40 +1220,13 @@ export function createRenderer(canvas) {
     const height = 120 + lines.length * 32 + 70 + (subtitle ? 34 : 0);
     const x = (view.w - width) / 2;
     const y = (view.h - height) / 2;
-    ctx.fillStyle = 'rgba(14,20,32,0.94)';
-    ctx.fillRect(x, y, width, height);
-    ctx.fillStyle = accent || COLORS.neonPink;
-    ctx.fillRect(x, y, width, 5);
+    drawMenuFrame(ctx, x, y, width, height, accent || COLORS.neonPink);
     text(title, view.w / 2, y + (subtitle ? 64 : 72), 46, '#ffffff', 'center', 'bold');
     if (subtitle) text(subtitle, view.w / 2, y + 100, 22, COLORS.neonPink, 'center', 'bold');
     lines.forEach((line, i) => {
       text(line, view.w / 2, y + (subtitle ? 150 : 120) + i * 32, 19, '#c8cdd6', 'center');
     });
     text(prompt, view.w / 2, y + height - 30, 20, COLORS.neonYellow, 'center', 'bold');
-  }
-
-  function drawSkyline() {
-    const base = view.h - 120;
-    ctx.fillStyle = '#0a0f1c';
-    ctx.fillRect(0, base, view.w, 120);
-    let x = 0;
-    let i = 0;
-    while (x < view.w) {
-      const w = 60 + ((i * 37) % 70);
-      const h = 40 + ((i * 53) % 90);
-      ctx.fillStyle = i % 2 === 0 ? '#131c2e' : '#0f1626';
-      ctx.fillRect(x, base - h, w, h + 120);
-      ctx.fillStyle = i % 3 === 0 ? COLORS.neonPink : COLORS.neonCyan;
-      ctx.globalAlpha = 0.8;
-      for (let wy = base - h + 10; wy < base - 8; wy += 18) {
-        for (let wx = x + 8; wx < x + w - 8; wx += 16) {
-          if ((wx + wy + i) % 5 === 0) ctx.fillRect(wx, wy, 5, 7);
-        }
-      }
-      ctx.globalAlpha = 1;
-      x += w + 8;
-      i += 1;
-    }
   }
 
   const TITLE_LINES = [
@@ -1317,10 +1253,7 @@ export function createRenderer(canvas) {
     const height = 120 + lines.length * 34 + 80;
     const x = (view.w - width) / 2;
     const y = (view.h - height) / 2;
-    ctx.fillStyle = 'rgba(14,20,32,0.95)';
-    ctx.fillRect(x, y, width, height);
-    ctx.fillStyle = COLORS.neonCyan;
-    ctx.fillRect(x, y, width, 5);
+    drawMenuFrame(ctx, x, y, width, height, COLORS.neonCyan);
     text('SETTINGS', view.w / 2, y + 72, 40, '#ffffff', 'center', 'bold');
     lines.forEach((line, i) => {
       const selected = i === ui.settingsIndex;
@@ -1341,10 +1274,7 @@ export function createRenderer(canvas) {
     const height = 150 + UPGRADES.length * lineH + 60 + (closed ? 30 : 0);
     const x = (view.w - width) / 2;
     const y = (view.h - height) / 2;
-    ctx.fillStyle = 'rgba(14,20,32,0.95)';
-    ctx.fillRect(x, y, width, height);
-    ctx.fillStyle = COLORS.neonCyan;
-    ctx.fillRect(x, y, width, 5);
+    drawMenuFrame(ctx, x, y, width, height, COLORS.neonCyan);
     text('GARAGE — UPGRADE SHOP', view.w / 2, y + 58, 30, '#ffffff', 'center', 'bold');
     text(`Cash $${state.cash} — fitted for good, kept for this visit`, view.w / 2, y + 88, 15, COLORS.cash, 'center');
     if (closed) {
@@ -1379,15 +1309,25 @@ export function createRenderer(canvas) {
       drawWorld(state);
       state.camera.x = saved.x;
       state.camera.y = saved.y;
-      drawSkyline();
-      ctx.globalAlpha = 0.5;
-      ctx.drawImage(glowSprite, view.w / 2 - 320, 60, 640, 130);
-      ctx.globalAlpha = 1;
-      drawPanel('NEON HARBOR', TITLE_LINES, 'Press Enter or click to start', COLORS.neonCyan, '— THE MARA JOB —');
+      drawHarborSkyline(ctx, 0, view.h - 120, view.w, 120);
+      if (view.w >= 1160) {
+        drawJaxPortrait(ctx, 56, 250, 200, 260, 'stern');
+        drawMaraPortrait(ctx, view.w - 256, 250, 200, 260, 'alert');
+      }
+      const tw = Math.min(640, view.w - 48);
+      const th = 120 + TITLE_LINES.length * 32 + 70;
+      const tx = (view.w - tw) / 2;
+      const ty = (view.h - th) / 2;
+      drawMenuFrame(ctx, tx, ty, tw, th, COLORS.neonCyan);
+      drawNeonLogo(ctx, view.w / 2, ty + 66, 1.4);
+      drawNeonLine(ctx, tx + 24, ty + 104, tw - 48, COLORS.neonCyan);
+      TITLE_LINES.forEach((line, i) => text(line, view.w / 2, ty + 126 + i * 32, 19, '#c8cdd6', 'center'));
+      drawButton(ctx, view.w / 2 - 170, ty + th - 62, 340, 38, 'PRESS ENTER TO START', 1);
       text(`Best cash $${best}`, view.w / 2, view.h - 40, 16, '#c8cdd6', 'center');
       return;
     }
     drawWorld(state);
+    cine.drawBars(ctx, view.w, view.h);
     drawHud(state, best, ui);
     if (screen === SCREEN_PAUSED) {
       drawPanel('Paused', ['The city waits for no one — except right now.', 'O — settings'], 'Press P or Esc to resume', COLORS.neonCyan);
@@ -1405,10 +1345,14 @@ export function createRenderer(canvas) {
       ];
       if (ui && ui.hasCheckpoint) lines.push('C — resume from the last checkpoint');
       drawPanel(title, lines, 'Press Enter to play again', '#ef4444');
+      if (view.w >= 1160) {
+        drawJaxPortrait(ctx, 56, 270, 200, 260, 'worried');
+        drawMaraPortrait(ctx, view.w - 256, 270, 200, 260, 'worried');
+      }
     }
   }
 
   resize();
   window.addEventListener('resize', resize);
-  return { draw, view };
+  return { draw, view, updateCinematic };
 }

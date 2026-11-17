@@ -1,9 +1,7 @@
 // Neon Harbor — WebAudio — no files — radio — sfx.
 import { RADIO_STATIONS } from './config.js';
-
-function midiToFreq(midi) {
-  return 440 * Math.pow(2, (midi - 69) / 12);
-}
+import { createMusic } from './music.js';
+import { createSfx } from './sfx.js';
 
 export function createAudio() {
   let ctx = null;
@@ -12,10 +10,21 @@ export function createAudio() {
   let master = null;
   let sirenNodes = null;
   let engineNodes = null;
-  let radioTimer = null;
-  let radioStep = 0;
-  let radioNextTime = 0;
   let stationIndex = 0;
+  let music = null;
+  let sfx = null;
+
+  function ensureMusic() {
+    const c = ensure();
+    if (!c || !master) return null;
+    if (!music) music = createMusic(c, master);
+    return music;
+  }
+
+  function ensureSfx() {
+    if (!sfx) sfx = createSfx();
+    return sfx;
+  }
 
   function ensure() {
     if (ctx) return ctx;
@@ -35,6 +44,8 @@ export function createAudio() {
   function unlock() {
     const c = ensure();
     if (c && c.state === 'suspended') c.resume().catch(() => {});
+    const s = ensureSfx();
+    if (s) s.unlock();
   }
 
   function setVolume(v) {
@@ -91,68 +102,20 @@ export function createAudio() {
     }
   }
 
-  function scheduleRadioStep(step, time) {
-    const station = RADIO_STATIONS[stationIndex];
-    const scale = station.scale;
-    const tag = station.tag;
-    const bassNotes = [0, 0, 3, 5];
-    const bar = Math.floor(step / 16) % 4;
-    const bassEvery = tag === 'lofi' ? 8 : 4;
-    if (step % bassEvery === 0) {
-      const root = station.root + scale[bassNotes[bar] % scale.length];
-      tone(midiToFreq(root), tag === 'lofi' ? 0.5 : 0.22, 'sawtooth', tag === 'lofi' ? 0.07 : 0.10, null, time);
-      tone(midiToFreq(root + 12), 0.22, 'square', 0.04, null, time);
-    }
-    const arpOn = tag === 'chill' ? step % 4 === 0
-      : tag === 'lofi' ? step % 4 === 2
-      : tag === 'drive' ? true
-      : step % 2 === 0;
-    if (arpOn) {
-      const arpDegree = (step * 3 + bar) % scale.length;
-      const arp = station.root + 24 + scale[arpDegree];
-      tone(midiToFreq(arp), 0.12, 'triangle', tag === 'lofi' ? 0.035 : 0.05, null, time);
-    }
-    const hatOn = tag === 'drive' ? true : tag === 'lofi' ? step % 4 === 3 : step % 2 === 1;
-    if (hatOn) noise(0.03, tag === 'lofi' ? 0.03 : 0.05, 6000, time);
-    if (step % 16 === 0) {
-      const chord = [0, 2, 4].map((d) => station.root + 12 + scale[d % scale.length]);
-      for (const n of chord) tone(midiToFreq(n), 1.4, 'sine', 0.03, null, time);
-    }
-  }
-
-  function radioTick() {
-    const c = ensure();
-    if (!c || muted) return;
-    const station = RADIO_STATIONS[stationIndex];
-    const stepDur = 60 / station.bpm / 4;
-    while (radioNextTime < c.currentTime + 0.25) {
-      scheduleRadioStep(radioStep % 64, radioNextTime);
-      radioNextTime += stepDur;
-      radioStep += 1;
-    }
-  }
-
   function startRadio(index) {
     if (typeof index === 'number') stationIndex = ((index % RADIO_STATIONS.length) + RADIO_STATIONS.length) % RADIO_STATIONS.length;
-    const c = ensure();
-    if (!c) return;
-    unlock();
-    if (radioTimer) return;
-    radioNextTime = c.currentTime + 0.05;
-    radioTimer = setInterval(radioTick, 90);
+    const m = ensureMusic();
+    if (m) m.startLoop(stationIndex);
   }
 
   function stopRadio() {
-    if (radioTimer) {
-      clearInterval(radioTimer);
-      radioTimer = null;
-    }
+    if (music) music.stopLoop();
   }
 
   function setStation(index) {
     stationIndex = ((index % RADIO_STATIONS.length) + RADIO_STATIONS.length) % RADIO_STATIONS.length;
-    radioStep = 0;
-    return RADIO_STATIONS[stationIndex].name;
+    const m = ensureMusic();
+    return m ? m.setLoop(stationIndex) : RADIO_STATIONS[stationIndex].name;
   }
 
   function nextStation() {
@@ -167,6 +130,8 @@ export function createAudio() {
       muted = !muted;
       if (master && ctx) master.gain.value = muted ? 0 : volume;
       if (muted) this.stopSiren();
+      const s = ensureSfx();
+      if (s && s.isMuted() !== muted) s.toggleMute();
       return muted;
     },
     isMuted() {
@@ -190,9 +155,8 @@ export function createAudio() {
       setTimeout(() => tone(990, 0.12, 'sine', 0.14), 80);
     },
     cash() {
-      tone(880, 0.08, 'triangle', 0.14);
-      setTimeout(() => tone(1174, 0.08, 'triangle', 0.14), 70);
-      setTimeout(() => tone(1568, 0.16, 'triangle', 0.14), 140);
+      const m = ensureMusic();
+      if (m) m.jingle('cash');
     },
     repair() {
       tone(1244, 0.07, 'square', 0.08);
@@ -204,10 +168,33 @@ export function createAudio() {
       tone(90, 0.18, 'sawtooth', 0.12, 40);
     },
     missionJingle() {
-      [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.16, 'triangle', 0.15), i * 110));
+      const m = ensureMusic();
+      if (m) m.jingle('mission');
+    },
+    wanted() {
+      const m = ensureMusic();
+      if (m) m.jingle('wanted');
     },
     busted() {
-      tone(220, 0.5, 'sawtooth', 0.12, 110);
+      const m = ensureMusic();
+      if (m) m.jingle('busted');
+    },
+    wasted() {
+      const m = ensureMusic();
+      if (m) m.jingle('wasted');
+    },
+    blackout() {
+      const m = ensureMusic();
+      if (m) m.jingle('blackout');
+    },
+    bigExplosion() {
+      ensureSfx().bigExplosion();
+    },
+    waterSpray() {
+      ensureSfx().waterSpray();
+    },
+    carHorn() {
+      ensureSfx().carHorn();
     },
     crash() {
       noise(0.25, 0.25, 900);
