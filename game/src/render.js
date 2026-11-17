@@ -1,4 +1,4 @@
-// Neon Harbor — drawing only: the city, cars, people, effects, the HUD
+// Neon Harbor — hydrant jets, wet asphalt and gas fireballs; drawing only: the city, cars, people, effects, the HUD
 // (cash, health, wanted stars, ammo, speed, objective, minimap) and the
 // title, pause, settings and game-over screens. The camera follows the
 // player and pulls back as the car goes faster. Nothing is drawn outside
@@ -396,6 +396,23 @@ export function createRenderer(canvas) {
     ctx.fillText(value, x, y);
   }
 
+  function drawDestructionLight(pt, x, y, scale) {
+    const alpha = Math.max(0, pt.life / pt.maxLife);
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+    if (pt.kind === 'jet') {
+      ctx.strokeStyle = '#c7f5ff'; ctx.lineWidth = 3 * scale;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - pt.vx * 0.035 * scale, y + 18 * scale); ctx.stroke();
+    } else {
+      const r = pt.size * Math.sin(Math.PI * Math.sqrt(alpha)) * scale;
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = pt.color;
+      ctx.beginPath(); ctx.arc(x, y, Math.max(1, r), 0, Math.PI * 2); ctx.fill();
+      ctx.drawImage(glowSprite, x - r * 1.5, y - r * 1.5, r * 3, r * 3);
+    }
+    ctx.restore();
+  }
+
   function drawWorld(state) {
     const zoom = state.zoom || 1;
     const vw = view.w / zoom;
@@ -441,6 +458,47 @@ export function createRenderer(canvas) {
       const drift = Math.sin(state.elapsed * 1.6 + y * 0.02) * 26;
       ctx.fillRect(WATER_X + 12 + drift, y + 30, 60, 4);
       ctx.fillRect(WATER_X + 40 - drift, y + 70, 44, 4);
+    }
+
+    // Wet asphalt sits beneath vehicles, with a glossy blue-white rim.
+    for (const w of state.wet) {
+      ctx.globalAlpha = Math.min(1, w.life / 3);
+      ctx.fillStyle = 'rgba(20,30,50,0.35)';
+      ctx.strokeStyle = 'rgba(180,225,245,0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(w.x, w.y, w.r, w.r * 0.65, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    const gas = state.gasStation;
+    ctx.fillStyle = '#7d8183'; ctx.fillRect(gas.x, gas.y, gas.w, gas.h);
+    ctx.strokeStyle = '#f2db96'; ctx.lineWidth = 3;
+    ctx.strokeRect(gas.x + 8, gas.y + 8, gas.w - 16, gas.h - 16);
+    // Canopy is behind the pump row so the boxes stay legible from above.
+    ctx.fillStyle = '#292f3c'; ctx.fillRect(gas.x + 14, gas.y + 25, gas.w - 28, 55);
+    ctx.fillStyle = '#ee594d'; ctx.fillRect(gas.x + 14, gas.y + 25, gas.w - 28, 7);
+    ctx.fillStyle = '#c6cbd0';
+    for (const dx of [20, gas.w - 28]) for (const dy of [40, 100]) ctx.fillRect(gas.x + dx, gas.y + dy, 7, 30);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('HARBOR GAS', gas.x + gas.w / 2, gas.y + 60);
+    for (const pump of gas.pumps) {
+      if (!pump.alive) {
+        ctx.fillStyle = '#25232a'; ctx.fillRect(pump.x - 10, pump.y - 4, 20, 10);
+        ctx.fillStyle = '#474047'; ctx.fillRect(pump.x - 7, pump.y - 11, 14, 9);
+        continue;
+      }
+      ctx.fillStyle = '#cc3e45'; ctx.fillRect(pump.x - 10, pump.y - 24, 20, 28);
+      ctx.fillStyle = '#e8e8df'; ctx.fillRect(pump.x - 10, pump.y - 24, 20, 15);
+      ctx.fillStyle = '#182c36'; ctx.fillRect(pump.x - 6, pump.y - 20, 12, 7);
+      ctx.strokeStyle = '#20232b'; ctx.lineWidth = 3; ctx.beginPath();
+      ctx.moveTo(pump.x + 11, pump.y - 16); ctx.lineTo(pump.x + 16, pump.y - 9); ctx.lineTo(pump.x + 13, pump.y + 1); ctx.stroke();
+    }
+    ctx.fillStyle = '#a9afb4'; ctx.fillRect(gas.x + 12, gas.y + gas.h - 70, 5, 62);
+    ctx.fillStyle = '#263948'; ctx.fillRect(gas.x - 2, gas.y + gas.h - 80, 34, 44);
+    ctx.fillStyle = '#a6ffb6'; ctx.font = 'bold 24px sans-serif'; ctx.fillText('$', gas.x + 15, gas.y + gas.h - 49);
+    for (const h of state.hydrants) {
+      ctx.fillStyle = h.burst ? '#643b3c' : '#d94743'; ctx.fillRect(h.x - 4, h.y - 10, 8, 12);
+      ctx.fillRect(h.x - 8, h.y - 6, 16, 4);
+      ctx.fillStyle = '#892b34'; ctx.fillRect(h.x - 5, h.y - 12, 10, 4);
     }
 
     // Landmark overlays, drawn live over the static layer.
@@ -866,9 +924,11 @@ export function createRenderer(canvas) {
     // Particles: sparks as streaks, smoke as fading puffs, camera
     // flashes as white starbursts that pop and fade fast.
     for (const pt of state.particles) {
-      if (!inView(pt.x, pt.y, 20)) continue;
+      if (!inView(pt.x, pt.y, pt.size * 2 + 20)) continue;
       const alpha = Math.max(0, pt.life / pt.maxLife);
-      if (pt.kind === 'flash') {
+      if (pt.kind === 'flame' || pt.kind === 'jet') {
+        drawDestructionLight(pt, pt.x, pt.y, 1);
+      } else if (pt.kind === 'flash') {
         ctx.globalAlpha = alpha;
         ctx.drawImage(glowSprite, pt.x - 20, pt.y - 20, 40, 40);
         ctx.strokeStyle = '#ffffff';
@@ -1027,6 +1087,9 @@ export function createRenderer(canvas) {
       ctx.fillRect(0, 0, view.w, view.h);
       const sx = (x) => (x - camX) * zoom + view.w / 2;
       const sy = (y) => (y - camY) * zoom + view.h / 2;
+      for (const pt of state.particles) {
+        if (pt.kind === 'jet' || pt.kind === 'flame') drawDestructionLight(pt, sx(pt.x), sy(pt.y), zoom);
+      }
       const heli2 = state.police.heli;
       if (heli2 && heli2.active) {
         const px = sx(state.player.x);

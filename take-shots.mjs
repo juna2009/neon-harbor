@@ -1,4 +1,4 @@
-// Screenshot driver for the Neon Harbor entry. Serves game/ on localhost
+// Round 7 explosion review plus screenshot driver for the Neon Harbor entry. Serves game/ on localhost
 // and captures the four gate screenshots with Playwright against the
 // cached Chromium. Not part of the entry (lives in the repo root, not game/).
 import { createRequire } from 'node:module';
@@ -29,6 +29,7 @@ const errors = [];
 // the same vault moment the blackout frame shows, only less dramatic;
 // onfoot's shootout is covered by the blackout frame's muzzle flash.
 const shots = [
+  ['neon-harbor-explosion7.jpg', '?shot=explosion&seed=7', '/tmp'],
   ['1-chase.jpg', '?shot=chase&seed=7', `${SHOTS}`],
   ['2-boat.jpg', '?shot=boat&seed=7', `${SHOTS}`],
   ['3-blackout.jpg', '?shot=blackout&seed=7', `${SHOTS}`],

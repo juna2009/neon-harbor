@@ -1,4 +1,4 @@
-// Neon Harbor — the procedural city. A seeded grid of roads, building
+// Neon Harbor — hydrants, an open gas forecourt and the procedural city. A seeded grid of roads, building
 // blocks, parks and a harbor edge on the east side. The layout is fixed by
 // the seed, so every player with the same seed walks the same streets.
 // Three districts give the city its geography: Old Town in the west,
@@ -184,7 +184,25 @@ export function buildCity(rng) {
   });
   const lighthouse = buildings[buildings.length - 1];
 
+  // Reserve a separate Old Town block for the gas forecourt, clear of roads.
+  const gasStation = { x: 850, y: 1490, w: 210, h: 210, label: 'Gas',
+    pumps: [900, 960, 1020].map((x) => ({ x, y: 1610, alive: true })) };
+  const overlapsLot = (b) => b.x < 1080 && b.x + (b.w || b.r || 0) > 836
+    && b.y < 1710 && b.y + (b.h || b.r || 0) > 1480;
+  for (const list of [buildings, parks, trees]) {
+    for (let i = list.length - 1; i >= 0; i -= 1) if (overlapsLot(list[i])) list.splice(i, 1);
+  }
+  // Kerb corners are outside both road surfaces, before building setbacks.
+  const candidates = intersections.filter((pt) => pt.x < WATER_X - 80 && !(pt.x === 800 && pt.y === 1440));
+  const hydrants = [{ x: 842, y: 1398, burst: false }];
+  while (hydrants.length < 8 && candidates.length) {
+    const pt = candidates.splice(rng.int(0, candidates.length - 1), 1)[0];
+    const x = pt.x + 42, y = pt.y + 42;
+    if (!buildingAt({ buildings }, x, y, 5)) hydrants.push({ x, y, burst: false });
+  }
+
   return {
+    hydrants, gasStation,
     roadsV,
     roadsH,
     intersections,

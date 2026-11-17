@@ -1,5 +1,5 @@
 // Neon Harbor — the screenshot scenes behind ?shot=chase|onfoot|
-// mission|police|boat|blackout|shop. Each one stages a real world from
+// mission|police|boat|blackout|shop|explosion. Each one stages a real world from
 // the seed, places the player and the police where the scene needs them,
 // then plays the real rules forward with a scripted driver, so the frame
 // is what a short game really looks like and the same seed always gives
@@ -205,7 +205,24 @@ export function stageShot(name, world) {
   // Late-game cash for the chase / mission / police shots: $2,150
   // (missions 1–4 $1,900 + race $300 + tokens $100 − respray $150).
   state.cash = 2150;
-  if (name === 'chase') {
+  if (name === 'explosion') {
+    setLight(world, 0.9);
+    state.zoom = 1.25; state.zoomLock = true;
+    placePlayerOnFoot(world, 820, 1520);
+    state.mission.done = true;
+    state.peds.length = 0;
+    for (const car of state.traffic.cars) car.alive = false;
+    // Real impact bursts the opposite kerb's hydrant, then a real bullet ignites a pump.
+    const h = state.hydrants[0];
+    const car = state.traffic.cars[0];
+    Object.assign(car, { x: h.x - 2, y: h.y, speed: 100, alive: true, kind: 'traffic' });
+    walkFor(world, input, 0.02, 0, 0);
+    car.alive = false;
+    const pump = state.gasStation.pumps[0];
+    state.bullets.push({ x: pump.x - 20, y: pump.y, vx: 760, vy: 0, life: 1, damage: 1, hostile: false });
+    walkFor(world, input, 0.55, 0, 0);
+    stageHeat(world);
+  } else if (name === 'chase') {
     // Cover: the finale ledger run — a high-speed chase at night, neon,
     // headlights, 3 stars, the police behind. The player starts at speed
     // with the patrol cars well behind, so the frame reads as a chase,

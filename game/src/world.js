@@ -1,4 +1,4 @@
-// Neon Harbor — the world: one state object, one fixed step. Movement on
+// Neon Harbor — hydrant jets, wet-road slides and gas-pump chains; the world: one state object, one fixed step. Movement on
 // foot and in a car, entering and stealing cars, collisions, shooting,
 // reloading, the wanted clock, mission updates, particles, skid marks,
 // explosions, the day/night cycle and the speed-based camera zoom all
@@ -30,6 +30,9 @@ export function createWorld(rng, savedMission) {
     rng,
     city,
     traffic,
+    hydrants: city.hydrants.map((h) => ({ ...h, jetTimer: 0 })),
+    gasStation: { ...city.gasStation, pumps: city.gasStation.pumps.map((p) => ({ ...p })), chainTimer: 0, triggered: false },
+    wet: [],
     peds,
     police: createPolice(),
     bullets: createBullets(),
@@ -127,6 +130,10 @@ export function createWorld(rng, savedMission) {
     state.raceWins = 0;
     state.blackout = { active: false, timer: 0 };
     state.boats = createBoats(city, rng);
+    state.hydrants = city.hydrants.map((h) => ({ ...h, jetTimer: 0 }));
+    state.gasStation = { ...city.gasStation, pumps: city.gasStation.pumps.map((p) => ({ ...p })), chainTimer: 0, triggered: false };
+    state.wet.length = 0;
+    state.events = {};
     state.bullets.length = 0;
     state.particles.length = 0;
     state.skids.length = 0;
@@ -305,7 +312,7 @@ export function createWorld(rng, savedMission) {
   }
 
   /** A burst of sparks, flame and smoke at (x, y); also shakes the camera. */
-  function spawnExplosion(x, y) {
+  function spawnExplosion(x, y, opts = {}) {
     for (let i = 0; i < 26; i += 1) {
       const a = state.rng.range(0, Math.PI * 2);
       const speed = state.rng.range(40, 260);
@@ -320,8 +327,71 @@ export function createWorld(rng, savedMission) {
         kind: i % 3 === 0 ? 'smoke' : 'spark',
       });
     }
-    state.shake = Math.max(state.shake, 9);
+    if (opts.big) {
+      for (let i = 0; i < 22; i += 1) {
+        const life = state.rng.range(0.9, 1.5);
+        state.particles.push({ x: x + state.rng.range(-24, 24), y: y + state.rng.range(-35, 8),
+          vx: state.rng.range(-36, 36), vy: state.rng.range(-100, -35), life, maxLife: life,
+          size: state.rng.range(28, 55), color: state.rng.pick(['#ff681f', '#ffad32', '#ffe391']), kind: 'flame' });
+      }
+      for (let i = 0; i < 20; i += 1) {
+        const life = state.rng.range(7, 10);
+        state.particles.push({ x: x + state.rng.range(-16, 16), y: y - i * 13,
+          vx: state.rng.range(-7, 7), vy: -state.rng.range(12, 25), life, maxLife: life,
+          size: state.rng.range(23, 42), color: '#55535a', kind: 'smoke' });
+      }
+    }
+    state.shake = Math.max(state.shake, opts.big ? 14 : 9);
     state.events.crash = true;
+  }
+
+  function explodePump(pump) {
+    if (!pump || !pump.alive) return;
+    const station = state.gasStation;
+    pump.alive = false;
+    if (!station.triggered) {
+      station.triggered = true;
+      addWanted(state, 2);
+    }
+    station.chainTimer = station.pumps.some((p) => p.alive) ? 0.4 : 0;
+    spawnExplosion(pump.x, pump.y, { big: true });
+    if (Math.hypot(state.player.x - pump.x, state.player.y - pump.y) < 120) state.player.health -= 25;
+  }
+
+  function hitScenery(car) {
+    if (!car.alive) return;
+    for (const h of state.hydrants) {
+      if (!h.burst && Math.abs(car.speed) > 60 && Math.hypot(car.x - h.x, car.y - h.y) < 28) {
+        h.burst = true;
+        h.jetTimer = 10;
+        state.wet.push({ x: h.x, y: h.y, r: 70, life: 25 });
+        state.shake = Math.max(state.shake, 3);
+      }
+    }
+    for (const pump of state.gasStation.pumps) {
+      if (pump.alive && Math.abs(car.speed) > 80 && Math.hypot(car.x - pump.x, car.y - pump.y) < 34) explodePump(pump);
+    }
+  }
+
+  function stepScenery(dt) {
+    const station = state.gasStation;
+    if (station.chainTimer > 0) {
+      station.chainTimer -= dt;
+      if (station.chainTimer <= 0) explodePump(station.pumps.find((p) => p.alive));
+    }
+    for (let i = state.wet.length - 1; i >= 0; i -= 1) {
+      state.wet[i].life -= dt;
+      if (state.wet[i].life <= 0) state.wet.splice(i, 1);
+    }
+    for (const h of state.hydrants) {
+      if (h.jetTimer <= 0) continue;
+      h.jetTimer -= dt;
+      for (let i = 0; i < 3; i += 1) state.particles.push({
+        x: h.x + state.rng.range(-3, 3), y: h.y - 10, vx: state.rng.range(-15, 15),
+        vy: -state.rng.range(155, 220), life: 0.8, maxLife: 0.8,
+        size: 3, color: '#caf6ff', kind: 'jet',
+      });
+    }
   }
 
   function addSkid(x, y, angle) {
@@ -400,7 +470,8 @@ export function createWorld(rng, savedMission) {
     // Harbor Slicks (+25% steering response).
     const speedFactor = state.upgrades.turbo ? 1.15 : 1;
     const accelFactor = state.upgrades.turbo ? 1.1 : 1;
-    const steerFactor = state.upgrades.slicks ? 1.25 : 1;
+    const wet = state.wet.some((w) => Math.hypot(car.x - w.x, car.y - w.y) < w.r);
+    const steerFactor = (state.upgrades.slicks ? 1.25 : 1) * (wet ? 0.55 : 1);
     if (throttle > 0) car.speed += CAR.accel * tireFactor * accelFactor * dt;
     else if (throttle < 0) {
       car.speed -= (speedAlong > 10 ? CAR.brake : CAR.accel * 0.6) * dt;
@@ -411,8 +482,10 @@ export function createWorld(rng, savedMission) {
     if (Math.abs(car.speed) > 5) {
       car.angle += steer * CAR.turnRate * steerFactor * (car.tiresPopped ? 0.55 : 1) * dt * Math.sign(car.speed) * Math.min(1, Math.abs(car.speed) / 120);
     }
-    const nx = car.x + Math.cos(car.angle) * car.speed * dt;
-    const ny = car.y + Math.sin(car.angle) * car.speed * dt;
+    // Retain lateral momentum on water even after the wheel turns back.
+    car.slide = wet ? (car.slide || 0) * 0.98 + steer * car.speed * dt * 0.7 : (car.slide || 0) * 0.9;
+    const nx = car.x + (Math.cos(car.angle) * car.speed - Math.sin(car.angle) * car.slide) * dt;
+    const ny = car.y + (Math.sin(car.angle) * car.speed + Math.cos(car.angle) * car.slide) * dt;
     if (collides(city, nx, car.y, 22)) {
       car.speed *= -0.25;
       state.events.crash = true;
@@ -428,6 +501,7 @@ export function createWorld(rng, savedMission) {
     car.x = Math.max(24, Math.min(WORLD_W - 24, car.x));
     car.y = Math.max(24, Math.min(WORLD_H - 24, car.y));
     // Traffic no longer passes through the player car.
+    hitScenery(car);
     collideCars(car, dt);
     // Hard cornering and braking leave skid marks and tire smoke.
     if (Math.abs(car.speed) > 200 && Math.abs(steer) > 0.6) {
@@ -490,8 +564,7 @@ export function createWorld(rng, savedMission) {
       const pt = state.particles[i];
       pt.x += pt.vx * dt;
       pt.y += pt.vy * dt;
-      pt.vx *= 0.94;
-      pt.vy *= 0.94;
+      if (pt.kind !== 'jet' && pt.kind !== 'flame' && !(pt.kind === 'smoke' && pt.maxLife > 5)) { pt.vx *= 0.94; pt.vy *= 0.94; }
       pt.life -= dt;
       if (pt.life <= 0) state.particles.splice(i, 1);
     }
@@ -702,18 +775,25 @@ export function createWorld(rng, savedMission) {
         p.fireTimer = WEAPONS[p.weapon].fireInterval;
         const mx = p.x + Math.cos(p.angle) * 22;
         const my = p.y + Math.sin(p.angle) * 22;
-        fireWeapon(state.bullets, p.weapon, mx, my, p.angle, false);
+        fireWeapon(state.bullets, p.weapon, mx, my, p.angle, false, state.rng);
         events.shot = true;
         events.muzzle = { x: mx, y: my, angle: p.angle };
         syncAmmo();
-        if (nearPolice(p.x, p.y, 420) || state.wanted > 0) addWanted(state, 0.2);
+        const aimingAtPump = state.gasStation.pumps.some((pump) => pump.alive
+          && Math.abs(Math.atan2(Math.sin(Math.atan2(pump.y - my, pump.x - mx) - p.angle), Math.cos(Math.atan2(pump.y - my, pump.x - mx) - p.angle))) < 0.12);
+        if (!aimingAtPump && (nearPolice(p.x, p.y, 420) || state.wanted > 0)) addWanted(state, 0.2);
       }
     }
 
+    stepScenery(dt);
     stepBullets(state, dt);
+    if (events.pumpHit) {
+      explodePump(state.gasStation.pumps.find((p) => p.x === events.pumpHit.x && p.y === events.pumpHit.y));
+      events.pumpHit = null;
+    }
     // Gunmen actually shoot now (round 1 set the event but never fired).
     if (events.enemyShot) {
-      fireWeapon(state.bullets, 'pistol', events.enemyShot.x, events.enemyShot.y, events.enemyShot.angle, true);
+      fireWeapon(state.bullets, 'pistol', events.enemyShot.x, events.enemyShot.y, events.enemyShot.angle, true, state.rng);
       events.enemyShotFired = true;
     }
     if (events.explosion) {
@@ -742,6 +822,7 @@ export function createWorld(rng, savedMission) {
       if (unit.kind === 'car') obstacles.push(unit.car);
     }
     stepTraffic(traffic, dt, city, obstacles);
+    for (const car of traffic.cars) if (car.kind !== 'player') hitScenery(car);
     const danger = events.shot
       ? { x: p.x, y: p.y }
       : (p.inCar && p.car && Math.abs(p.car.speed) > 250 ? { x: p.x, y: p.y } : null);

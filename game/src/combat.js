@@ -1,4 +1,4 @@
-// Neon Harbor — combat. Three weapons (pistol, SMG, shotgun) with their
+// Neon Harbor — combat, including player bullets igniting gas pumps. Three weapons (pistol, SMG, shotgun) with their
 // own fire rate, spread and pellet count; bullets fly from the player's
 // aim or from hostile gunmen, hit buildings, pedestrians, police and cars,
 // and raise the wanted level when the player hurts a bystander in public.
@@ -28,10 +28,10 @@ export function fireBullet(bullets, x, y, angle, hostile, weapon) {
  * Fire a whole shot from `weaponKey` (pellets + spread) at (x, y) along
  * `angle`. Returns true when a shot was actually fired.
  */
-export function fireWeapon(bullets, weaponKey, x, y, angle, hostile) {
+export function fireWeapon(bullets, weaponKey, x, y, angle, hostile, rng) {
   const def = WEAPONS[weaponKey] || WEAPONS.pistol;
   for (let i = 0; i < def.pellets; i += 1) {
-    const spread = (Math.random() - 0.5) * def.spread * 2;
+    const spread = (rng.next() - 0.5) * def.spread * 2;
     fireBullet(bullets, x, y, angle + spread, hostile, def);
   }
   return true;
@@ -78,6 +78,15 @@ export function stepBullets(world, dt) {
             world.events.explosion = { x: car.x, y: car.y };
             addWanted(world, 1);
           }
+          break;
+        }
+      }
+    }
+    if (!dead && !b.hostile) {
+      for (const pump of world.gasStation.pumps) {
+        if (pump.alive && hitCircle(b.x, b.y, pump.x, pump.y, 16)) {
+          world.events.pumpHit = { x: pump.x, y: pump.y };
+          dead = true;
           break;
         }
       }

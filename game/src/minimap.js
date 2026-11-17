@@ -1,4 +1,4 @@
-// Neon Harbor — the live minimap: the whole city shrunk into the corner,
+// Neon Harbor — the gas forecourt and the live minimap: the whole city shrunk into the corner,
 // with the player, police, gunmen, roadblocks, race checkpoints,
 // collectibles and the mission marker on it. Every blip has its own
 // colour so the map reads at a glance: yellow player, blue police,
@@ -57,6 +57,11 @@ export function drawMinimap(ctx, state, x, y, w, h) {
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }
+  const gas = state.gasStation;
+  ctx.fillStyle = '#ffab62';
+  ctx.fillRect(x + (gas.x + gas.w / 2) * sx - 3, y + (gas.y + gas.h / 2) * sy - 3, 6, 6);
+  ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('Gas', x + (gas.x + gas.w / 2) * sx, y + (gas.y + gas.h / 2) * sy - 6);
   // Garage bay.
   if (state.city.garage) {
     ctx.fillStyle = '#37e0e6';
