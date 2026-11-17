@@ -6,9 +6,17 @@
 // instead of from the start. Side activities run alongside the story: a
 // street race around Downtown, harbor tokens hidden around the city,
 // weapon pickups (SMG at the plaza, shotgun at the docks), taxi fares for
-// quick cash, and a garage that repairs a battered car for $150.
-import { CHECKPOINT_KEY, COLLECTIBLE_COUNT, COLLECTIBLE_VALUE, GARAGE_COST, MISSION_REWARDS, RACE_REWARD, TAXI_FARE, TAXI_TIME_LIMIT } from './config.js';
-import { addWanted, clearPolice, spawnPoliceUnit } from './police.js';
+// quick cash, a garage that repairs a battered car for $150 — or resprays
+// it for $150 to drop one wanted star — and a bubblegum-pink taxi worth
+// $1,000 to the crew if Jax steals it.
+//
+// The story twist: Mara is the police commissioner's daughter. She tipped
+// off the police in mission 3 ("Lose the Heat" was her setup, not bad
+// luck) to protect Jax from a crew that was going to kill him. In the
+// finale she flips: she helps Jax rob the police evidence vault for the
+// ledger that proves her father is corrupt.
+import { CHECKPOINT_KEY, COLLECTIBLE_COUNT, COLLECTIBLE_VALUE, GARAGE_COST, MISSION_REWARDS, PINK_TAXI_REWARD, RACE_REWARD, RESPRAY_COST, RESPRAY_STARS, TAXI_FARE, TAXI_TIME_LIMIT } from './config.js';
+import { addWanted, clearPolice, dropWanted, spawnPoliceUnit } from './police.js';
 
 export const MISSION_DEFS = [
   {
@@ -33,12 +41,12 @@ export const MISSION_DEFS = [
   },
   {
     title: 'Lose the Heat',
-    brief: 'The delivery was flagged. The police are all over the harbor.',
-    objective: 'Lose the heat — get your wanted level back to 0',
+    brief: 'The delivery was flagged. The police are all over the harbor — and Mara made the call.',
+    objective: 'Lose the heat — Mara set you up. Get your wanted level back to 0',
     reward: MISSION_REWARDS[2],
     dialogue: [
-      'MARA: The marina cameras caught your plate. Lay low, Jax.',
-      'MARA: Stay out of trouble until the heat dies down.',
+      'MARA: Jax... I tipped them off. The marina cameras — I made that call.',
+      'MARA: The crew was going to kill you tonight. I bought you time. Lay low until the heat dies down.',
     ],
   },
   {
@@ -53,12 +61,12 @@ export const MISSION_DEFS = [
   },
   {
     title: 'The Last Run',
-    brief: "The crew's cut is stashed at the casino. Grab it, run it to the lighthouse, and Neon Harbor is yours.",
-    objective: 'Grab the cut at the casino, then run it to the lighthouse',
+    brief: "Mara flips: rob the police evidence vault for the ledger that proves her father — the commissioner — is corrupt. Run it to the lighthouse, and Neon Harbor is yours.",
+    objective: 'Grab the ledger at the evidence vault, then run it to the lighthouse',
     reward: MISSION_REWARDS[4],
     dialogue: [
-      'MARA: One last run, Jax. The crew’s cut is stashed at the casino.',
-      'MARA: Grab it and bring it to the lighthouse. Then we are free.',
+      'MARA: My father runs the Harbor Police — and the ledger in the evidence vault proves it.',
+      'MARA: I cut the power to the district. Grab the ledger, get to the lighthouse. Then we are free.',
     ],
   },
 ];
@@ -83,8 +91,17 @@ function plazaTarget(city) {
 function docksTarget(city) {
   return { x: city.docks.x + 60, y: city.docks.y + 140, label: 'Docks' };
 }
+function marinaTarget(city) {
+  return { x: city.marina.x + 84, y: city.marina.y + 80, label: 'Marina' };
+}
 function casinoTarget(city) {
   return { x: city.casino.x, y: city.casino.y, label: 'Casino' };
+}
+// The finale's target is the police evidence vault — the same Downtown
+// tower as the old casino stash, retargeted for the heist against Mara's
+// father. One objective change, same building, new story.
+function vaultTarget(city) {
+  return { x: city.casino.x, y: city.casino.y, label: 'Evidence Vault' };
 }
 function lighthouseTarget(city) {
   return { x: city.lighthouse.x, y: city.lighthouse.y, label: 'Lighthouse' };
@@ -96,7 +113,7 @@ export function targetForMission(city, index, stage) {
   if (index === 1) return stage === 0 ? plazaTarget(city) : marinaTarget(city);
   if (index === 2) return null;
   if (index === 3) return docksTarget(city);
-  if (index === 4) return stage === 0 ? casinoTarget(city) : lighthouseTarget(city);
+  if (index === 4) return stage === 0 ? vaultTarget(city) : lighthouseTarget(city);
   return null;
 }
 
@@ -208,7 +225,7 @@ export function startMission(world, index) {
     world.gunmen = 4;
     for (let i = 0; i < 4; i += 1) spawnPoliceUnit(world.police, world.player, world.rng, 'gunman', world.city);
   } else if (index === 4) {
-    mission.target = casinoTarget(city);
+    mission.target = vaultTarget(city);
   }
   saveCheckpoint(world, `${def.title} — start`);
 }
@@ -225,7 +242,7 @@ function completeMission(world) {
     mission.done = true;
     world.gunmen = 0;
     clearPolice(world.police);
-    mission.dialogue = ['MARA: We made it, Jax. Neon Harbor is ours now.', 'Free roam — the city is yours.'];
+    mission.dialogue = ['The harbor keeps its secrets. So do we.', 'MARA: The ledger is ours. We are free now.'];
     mission.dialogueTimer = 8;
     clearCheckpoint();
   } else {
@@ -288,13 +305,13 @@ export function updateMission(world, dt) {
     }
     if (mission.stage === 1 && near(world, docksTarget(city), 90)) completeMission(world);
   } else if (mission.index === 4) {
-    if (mission.stage === 0 && near(world, casinoTarget(city), 90)) {
+    if (mission.stage === 0 && near(world, vaultTarget(city), 90)) {
       mission.stage = 1;
       mission.target = lighthouseTarget(city);
-      mission.dialogue = ['Cut secured. Now the lighthouse, east end of the docks.'];
+      mission.dialogue = ['Ledger secured. Now the lighthouse, east end of the docks.'];
       mission.dialogueTimer = 4;
       world.events.pickup = true;
-      saveCheckpoint(world, 'The Last Run — cut grabbed');
+      saveCheckpoint(world, 'The Last Run — ledger grabbed');
     }
     if (mission.stage === 1 && near(world, lighthouseTarget(city), 90)) completeMission(world);
   }
@@ -425,6 +442,40 @@ export function repairAtGarage(world) {
   p.car.tiresPopped = false;
   world.events.repair = true;
   return 'ok';
+}
+
+/**
+ * Respray the player's car at the garage bay: $150 for a fresh paint
+ * job, and the heat drops by one star — new colour, new plate, cooler
+ * trail. Returns 'ok', 'broke', 'clean' (no heat to lose) or 'far'.
+ */
+export function resprayAtGarage(world) {
+  const p = world.player;
+  const g = world.city.garage;
+  if (!p.inCar || !p.car) return 'far';
+  if (Math.hypot(p.car.x - g.x, p.car.y - g.y) > 80) return 'far';
+  if (world.wanted < 1) return 'clean';
+  if (world.cash < RESPRAY_COST) return 'broke';
+  world.cash -= RESPRAY_COST;
+  const choices = world.city.carColors.filter((c) => c !== p.car.color);
+  const paint = choices.length ? world.rng.pick(choices) : '#37e0e6';
+  p.car.color = paint;
+  p.car.paint = paint;
+  dropWanted(world, RESPRAY_STARS);
+  world.events.repair = true;
+  return 'ok';
+}
+
+/** The pink-taxi bounty: stealing the bubblegum-pink cab pays $1,000. */
+export function claimPinkTaxi(world) {
+  const car = world.player.car;
+  if (!car || !car.pink || car.pinkClaimed) return false;
+  car.pinkClaimed = true;
+  world.cash += PINK_TAXI_REWARD;
+  world.events.cash = true;
+  world.mission.dialogue = [`PINK TAXI! The rarest cab in Neon Harbor — $${PINK_TAXI_REWARD} from the crew.`];
+  world.mission.dialogueTimer = 5;
+  return true;
 }
 
 /** Collect harbor tokens and weapon pickups the player walks or drives over. */
