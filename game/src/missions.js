@@ -444,6 +444,11 @@ export function updateMission(world, dt) {
   } else if (mission.index === 10) {
     if (world.wanted <= 0) completeMission(world);
   } else if (mission.index === 11) {
+    if (world.events.jump && !mission.bridgeJump) {
+      mission.bridgeJump = true;
+      mission.dialogue = ['MARA: That bridge jump! Now get the boat.'];
+      mission.dialogueTimer = 5;
+    }
     if (world.player.inBoat && near(world, marinaWaterTarget(city), 90)) completeMission(world);
   }
 }

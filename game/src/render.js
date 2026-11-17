@@ -237,6 +237,7 @@ export function createRenderer(canvas) {
     const d = districtAt(state.city, state.player.x, state.player.y);
     fx = cine.update(dt, {
       shot: !!state.events.shot, crash: !!state.events.crash,
+      jump: !!state.events.jump,
       explosion: flames > prevFlames, mission: !!state.events.missionComplete,
       dialogue: state.mission.dialogueTimer > 0,
       busted: state.overKind === 'busted', wasted: state.overKind === 'wasted',

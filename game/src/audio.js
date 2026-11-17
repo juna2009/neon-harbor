@@ -196,6 +196,8 @@ export function createAudio() {
     carHorn() {
       ensureSfx().carHorn();
     },
+    bridgeAlarm() { ensureSfx().bridgeAlarm(); },
+    bridgeJump() { ensureSfx().bridgeJump(); },
     crash() {
       noise(0.25, 0.25, 900);
     },

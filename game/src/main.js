@@ -304,6 +304,8 @@ function runGame() {
     if (state.events.pickup) audio.pickup();
     if (state.events.crash) audio.crash();
     if (state.events.thunder) audio.thunder();
+    if (state.events.bridgeAlarm) audio.bridgeAlarm();
+    if (state.events.bridgeJump) audio.bridgeJump();
     if (state.events.tirePop) audio.tirePop();
     if (state.events.repair) audio.repair();
     if (state.events.taxiFare) audio.cash();

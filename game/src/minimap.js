@@ -1,7 +1,7 @@
 // Neon Harbor — the live minimap.
 import { WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
-import { drawMapGas, drawMapHydrant, drawMapMission, drawMapPlayer, drawMapPolice, drawMapWrench } from './ui-art.js';
+import { drawMapBridge, drawMapGas, drawMapHydrant, drawMapMission, drawMapPlayer, drawMapPolice, drawMapWrench } from './ui-art.js';
 
 export function drawMinimap(ctx, state, x, y, w, h) {
   const sx = w / WORLD_W;
@@ -57,6 +57,7 @@ export function drawMinimap(ctx, state, x, y, w, h) {
     ctx.arc(x + state.city.lighthouse.x * sx, y + state.city.lighthouse.y * sy, 3, 0, Math.PI * 2);
     ctx.fill();
   }
+  if (state.bridge) drawMapBridge(ctx, x + 2400 * sx, y + 1680 * sy, 9, state.bridge.up);
   if (state.taxi && state.taxi.state === 'pickup' && state.taxi.fare) {
     ctx.fillStyle = '#7be382';
     ctx.beginPath();
