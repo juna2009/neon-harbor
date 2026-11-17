@@ -61,8 +61,10 @@ function spawnPointNear(player, rng, distance, city) {
 }
 export function spawnPoliceUnit(police, player, rng, kind, city) {
   if (kind === 'boat') {
-    const bx = WATER_X + 30 + rng.range(0, 60);
-    const by = Math.max(60, Math.min(WORLD_H - 60, player.y + rng.range(-500, 500)));
+    const a = rng.range(0, Math.PI * 2);
+    const d = rng.range(420, 560);
+    const bx = Math.max(WATER_X + 30, Math.min(WORLD_W - 30, player.x + Math.cos(a) * d));
+    const by = Math.max(60, Math.min(WORLD_H - 60, player.y + Math.sin(a) * d));
     police.units.push({
       kind: 'boat', x: bx, y: by, angle: 0, speed: 0, health: 3, ramTimer: 0, wake: [],
     });
@@ -182,7 +184,8 @@ export function stepPolice(police, state, dt, rng, events) {
   const districtHeat = state.heat ? state.heat[state.city.districts.indexOf(district)] || 0 : 0;
   const hotExtra = wanted >= 1 && districtHeat >= 60 ? 2 : 0;
   const want = wantedUnitCount(wanted) + state.gunmen + hotExtra;
-  if (!player.inBoat) police.units = police.units.filter((u) => u.kind !== 'boat');
+  if (!player.inBoat || wanted < 3) police.units = police.units.filter((u) => u.kind !== 'boat');
+  if (!police.units.some((u) => u.kind === 'boat')) police.boatWarned = false;
   police.spawnTimer -= dt;
   if (police.roadblockTimer > 0) police.roadblockTimer -= dt;
   if (police.barrierTimer > 0) police.barrierTimer -= dt;
@@ -238,10 +241,19 @@ export function stepPolice(police, state, dt, rng, events) {
   }
   if (police.units.length < want && police.spawnTimer <= 0) {
     police.spawnTimer = heli.active ? 0.8 : (districtHeat >= 60 ? 0.9 : 1.2);
-    const kind = player.inBoat ? 'boat'
+    const boats = police.units.filter((u) => u.kind === 'boat').length;
+    const kind = player.inBoat
+      ? (wanted >= 3 && boats < 2 ? 'boat' : null)
       : (wanted >= 6 && rng.chance(0.45) ? (player.inCar ? 'mtruck' : 'soldier')
         : (player.inCar && wanted >= 2 ? 'car' : 'foot'));
-    spawnPoliceUnit(police, player, rng, kind, state.city);
+    if (kind) {
+      spawnPoliceUnit(police, player, rng, kind, state.city);
+      if (kind === 'boat' && !police.boatWarned) {
+        police.boatWarned = true;
+        state.mission.dialogue = ['POLICE BOATS INBOUND! Outrun them on the water!'];
+        state.mission.dialogueTimer = 5;
+      }
+    }
   }
   let busted = false;
   for (let i = police.units.length - 1; i >= 0; i -= 1) {
@@ -279,7 +291,11 @@ export function stepPolice(police, state, dt, rng, events) {
         unit.ramTimer = 0.8;
         events.crash = true;
         state.player.health = Math.max(0, state.player.health - 3);
-        if (player.boat) player.boat.speed *= 0.8;
+        if (player.boat) {
+          player.boat.speed *= 0.8;
+          player.boat.hp -= 34;
+          if (player.boat.hp <= 0) events.boatSunk = { x: player.boat.x, y: player.boat.y };
+        }
         unit.speed *= 0.5;
       }
     } else if (unit.kind === 'car') {

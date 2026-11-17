@@ -765,6 +765,10 @@ export function createRenderer(canvas) {
       ctx.beginPath();
       ctx.arc(unit.x, unit.y - 12, 4, 0, Math.PI * 2);
       ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold 9px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('POLICE', unit.x, unit.y - 20);
     }
     const heli = state.police.heli;
     if (heli && heli.active && inView(heli.x, heli.y, 420)) {
@@ -1108,7 +1112,7 @@ export function createRenderer(canvas) {
         const hp = Math.max(0, Math.round(p.car.hp || 0));
         text(`Car ${hp}%`, view.w - 28, view.h - 100, 12, '#c8cdd6', 'right');
       } else {
-        text('Speedboat', view.w - 28, view.h - 100, 12, '#c8cdd6', 'right');
+        text(`Boat ${Math.max(0, Math.round(p.boat.hp || 0))}%`, view.w - 28, view.h - 100, 12, '#c8cdd6', 'right');
       }
       if (p.car && p.car.tiresPopped) {
         text('TIRES POPPED — garage $150 (G)', view.w - 16, view.h - 128, 14, '#ff5a3c', 'right', 'bold');

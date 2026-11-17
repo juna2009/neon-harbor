@@ -117,6 +117,7 @@ export function createWorld(rng, savedMission) {
     state.floaters.length = 0;
     state.police.units.length = 0;
     state.police.arrestTimer = 0;
+    state.police.boatWarned = false;
     state.police.roadblockTimer = 0;
     state.police.barrierTimer = 8;
     state.police.heli.active = false;
@@ -780,6 +781,19 @@ export function createWorld(rng, savedMission) {
       });
     }
     stepPolice(state.police, state, dt, rng, events);
+    if (events.boatSunk) {
+      const boat = p.boat;
+      spawnExplosion(events.boatSunk.x, events.boatSunk.y);
+      if (boat) boat.alive = false;
+      p.inBoat = false;
+      p.boat = null;
+      p.x = WATER_X - 40;
+      p.y = Math.max(40, Math.min(WORLD_H - 40, events.boatSunk.y));
+      p.health = Math.max(10, p.health - 15);
+      state.mission.dialogue = ['Your boat went down! Swim back to shore, Jax.'];
+      state.mission.dialogueTimer = 5;
+      events.boatSunk = null;
+    }
     if (!state.police.heli.active) decayWanted(state, dt);
     stepBridge(state.bridge, state, dt, { floater: addFloater, explosion: spawnExplosion });
     updateMission(state, dt);
