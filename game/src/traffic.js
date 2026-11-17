@@ -102,7 +102,11 @@ function blockedAhead(car, others, gap) {
  * ahead, and wait when the crossing ahead is occupied.
  */
 export function stepTraffic(traffic, dt, city, obstacles) {
-  const others = traffic.cars.concat(obstacles || []);
+  // Traffic stops for the car ahead — but only when that car is slow.
+  // A car flying up behind at speed is dodged around, never a brick
+  // wall the player rear-ends at full speed.
+  const slowObstacles = (obstacles || []).filter((o) => Math.abs(o.speed || 0) < 150);
+  const others = traffic.cars.concat(slowObstacles);
   for (const car of traffic.cars) {
     if (!car.alive) continue;
     const next = nextIntersectionCoord(car, city);

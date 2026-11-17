@@ -146,7 +146,7 @@ export function createCollectibles(city, rng) {
   spots.push({ x: city.marina.x + 40, y: city.marina.y + 120 });
   spots.push({ x: city.marina.x + 130, y: city.marina.y + 40 });
   for (const pt of city.intersections) {
-    if (rng.chance(0.25)) spots.push({ x: pt.x + 52, y: pt.y + 52 });
+    if (rng.chance(0.25)) spots.push({ x: pt.x + 46, y: pt.y + 46 });
   }
   const picked = rng.shuffle(spots).slice(0, COLLECTIBLE_COUNT);
   return picked.map((s) => ({ x: s.x, y: s.y, taken: false }));
@@ -155,7 +155,7 @@ export function createCollectibles(city, rng) {
 /** Weapon pickups: SMG at the plaza, shotgun at the docks, ammo at the marina. */
 export function createWeaponPickups(city) {
   return [
-    { x: city.roadsV[2] + 52, y: city.roadsH[1] + 52, weapon: 'smg', taken: false },
+    { x: city.roadsV[2] + 46, y: city.roadsH[1] + 46, weapon: 'smg', taken: false },
     { x: city.docks.x + 30, y: city.docks.y + 200, weapon: 'shotgun', taken: false },
     { x: city.marina.x + 84, y: city.marina.y + 130, weapon: 'pistol', taken: false },
   ];

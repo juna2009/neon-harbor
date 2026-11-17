@@ -158,6 +158,7 @@ export function createWorld(rng, savedMission) {
 
   function nearPolice(x, y, radius) {
     for (const unit of state.police.units) {
+      if (unit.kind === 'gunman') continue; // Harbor Crew are not police.
       const ux = unit.kind === 'car' ? unit.car.x : unit.x;
       const uy = unit.kind === 'car' ? unit.car.y : unit.y;
       if (Math.hypot(ux - x, uy - y) < radius) return true;
@@ -227,17 +228,22 @@ export function createWorld(rng, savedMission) {
       car.x += nx * push;
       car.y += ny * push;
       if (other.kind !== 'parked' && !other.roadblock) {
-        other.x -= nx * push;
-        other.y -= ny * push;
-        other.speed *= 0.4;
+        // Shove the other car forward out of the way instead of making
+        // it a wall: it keeps its own heading, just faster.
+        other.x -= nx * push * 1.5;
+        other.y -= ny * push * 1.5;
+        if (other.kind === 'traffic') other.speed = Math.max(other.speed, impact * 0.6);
+        else other.speed *= 0.4;
       }
       if (impact > 60) {
-        car.speed *= -0.3;
+        // A shunt, not a brick wall: the car loses some speed and takes
+        // a dent only on a really hard hit, never a full stop.
+        car.speed *= 0.85;
         state.events.crash = true;
         state.shake = Math.max(state.shake, 4);
         addSkid(car.x, car.y, car.angle);
-        if (car.hp !== undefined) {
-          car.hp -= impact * 0.08;
+        if (car.hp !== undefined && impact > 350) {
+          car.hp -= impact * 0.03;
           if (car.hp <= 0) {
             spawnExplosion(car.x, car.y);
             car.alive = false;

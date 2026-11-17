@@ -1,34 +1,82 @@
 // Neon Harbor — keyboard and mouse state. Keys are tracked by code so the
 // layout never depends on the player's language; mouse aim is in canvas
-// pixels and converted to world coordinates by the caller.
+// pixels and converted to world coordinates by the caller. Bindings are
+// remappable from the settings menu and saved in localStorage, so a
+// player can put Interact, Reload, Mute, Weapon and Radio wherever their
+// fingers live.
 export const ACTION_CONFIRM = 'confirm';
 export const ACTION_PAUSE = 'pause';
 export const ACTION_INTERACT = 'interact';
 export const ACTION_RELOAD = 'reload';
 export const ACTION_MUTE = 'mute';
+export const ACTION_WEAPON = 'weapon';
+export const ACTION_RADIO = 'radio';
+export const ACTION_SETTINGS = 'settings';
 
-const KEY_ACTIONS = {
-  Enter: ACTION_CONFIRM,
-  Space: ACTION_CONFIRM,
-  Escape: ACTION_PAUSE,
-  KeyP: ACTION_PAUSE,
-  KeyE: ACTION_INTERACT,
-  KeyR: ACTION_RELOAD,
-  KeyM: ACTION_MUTE,
+export const DEFAULT_BINDINGS = {
+  confirm: ['Enter', 'Space'],
+  pause: ['Escape', 'KeyP'],
+  interact: ['KeyE'],
+  reload: ['KeyR'],
+  mute: ['KeyM'],
+  weapon: ['KeyQ'],
+  radio: ['KeyC'],
+  settings: ['KeyO'],
 };
+
+const ACTION_LABELS = {
+  confirm: 'Confirm',
+  pause: 'Pause',
+  interact: 'Interact',
+  reload: 'Reload',
+  mute: 'Mute',
+  weapon: 'Weapon',
+  radio: 'Radio',
+  settings: 'Settings',
+};
+
+export function actionLabel(action) {
+  return ACTION_LABELS[action] || action;
+}
+
+/** Human-readable key name for the settings screen (KeyE → E). */
+export function keyLabel(code) {
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  return code;
+}
 
 export function createInput(canvas) {
   const keys = new Set();
   const pressed = new Set();
   const mouse = { x: 0, y: 0, down: false, clicked: false };
+  let bindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
+  let capture = null; // { action, done } while the settings screen waits for a key.
+
+  function actionFor(code) {
+    for (const [action, codes] of Object.entries(bindings)) {
+      if (codes.includes(code)) return action;
+    }
+    return null;
+  }
 
   function onKeyDown(event) {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
       event.preventDefault();
     }
+    if (capture) {
+      // Rebind capture: the next key becomes the binding, Escape cancels.
+      if (event.code !== 'Escape') {
+        bindings[capture.action] = [event.code];
+      }
+      const done = capture.done;
+      capture = null;
+      if (done) done();
+      return;
+    }
     if (!event.repeat) {
       keys.add(event.code);
-      const action = KEY_ACTIONS[event.code];
+      const action = actionFor(event.code);
       if (action) pressed.add(action);
     }
   }
@@ -66,6 +114,21 @@ export function createInput(canvas) {
   return {
     keys,
     mouse,
+    getBindings() {
+      return JSON.parse(JSON.stringify(bindings));
+    },
+    setBindings(next) {
+      if (!next) return;
+      for (const [action, codes] of Object.entries(next)) {
+        if (Array.isArray(codes) && codes.length > 0) bindings[action] = codes.slice();
+      }
+    },
+    beginCapture(action, done) {
+      capture = { action, done };
+    },
+    isCapturing() {
+      return capture !== null;
+    },
     moveX() {
       return axis('ArrowLeft', 'ArrowRight') || axis('KeyA', 'KeyD');
     },

@@ -10,7 +10,7 @@ import { WATER_X, collides, moveCircle, nearestIntersection, pathBlocked } from 
 import { makeCar } from './traffic.js';
 
 export function createPolice() {
-  return { units: [], spawnTimer: 0, arrestTimer: 0, roadblockTimer: 0 };
+  return { units: [], spawnTimer: 0, arrestTimer: 0, roadblockTimer: 8 };
 }
 
 export function addWanted(state, stars) {
@@ -37,7 +37,15 @@ function wantedUnitCount(wanted) {
 }
 
 function spawnPointNear(player, rng, distance, city) {
-  const angle = rng.range(0, Math.PI * 2);
+  // Never spawn dead ahead of a fast-moving car: a patrol car appearing
+  // stationary in the player's path is an unavoidable wall. Spawn
+  // behind or beside a moving car, anywhere around a player on foot.
+  let angle;
+  if (player.inCar && player.car && Math.abs(player.car.speed) > 100) {
+    angle = player.car.angle + Math.PI + rng.range(-0.9, 0.9);
+  } else {
+    angle = rng.range(0, Math.PI * 2);
+  }
   let x = Math.max(60, Math.min(WATER_X - 60, player.x + Math.cos(angle) * distance));
   let y = Math.max(60, Math.min(WORLD_H - 60, player.y + Math.sin(angle) * distance));
   // Snap onto the nearest road so a unit never starts inside a building.
@@ -135,7 +143,9 @@ function spawnRoadblock(police, state) {
     if (d < bestD) { bestD = d; bestH = ry; }
   }
   const vertical = Math.abs(bestV - px) < Math.abs(bestH - py);
-  const ahead = 380;
+  // Far enough ahead that a speeding player sees the block and can
+  // brake or swerve — 380 px was an unavoidable wall at 540 px/s.
+  const ahead = 700;
   let bx;
   let by;
   let blockAngle;
@@ -239,7 +249,12 @@ export function stepPolice(police, state, dt, rng, events) {
       const dist = Math.hypot(dx, dy) || 1;
       unit.angle = Math.atan2(dy, dx);
       // Officers and gunmen run around buildings, never through them.
-      moveCircle(state.city, unit, Math.cos(unit.angle) * unit.speed * dt, Math.sin(unit.angle) * unit.speed * dt, 12);
+      // Gunmen hold a standoff range (~200 px) and shoot from there
+      // instead of walking onto the player's exact spot.
+      const holdGround = unit.kind === 'gunman' && dist < 200;
+      if (!holdGround) {
+        moveCircle(state.city, unit, Math.cos(unit.angle) * unit.speed * dt, Math.sin(unit.angle) * unit.speed * dt, 12);
+      }
       if (unit.kind === 'gunman') {
         // Burst fire: three quick shots, then a pause to re-aim.
         if (unit.burstLeft > 0) {
