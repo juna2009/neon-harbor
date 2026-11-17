@@ -6,7 +6,7 @@
 import { CAR, PLAYER, STEP, WANTED, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { buildCity, collides, moveCircle } from './city.js';
 import { createBullets, fireWeapon, stepBullets } from './combat.js';
-import { createCollectibles, createMissionState, createRace, createWeaponPickups, loadCheckpoint, saveCheckpoint, updateMission, updatePickups, updateRace } from './missions.js';
+import { createCollectibles, createMissionState, createRace, createTaxi, createWeaponPickups, loadCheckpoint, repairAtGarage, saveCheckpoint, targetForMission, updateMission, updatePickups, updateRace, updateTaxi } from './missions.js';
 import { addWanted, clearPolice, createPolice, decayWanted, spawnPoliceUnit, stepPolice } from './police.js';
 import { createPedestrians, createTraffic, stepPedestrians, stepTraffic } from './traffic.js';
 
@@ -28,6 +28,9 @@ export function createWorld(rng, savedMission) {
     collectibles: createCollectibles(city, rng),
     pickups: createWeaponPickups(city),
     race: createRace(city),
+    taxi: createTaxi(),
+    weather: { rain: false, timer: 55, duration: 0 },
+    rainDrops: [],
     particles: [],
     skids: [],
     floaters: [],
@@ -95,8 +98,14 @@ export function createWorld(rng, savedMission) {
     state.police.units.length = 0;
     state.police.arrestTimer = 0;
     state.police.roadblockTimer = 0;
+    state.police.heli.active = false;
+    state.police.strips.length = 0;
+    state.police.stripTimer = 10;
     state.mission = createMissionState(0);
     state.race = createRace(city);
+    state.taxi = createTaxi();
+    state.weather = { rain: false, timer: 55, duration: 0 };
+    state.rainDrops.length = 0;
     for (const c of state.collectibles) c.taken = false;
     for (const pk of state.pickups) pk.taken = false;
     for (const ped of peds) ped.alive = true;
@@ -112,6 +121,9 @@ export function createWorld(rng, savedMission) {
     state.mission = createMissionState(cp.mission);
     state.mission.stage = cp.stage;
     state.mission.started = true;
+    // Round-3 fix: the restored mission needs its target marker back —
+    // without it the player resumes with no idea where to go.
+    state.mission.target = targetForMission(city, cp.mission, cp.stage);
     state.mission.dialogue = [`Checkpoint — ${cp.label}. Pick up where you left off.`];
     state.mission.dialogueTimer = 5;
     state.player.x = cp.x;
@@ -119,7 +131,16 @@ export function createWorld(rng, savedMission) {
     state.camera.x = cp.x;
     state.camera.y = cp.y;
     state.cash = cp.cash;
-    state.wanted = 0;
+    // Round-3 fix: restore the wanted level the checkpoint was saved
+    // with — resetting it to 0 instantly completed "Lose the Heat".
+    state.wanted = typeof cp.wanted === 'number' ? cp.wanted : 0;
+    state.wantedTimer = 0;
+    // Restore exactly which harbor tokens were already collected.
+    if (Array.isArray(cp.taken)) {
+      for (const i of cp.taken) {
+        if (state.collectibles[i]) state.collectibles[i].taken = true;
+      }
+    }
     // Mission 4's ambush re-spawns at the checkpoint stage.
     if (cp.mission === 3 && cp.stage === 0) {
       state.gunmen = 4;
@@ -263,18 +284,24 @@ export function createWorld(rng, savedMission) {
   }
 
   function driveCar(car, input, dt) {
-    const throttle = input.moveY();
+    // Round-3 fix: W / Up is the gas. moveY() returns -1 for Up (north
+    // on foot), but driveCar's throttle is +1 for forward — without the
+    // flip, W braked and reversed while S drove forward.
+    const throttle = -input.moveY();
     const steer = input.moveX();
     const speedAlong = car.speed;
-    if (throttle > 0) car.speed += CAR.accel * dt;
+    // Popped tires (spike strips): half the top speed, weak acceleration
+    // and sloppy steering until the garage fixes it or the car is swapped.
+    const tireFactor = car.tiresPopped ? 0.45 : 1;
+    if (throttle > 0) car.speed += CAR.accel * tireFactor * dt;
     else if (throttle < 0) {
       car.speed -= (speedAlong > 10 ? CAR.brake : CAR.accel * 0.6) * dt;
     } else {
       car.speed -= car.speed * 1.4 * dt;
     }
-    car.speed = Math.max(-CAR.maxReverse, Math.min(CAR.maxSpeed, car.speed));
+    car.speed = Math.max(-CAR.maxReverse, Math.min(CAR.maxSpeed * tireFactor, car.speed));
     if (Math.abs(car.speed) > 5) {
-      car.angle += steer * CAR.turnRate * dt * Math.sign(car.speed) * Math.min(1, Math.abs(car.speed) / 120);
+      car.angle += steer * CAR.turnRate * (car.tiresPopped ? 0.55 : 1) * dt * Math.sign(car.speed) * Math.min(1, Math.abs(car.speed) / 120);
     }
     const nx = car.x + Math.cos(car.angle) * car.speed * dt;
     const ny = car.y + Math.sin(car.angle) * car.speed * dt;
@@ -312,6 +339,19 @@ export function createWorld(rng, savedMission) {
         ped.alive = false;
         addWanted(state, 1);
         state.events.pedDown = true;
+      }
+    }
+    // Spike strips: driving over one pops the tires.
+    if (car === state.player.car && !car.tiresPopped) {
+      for (const strip of state.police.strips) {
+        if (Math.hypot(strip.x - car.x, strip.y - car.y) < 34) {
+          car.tiresPopped = true;
+          state.events.tirePop = true;
+          state.shake = Math.max(state.shake, 6);
+          state.mission.dialogue = ['Tires popped! Get to the garage — $150 repair (G).'];
+          state.mission.dialogueTimer = 5;
+          break;
+        }
       }
     }
   }
@@ -388,7 +428,13 @@ export function createWorld(rng, savedMission) {
       if (p.inCar) exitCar();
       else {
         const car = nearestCar(70);
-        if (car) enterCar(car);
+        if (car) {
+          enterCar(car);
+          if (car.body === 'taxi') {
+            state.mission.dialogue = ['TAXI: This cab picks up fares — watch for waving passengers.'];
+            state.mission.dialogueTimer = 4;
+          }
+        }
       }
     }
     if (input.wasPressed && input.wasPressed('reload')) {
@@ -407,6 +453,54 @@ export function createWorld(rng, savedMission) {
       p.weapon = owned[(idx + 1) % owned.length] || 'pistol';
       syncAmmo();
       events.weaponSwitch = p.weapon;
+    }
+    if (input.wasPressed && input.wasPressed('repair')) {
+      const result = repairAtGarage(state);
+      if (result === 'ok') {
+        state.mission.dialogue = ['Garage: good as new. $150 — drive safe, Jax.'];
+        state.mission.dialogueTimer = 4;
+      } else if (result === 'broke') {
+        state.mission.dialogue = ['Garage: $150 for a full repair — you are short on cash.'];
+        state.mission.dialogueTimer = 4;
+      } else if (result === 'fine') {
+        state.mission.dialogue = ['Garage: this car is already in fine shape.'];
+        state.mission.dialogueTimer = 3;
+      }
+    }
+
+    // Weather: a rain shower rolls in every couple of minutes and lasts
+    // about 25 seconds — streaks, splashes and a darker sky.
+    const weather = state.weather;
+    if (!weather.rain) {
+      weather.timer -= dt;
+      if (weather.timer <= 0) {
+        weather.rain = true;
+        weather.duration = 25;
+      }
+    } else {
+      weather.duration -= dt;
+      if (weather.duration <= 0) {
+        weather.rain = false;
+        weather.timer = 95;
+        state.rainDrops.length = 0;
+      }
+    }
+    if (weather.rain) {
+      while (state.rainDrops.length < 80) {
+        state.rainDrops.push({
+          x: state.camera.x + state.rng.range(-700, 700),
+          y: state.camera.y + state.rng.range(-500, 500),
+          speed: state.rng.range(700, 1000),
+        });
+      }
+      for (const drop of state.rainDrops) {
+        drop.y += drop.speed * dt;
+        drop.x += 120 * dt;
+        if (drop.y > state.camera.y + 520) {
+          drop.y = state.camera.y - 480;
+          drop.x = state.camera.x + state.rng.range(-700, 700);
+        }
+      }
     }
 
     if (p.inCar && p.car) {
@@ -469,9 +563,12 @@ export function createWorld(rng, savedMission) {
       : (p.inCar && p.car && Math.abs(p.car.speed) > 250 ? { x: p.x, y: p.y } : null);
     stepPedestrians(peds, dt, city, danger);
     stepPolice(state.police, state, dt, rng, events);
-    decayWanted(state, dt);
+    // The helicopter's searchlight keeps the heat on: no cooling off
+    // while it circles above.
+    if (!state.police.heli.active) decayWanted(state, dt);
     updateMission(state, dt);
     updateRace(state, dt);
+    updateTaxi(state, dt);
     updatePickups(state);
     stepParticles(dt);
 

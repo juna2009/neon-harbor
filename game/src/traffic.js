@@ -59,10 +59,10 @@ export function createTraffic(city, rng) {
     const color = body === 'taxi' ? '#f7c948' : rng.pick(city.carColors);
     if (vertical) {
       const rx = rng.pick(city.roadsV);
-      parked.push(makeCar(rx + 30, rng.range(200, WORLD_H - 200), Math.PI / 2, color, 'parked', body));
+      parked.push(makeCar(rx + 24, rng.range(200, WORLD_H - 200), Math.PI / 2, color, 'parked', body));
     } else {
       const ry = rng.pick(city.roadsH);
-      parked.push(makeCar(rng.range(200, WATER_X - 200), ry + 30, 0, color, 'parked', body));
+      parked.push(makeCar(rng.range(200, WATER_X - 200), ry + 24, 0, color, 'parked', body));
     }
   }
   return { cars, parked };
@@ -108,7 +108,11 @@ export function stepTraffic(traffic, dt, city, obstacles) {
   const slowObstacles = (obstacles || []).filter((o) => Math.abs(o.speed || 0) < 150);
   const others = traffic.cars.concat(slowObstacles);
   for (const car of traffic.cars) {
-    if (!car.alive) continue;
+    // Round-3 fix: a car Jax is driving is his, not the traffic AI's.
+    // Before this, starting mission 1 in a moving traffic car meant
+    // the AI kept steering it — it randomly turned at intersections
+    // and fought the player's wheel.
+    if (!car.alive || car.kind === 'player') continue;
     const next = nextIntersectionCoord(car, city);
     const at = car.axis === 'v' ? car.y : car.x;
     const distToNext = next === null ? Infinity : Math.abs(next - at);

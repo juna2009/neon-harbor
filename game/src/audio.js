@@ -98,24 +98,33 @@ export function createAudio() {
     }
   }
 
-  // Radio: 16-step loop. Steps 0/4/8/12 carry the bass root, the arp
-  // dances over the station's scale, hats tick every other step.
+  // Radio: 16-step loop. The pattern depends on the station's tag:
+  // synthwave drives (bass on the beat, arp every other step), chill
+  // floats (sparse arp), drive pushes hats on every step, lofi plays
+  // sparse and swung — bass every other bar, arp on the off-beat.
   function scheduleRadioStep(step, time) {
     const station = RADIO_STATIONS[stationIndex];
     const scale = station.scale;
+    const tag = station.tag;
     const bassNotes = [0, 0, 3, 5];
     const bar = Math.floor(step / 16) % 4;
-    if (step % 4 === 0) {
+    const bassEvery = tag === 'lofi' ? 8 : 4;
+    if (step % bassEvery === 0) {
       const root = station.root + scale[bassNotes[bar] % scale.length];
-      tone(midiToFreq(root), 0.22, 'sawtooth', 0.10, null, time);
+      tone(midiToFreq(root), tag === 'lofi' ? 0.5 : 0.22, 'sawtooth', tag === 'lofi' ? 0.07 : 0.10, null, time);
       tone(midiToFreq(root + 12), 0.22, 'square', 0.04, null, time);
     }
-    if (step % 2 === 0) {
+    const arpOn = tag === 'chill' ? step % 4 === 0
+      : tag === 'lofi' ? step % 4 === 2
+      : tag === 'drive' ? true
+      : step % 2 === 0;
+    if (arpOn) {
       const arpDegree = (step * 3 + bar) % scale.length;
       const arp = station.root + 24 + scale[arpDegree];
-      tone(midiToFreq(arp), 0.12, 'triangle', 0.05, null, time);
+      tone(midiToFreq(arp), 0.12, 'triangle', tag === 'lofi' ? 0.035 : 0.05, null, time);
     }
-    if (step % 2 === 1) noise(0.03, 0.05, 6000, time);
+    const hatOn = tag === 'drive' ? true : tag === 'lofi' ? step % 4 === 3 : step % 2 === 1;
+    if (hatOn) noise(0.03, tag === 'lofi' ? 0.03 : 0.05, 6000, time);
     if (step % 16 === 0) {
       // A soft pad chord at the top of each bar.
       const chord = [0, 2, 4].map((d) => station.root + 12 + scale[d % scale.length]);
@@ -196,6 +205,16 @@ export function createAudio() {
       tone(880, 0.08, 'triangle', 0.14);
       setTimeout(() => tone(1174, 0.08, 'triangle', 0.14), 70);
       setTimeout(() => tone(1568, 0.16, 'triangle', 0.14), 140);
+    },
+    repair() {
+      // A little wrench jingle: two metallic pings, then a rising chord.
+      tone(1244, 0.07, 'square', 0.08);
+      setTimeout(() => tone(1568, 0.07, 'square', 0.08), 90);
+      setTimeout(() => tone(2093, 0.18, 'triangle', 0.12), 180);
+    },
+    tirePop() {
+      noise(0.2, 0.3, 500);
+      tone(90, 0.18, 'sawtooth', 0.12, 40);
     },
     missionJingle() {
       [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.16, 'triangle', 0.15), i * 110));

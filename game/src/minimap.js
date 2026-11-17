@@ -57,6 +57,40 @@ export function drawMinimap(ctx, state, x, y, w, h) {
     ctx.lineWidth = 1.5;
     ctx.stroke();
   }
+  // Garage bay.
+  if (state.city.garage) {
+    ctx.fillStyle = '#37e0e6';
+    ctx.fillRect(x + state.city.garage.x * sx - 3, y + state.city.garage.y * sy - 3, 6, 6);
+  }
+  // Landmarks: casino (gold), lighthouse (white), stadium (white ring).
+  if (state.city.casino) {
+    ctx.fillStyle = '#ffd23e';
+    ctx.beginPath();
+    ctx.arc(x + state.city.casino.x * sx, y + state.city.casino.y * sy, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (state.city.lighthouse) {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(x + state.city.lighthouse.x * sx, y + state.city.lighthouse.y * sy, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Taxi fare / drop-off.
+  if (state.taxi && state.taxi.state === 'pickup' && state.taxi.fare) {
+    ctx.fillStyle = '#7be382';
+    ctx.beginPath();
+    ctx.arc(x + state.taxi.fare.x * sx, y + state.taxi.fare.y * sy, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (state.taxi && state.taxi.state === 'dropoff' && state.taxi.dest) {
+    ctx.fillStyle = '#7be382';
+    ctx.fillRect(x + state.taxi.dest.x * sx - 3, y + state.taxi.dest.y * sy - 3, 6, 6);
+  }
+  // Spike strips.
+  ctx.fillStyle = '#ff5a3c';
+  for (const strip of state.police.strips) {
+    ctx.fillRect(x + strip.x * sx - 2, y + strip.y * sy - 2, 4, 4);
+  }
   // Police (blue), gunmen (red), roadblocks (red squares).
   for (const unit of state.police.units) {
     const ux = unit.kind === 'car' ? unit.car.x : unit.x;
@@ -73,6 +107,18 @@ export function drawMinimap(ctx, state, x, y, w, h) {
       ctx.fillStyle = '#5aa0ff';
       ctx.fillRect(x + ux * sx - 2, y + uy * sy - 2, 4, 4);
     }
+  }
+  // Police helicopter: a white dot with a ring.
+  if (state.police.heli && state.police.heli.active) {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(x + state.police.heli.x * sx, y + state.police.heli.y * sy, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ff5a3c';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x + state.police.heli.x * sx, y + state.police.heli.y * sy, 6, 0, Math.PI * 2);
+    ctx.stroke();
   }
   // Player: a yellow arrow pointing the way they face.
   const p = state.player;

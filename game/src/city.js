@@ -8,13 +8,20 @@ import { BLOCK, ROAD_W, WORLD_H, WORLD_W } from './config.js';
 
 export const WATER_X = 2448;
 
-const ROOF_COLORS = ['#b8455a', '#4a7fb5', '#c98a3d', '#7a5fb5', '#3f8f6f', '#8a4a6b'];
+const ROOF_COLORS = [
+  // One palette per district, so the neighbourhoods read apart at a
+  // glance: warm brick and ochre in Old Town, cool glass and steel
+  // Downtown, teal and sand by the Harbor.
+  ['#b8455a', '#c98a3d', '#a85a32', '#8a4a6b'],
+  ['#4a7fb5', '#7a5fb5', '#3f8f9f', '#5a6b8a'],
+  ['#3f8f6f', '#e8e4d8', '#4a9db5', '#c98a3d'],
+];
 const CAR_COLORS = ['#d8d8d8', '#c0392b', '#2e86c1', '#f39c12', '#27ae60', '#8e44ad', '#e67e22'];
 
 export const DISTRICTS = [
-  { name: 'Old Town', x: 0, y: 0, w: 1120, h: WORLD_H, ground: '#2f6b3d', accent: '#ffd23e' },
-  { name: 'Downtown', x: 1120, y: 0, w: 640, h: WORLD_H, ground: '#2a5a35', accent: '#ff4d9d' },
-  { name: 'Harbor', x: 1760, y: 0, w: WATER_X - 1760, h: WORLD_H, ground: '#33603c', accent: '#37e0e6' },
+  { name: 'Old Town', x: 0, y: 0, w: 1120, h: WORLD_H, ground: '#8a7648', accent: '#ffd23e' },
+  { name: 'Downtown', x: 1120, y: 0, w: 640, h: WORLD_H, ground: '#4b5563', accent: '#ff4d9d' },
+  { name: 'Harbor', x: 1760, y: 0, w: WATER_X - 1760, h: WORLD_H, ground: '#2f6b5a', accent: '#37e0e6' },
 ];
 
 /** The district whose rectangle contains (x, y), or the last one. */
@@ -134,20 +141,48 @@ export function buildCity(rng) {
         const y = count === 1 ? by : by + Math.floor(k / 2) * (bh / 2 + 8);
         const cx = x + w / 2;
         const cy = y + h / 2;
+        const district = cx < 1120 ? 0 : cx < 1760 ? 1 : 2;
         buildings.push({
           x, y, w, h,
-          color: rng.pick(ROOF_COLORS),
+          color: rng.pick(ROOF_COLORS[district]),
           neon: rng.pick(['#ff4d9d', '#37e0e6', '#ffd23e', '#9d6bff']),
           height: rng.int(1, 3),
           // Roof variety: 0 plain slab, 1 AC units, 2 skylight strip.
           roof: rng.weighted([[0, 4], [1, 3], [2, 2]]),
-          district: cx < 1120 ? 0 : cx < 1760 ? 1 : 2,
+          district,
           // A few roof props, seeded so the skyline never repeats twice.
           props: rng.int(0, 3),
         });
       }
     }
   }
+
+  // Landmarks: the casino tower (the tallest Downtown block, gold trim),
+  // the stadium (an Old Town park turned into a floodlit bowl) and the
+  // lighthouse on the docks pier (its beam sweeps the harbor at night).
+  // The lighthouse stands clear of every generated block (east of x 2350).
+  let casino = buildings[0];
+  let casinoD = Infinity;
+  for (const b of buildings) {
+    const d = Math.hypot(b.x + b.w / 2 - 1440, b.y + b.h / 2 - 800);
+    if (d < casinoD) { casinoD = d; casino = b; }
+  }
+  if (casino) {
+    casino.landmark = 'casino';
+    casino.height = 3;
+    casino.neon = '#ffd23e';
+  }
+  let stadium = null;
+  for (const park of parks) {
+    if (park.x < 1120) { stadium = park; break; }
+  }
+  if (stadium) stadium.stadium = true;
+  buildings.push({
+    x: 2380, y: 1500, w: 44, h: 44,
+    color: '#e8e4d8', neon: '#ffd23e', height: 3, roof: 0,
+    district: 2, props: 0, landmark: 'lighthouse',
+  });
+  const lighthouse = buildings[buildings.length - 1];
 
   return {
     roadsV,
@@ -160,6 +195,11 @@ export function buildCity(rng) {
     water: { x: WATER_X, y: 0, w: WORLD_W - WATER_X, h: WORLD_H },
     docks: { x: 2320, y: 1480, w: 128, h: 280 },
     marina: { x: 2280, y: 120, w: 168, h: 160 },
+    // The garage: a marked repair bay on the Old Town crossroads.
+    garage: { x: 480, y: 1440, label: 'Garage' },
+    casino: casino ? { x: casino.x + casino.w / 2, y: casino.y + casino.h / 2, label: 'Casino' } : { x: 1440, y: 800, label: 'Casino' },
+    lighthouse: { x: lighthouse.x + lighthouse.w / 2, y: lighthouse.y + lighthouse.h / 2, label: 'Lighthouse' },
+    stadium: stadium ? { x: stadium.x + stadium.w / 2, y: stadium.y + stadium.h / 2, label: 'Stadium' } : null,
     playerStart: { x: 480, y: 480 },
     carColors: CAR_COLORS,
   };

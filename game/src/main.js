@@ -61,7 +61,7 @@ function loadSettings() {
   }
 }
 
-const savedMission = Math.min(3, Math.max(0, readNumber(PROGRESS_KEY)));
+const savedMission = Math.min(4, Math.max(0, readNumber(PROGRESS_KEY)));
 const world = createWorld(createRandom(seed), savedMission);
 const renderer = createRenderer(canvas);
 const settings = loadSettings();
@@ -110,7 +110,7 @@ function runGame() {
 
   function startGame() {
     world.reset();
-    world.state.mission.index = Math.min(3, Math.max(0, readNumber(PROGRESS_KEY)));
+    world.state.mission.index = Math.min(4, Math.max(0, readNumber(PROGRESS_KEY)));
     accumulator = 0;
     screen = SCREEN_PLAY;
     audio.unlock();
@@ -175,12 +175,12 @@ function runGame() {
     if (down && !prevKeys.down) settingsIndex = (settingsIndex + 1) % 6;
     if (left && !prevKeys.left) {
       if (settingsIndex === 0) { settings.volume = Math.max(0, settings.volume - 0.1); audio.setVolume(settings.volume); }
-      if (settingsIndex === 1) { settings.station = (settings.station + 2) % 3; audio.setStation(settings.station); }
+      if (settingsIndex === 1) { settings.station = (settings.station + RADIO_STATIONS.length - 1) % RADIO_STATIONS.length; audio.setStation(settings.station); }
       saveSettings();
     }
     if (right && !prevKeys.right) {
       if (settingsIndex === 0) { settings.volume = Math.min(1, settings.volume + 0.1); audio.setVolume(settings.volume); }
-      if (settingsIndex === 1) { settings.station = (settings.station + 1) % 3; audio.setStation(settings.station); }
+      if (settingsIndex === 1) { settings.station = (settings.station + 1) % RADIO_STATIONS.length; audio.setStation(settings.station); }
       saveSettings();
     }
     prevKeys.up = up;
@@ -253,6 +253,9 @@ function runGame() {
     if (state.events.enemyShotFired) audio.enemyShot();
     if (state.events.pickup) audio.pickup();
     if (state.events.crash) audio.crash();
+    if (state.events.tirePop) audio.tirePop();
+    if (state.events.repair) audio.repair();
+    if (state.events.taxiFare) audio.cash();
     if (state.events.raceStart) audio.missionJingle();
     if (state.events.raceWin) {
       audio.missionJingle();
@@ -302,6 +305,12 @@ function runGame() {
   });
 
   announce('Neon Harbor. Press Enter or click to start.');
+  // Read-only handle for live verification (checkpoint-resume tests and
+  // soak checks read the state; it never changes the game).
+  window.__neonHarbor = {
+    get state() { return world.state; },
+    get screen() { return screen; },
+  };
   requestAnimationFrame(frame);
 }
 

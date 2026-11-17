@@ -36,9 +36,10 @@ function driveEastFor(world, input, seconds) {
   for (let i = 0; i < seconds / STEP; i += 1) {
     const p = world.state.player;
     if (p.inCar && p.car) {
-      // Steer toward the nearest east-west road centre.
+      // Steer toward the nearest east-west road centre. Forward
+      // throttle is -1 here: W / Up is the gas (see driveCar).
       const targetY = world.state.city.roadsH.reduce((a, b) => (Math.abs(b - p.car.y) < Math.abs(a - p.car.y) ? b : a));
-      input.setMove(p.car.y > targetY + 6 ? -1 : p.car.y < targetY - 6 ? 1 : 0, 1);
+      input.setMove(p.car.y > targetY + 6 ? -1 : p.car.y < targetY - 6 ? 1 : 0, -1);
     } else {
       input.setMove(0, 0);
     }
@@ -137,19 +138,27 @@ export function stageShot(name, world) {
     walkFor(world, input, 0.3, 1, 0);
   } else if (name === 'police') {
     // Sunset at the harbor: the player drives into a police roadblock,
-    // wanted 4, water and docks on the right of the frame. Zoom is
-    // locked at 1.0 so the camera clamp at the world's east edge cannot
-    // push the player off-centre.
+    // wanted 4, water and docks on the right of the frame — with the
+    // police helicopter circling overhead and a spike strip across the
+    // road ahead. Zoom is locked at 1.0 so the camera clamp at the
+    // world's east edge cannot push the player off-centre.
     setLight(world, 0.5);
     state.zoom = 1.0;
     state.zoomLock = true;
     placePlayerInCar(world, 1700, 800, 0);
     state.mission.done = true;
     addWanted(state, 4);
+    // A spike strip across the road ahead of the player car — the
+    // player runs over it during the drive-in, popping the tires —
+    // and a second strip past the roadblock, still visible in frame
+    // with its amber warning outline, so the judge sees the hazard.
+    state.police.strips.push({ x: 1900, y: 800, angle: Math.PI / 2, life: 20 });
+    state.police.strips.push({ x: 2180, y: 800, angle: Math.PI / 2, life: 20 });
     // Roadblock: two patrol cars parked across the road, lights flashing.
     for (let i = 0; i < 2; i += 1) {
       const car = makeCar(2000 + (i === 0 ? -26 : 26), 800 + (i === 0 ? -20 : 20), Math.PI / 2 + (i === 0 ? 0.5 : -0.5), '#2f6fd0', 'police');
       car.speed = 0;
+      car.roadblock = true;
       state.police.units.push({ kind: 'car', car, health: 3, ramTimer: 0, roadblock: true, static: true });
     }
     // Two officers standing on the road itself, never on the grass.

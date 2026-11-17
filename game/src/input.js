@@ -12,6 +12,7 @@ export const ACTION_MUTE = 'mute';
 export const ACTION_WEAPON = 'weapon';
 export const ACTION_RADIO = 'radio';
 export const ACTION_SETTINGS = 'settings';
+export const ACTION_REPAIR = 'repair';
 
 export const DEFAULT_BINDINGS = {
   confirm: ['Enter', 'Space'],
@@ -22,6 +23,7 @@ export const DEFAULT_BINDINGS = {
   weapon: ['KeyQ'],
   radio: ['KeyC'],
   settings: ['KeyO'],
+  repair: ['KeyG'],
 };
 
 const ACTION_LABELS = {
@@ -33,6 +35,7 @@ const ACTION_LABELS = {
   weapon: 'Weapon',
   radio: 'Radio',
   settings: 'Settings',
+  repair: 'Repair',
 };
 
 export function actionLabel(action) {

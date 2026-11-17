@@ -216,6 +216,111 @@ export function createRenderer(canvas) {
   const fonts = new Map();
   const glowSprite = makeGlowSprite(128, 'rgba(255,255,255,0.9)', 'rgba(255,255,255,0)');
   const vignetteSprite = makeGlowSprite(512, 'rgba(0,0,0,0)', 'rgba(0,0,0,0.55)');
+  // Pre-rendered static city: roads, buildings, parks and water painted
+  // once to an offscreen canvas, then stamped per frame with drawImage —
+  // the whole static layer costs one blit instead of hundreds of fills.
+  let staticLayer = null;
+  let staticCity = null;
+
+  function buildStaticLayer(city) {
+    const c = document.createElement('canvas');
+    c.width = WORLD_W;
+    c.height = WORLD_H;
+    const g = c.getContext('2d');
+    for (const d of city.districts) {
+      g.fillStyle = d.ground;
+      g.fillRect(d.x, d.y, d.w, d.h);
+    }
+    g.fillStyle = COLORS.water;
+    g.fillRect(WATER_X, 0, WORLD_W - WATER_X, WORLD_H);
+    g.fillStyle = '#8a6f4d';
+    g.fillRect(city.docks.x, city.docks.y, city.docks.w, city.docks.h);
+    g.fillStyle = '#6b5638';
+    for (let y = city.docks.y + 10; y < city.docks.y + city.docks.h; y += 28) {
+      g.fillRect(city.docks.x, y, city.docks.w, 3);
+    }
+    g.fillStyle = '#8a6f4d';
+    g.fillRect(city.marina.x, city.marina.y, city.marina.w, city.marina.h);
+    g.fillStyle = '#ffffff';
+    g.beginPath();
+    g.moveTo(city.marina.x + 100, city.marina.y + 60);
+    g.lineTo(city.marina.x + 130, city.marina.y + 60);
+    g.lineTo(city.marina.x + 115, city.marina.y + 20);
+    g.closePath();
+    g.fill();
+    g.fillStyle = COLORS.sidewalk;
+    for (const rx of city.roadsV) g.fillRect(rx - 52, 0, 104, WORLD_H);
+    for (const ry of city.roadsH) g.fillRect(0, ry - 52, WORLD_W, 104);
+    g.fillStyle = COLORS.road;
+    for (const rx of city.roadsV) g.fillRect(rx - 36, 0, 72, WORLD_H);
+    for (const ry of city.roadsH) g.fillRect(0, ry - 36, WORLD_W, 72);
+    g.fillStyle = COLORS.roadLine;
+    for (const rx of city.roadsV) {
+      for (let y = 0; y < WORLD_H; y += 64) g.fillRect(rx - 2, y + 12, 4, 32);
+    }
+    for (const ry of city.roadsH) {
+      for (let x = 0; x < WATER_X; x += 64) g.fillRect(x + 12, ry - 2, 32, 4);
+    }
+    g.fillStyle = 'rgba(255,255,255,0.75)';
+    for (const pt of city.intersections) {
+      for (let i = -3; i <= 3; i += 1) {
+        g.fillRect(pt.x + i * 10 - 3, pt.y - 46, 6, 12);
+        g.fillRect(pt.x + i * 10 - 3, pt.y + 34, 6, 12);
+        g.fillRect(pt.x - 46, pt.y + i * 10 - 3, 12, 6);
+        g.fillRect(pt.x + 34, pt.y + i * 10 - 3, 12, 6);
+      }
+    }
+    for (const park of city.parks) {
+      g.fillStyle = COLORS.park;
+      g.fillRect(park.x, park.y, park.w, park.h);
+    }
+    for (const tree of city.trees) {
+      g.fillStyle = 'rgba(0,0,0,0.3)';
+      g.beginPath();
+      g.arc(tree.x + 3, tree.y + 4, tree.r, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = COLORS.tree;
+      g.beginPath();
+      g.arc(tree.x, tree.y, tree.r, 0, Math.PI * 2);
+      g.fill();
+    }
+    for (const b of city.buildings) {
+      g.fillStyle = '#20242a';
+      g.fillRect(b.x - 3, b.y - 3 + b.height * 3, b.w + 6, b.h + 6);
+      g.fillStyle = b.color;
+      g.fillRect(b.x, b.y, b.w, b.h);
+      g.strokeStyle = b.neon;
+      g.lineWidth = 3;
+      g.strokeRect(b.x + 4, b.y + 4, b.w - 8, b.h - 8);
+      g.fillStyle = 'rgba(255,255,255,0.25)';
+      g.fillRect(b.x + 10, b.y + 10, b.w - 20, 8);
+      if (b.roof === 1) {
+        g.fillStyle = '#6b7280';
+        g.fillRect(b.x + 14, b.y + 22, 16, 12);
+        g.fillRect(b.x + b.w - 30, b.y + b.h - 34, 16, 12);
+      } else if (b.roof === 2) {
+        g.fillStyle = 'rgba(191,230,255,0.7)';
+        g.fillRect(b.x + 16, b.y + b.h / 2 - 5, b.w - 32, 10);
+      }
+      if (b.props > 0) {
+        g.fillStyle = 'rgba(0,0,0,0.4)';
+        for (let i = 0; i < b.props; i += 1) {
+          g.fillRect(b.x + 20 + i * 22, b.y + b.h - 18, 8, 8);
+        }
+      }
+      if (b.landmark === 'lighthouse') {
+        // Striped tower: red bands over the white pier house.
+        g.fillStyle = '#c0392b';
+        g.fillRect(b.x + 6, b.y + 8, b.w - 12, 8);
+        g.fillRect(b.x + 6, b.y + 28, b.w - 12, 8);
+        g.fillStyle = '#ffd23e';
+        g.beginPath();
+        g.arc(b.x + b.w / 2, b.y + b.h / 2, 6, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    return c;
+  }
 
   function resize() {
     const ratio = window.devicePixelRatio || 1;
@@ -261,110 +366,136 @@ export function createRenderer(canvas) {
     ctx.translate(ox, oy);
     ctx.scale(zoom, zoom);
 
-    // Ground: one tint per district, so the city reads as neighbourhoods.
-    for (const d of state.city.districts) {
-      ctx.fillStyle = d.ground;
-      ctx.fillRect(d.x, d.y, d.w, d.h);
+    // Static city, pre-rendered once: one drawImage blit for the whole
+    // ground, roads, parks and buildings instead of hundreds of fills.
+    if (!staticLayer || staticCity !== state.city) {
+      staticLayer = buildStaticLayer(state.city);
+      staticCity = state.city;
     }
-    // Water and docks.
-    ctx.fillStyle = COLORS.water;
-    ctx.fillRect(WATER_X, 0, WORLD_W - WATER_X, WORLD_H);
-    ctx.fillStyle = COLORS.waterDeep;
-    for (let y = 0; y < WORLD_H; y += 96) {
-      ctx.fillRect(WATER_X + 12, y + 30, 60, 4);
-      ctx.fillRect(WATER_X + 40, y + 70, 44, 4);
-    }
-    ctx.fillStyle = '#8a6f4d';
-    ctx.fillRect(state.city.docks.x, state.city.docks.y, state.city.docks.w, state.city.docks.h);
-    ctx.fillStyle = '#6b5638';
-    for (let y = state.city.docks.y + 10; y < state.city.docks.y + state.city.docks.h; y += 28) {
-      ctx.fillRect(state.city.docks.x, y, state.city.docks.w, 3);
-    }
-    // Marina pier.
-    ctx.fillStyle = '#8a6f4d';
-    ctx.fillRect(state.city.marina.x, state.city.marina.y, state.city.marina.w, state.city.marina.h);
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(state.city.marina.x + 100, state.city.marina.y + 60);
-    ctx.lineTo(state.city.marina.x + 130, state.city.marina.y + 60);
-    ctx.lineTo(state.city.marina.x + 115, state.city.marina.y + 20);
-    ctx.closePath();
-    ctx.fill();
+    ctx.drawImage(staticLayer, camX - vw / 2, camY - vh / 2, vw, vh, camX - vw / 2, camY - vh / 2, vw, vh);
 
-    // Sidewalks and roads.
-    ctx.fillStyle = COLORS.sidewalk;
-    for (const rx of state.city.roadsV) ctx.fillRect(rx - 52, 0, 104, WORLD_H);
-    for (const ry of state.city.roadsH) ctx.fillRect(0, ry - 52, WORLD_W, 104);
-    ctx.fillStyle = COLORS.road;
-    for (const rx of state.city.roadsV) ctx.fillRect(rx - 36, 0, 72, WORLD_H);
-    for (const ry of state.city.roadsH) ctx.fillRect(0, ry - 36, WORLD_W, 72);
-    ctx.fillStyle = COLORS.roadLine;
-    for (const rx of state.city.roadsV) {
-      for (let y = 0; y < WORLD_H; y += 64) ctx.fillRect(rx - 2, y + 12, 4, 32);
+    // Animated harbor water: shimmer dashes that drift with the clock,
+    // drawn only over the visible stretch of water.
+    ctx.fillStyle = 'rgba(190,230,255,0.35)';
+    const waterTop = Math.max(0, camY - vh / 2);
+    const waterBottom = Math.min(WORLD_H, camY + vh / 2);
+    for (let y = Math.floor(waterTop / 96) * 96; y < waterBottom; y += 96) {
+      const drift = Math.sin(state.elapsed * 1.6 + y * 0.02) * 26;
+      ctx.fillRect(WATER_X + 12 + drift, y + 30, 60, 4);
+      ctx.fillRect(WATER_X + 40 - drift, y + 70, 44, 4);
     }
-    for (const ry of state.city.roadsH) {
-      for (let x = 0; x < WATER_X; x += 64) ctx.fillRect(x + 12, ry - 2, 32, 4);
-    }
-    // Crosswalks at every intersection in view.
-    ctx.fillStyle = 'rgba(255,255,255,0.75)';
-    for (const pt of state.city.intersections) {
-      if (!inView(pt.x, pt.y, 60)) continue;
-      for (let i = -3; i <= 3; i += 1) {
-        ctx.fillRect(pt.x + i * 10 - 3, pt.y - 46, 6, 12);
-        ctx.fillRect(pt.x + i * 10 - 3, pt.y + 34, 6, 12);
-        ctx.fillRect(pt.x - 46, pt.y + i * 10 - 3, 12, 6);
-        ctx.fillRect(pt.x + 34, pt.y + i * 10 - 3, 12, 6);
+
+    // Landmark overlays, drawn live over the static layer.
+    const city = state.city;
+    if (city.stadium) {
+      const s = city.stadium;
+      if (inView(s.x, s.y, 160)) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, 92, 62, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(s.x - 92, s.y);
+        ctx.lineTo(s.x + 92, s.y);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.font = `bold 15px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('STADIUM', s.x, s.y - 74);
       }
     }
-
-    // Parks and trees.
-    for (const park of state.city.parks) {
-      if (!inView(park.x + park.w / 2, park.y + park.h / 2, park.w)) continue;
-      ctx.fillStyle = COLORS.park;
-      ctx.fillRect(park.x, park.y, park.w, park.h);
-    }
-    for (const tree of state.city.trees) {
-      if (!inView(tree.x, tree.y, 20)) continue;
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.beginPath();
-      ctx.arc(tree.x + 3, tree.y + 4, tree.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = COLORS.tree;
-      ctx.beginPath();
-      ctx.arc(tree.x, tree.y, tree.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Buildings with neon roof trim and roof variety.
-    for (const b of state.city.buildings) {
-      if (!inView(b.x + b.w / 2, b.y + b.h / 2, Math.max(b.w, b.h))) continue;
-      ctx.fillStyle = '#20242a';
-      ctx.fillRect(b.x - 3, b.y - 3 + b.height * 3, b.w + 6, b.h + 6);
-      ctx.fillStyle = b.color;
-      ctx.fillRect(b.x, b.y, b.w, b.h);
-      ctx.strokeStyle = b.neon;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(b.x + 4, b.y + 4, b.w - 8, b.h - 8);
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.fillRect(b.x + 10, b.y + 10, b.w - 20, 8);
-      if (b.roof === 1) {
-        // AC units on the roof.
-        ctx.fillStyle = '#6b7280';
-        ctx.fillRect(b.x + 14, b.y + 22, 16, 12);
-        ctx.fillRect(b.x + b.w - 30, b.y + b.h - 34, 16, 12);
-      } else if (b.roof === 2) {
-        // Skylight strip.
-        ctx.fillStyle = 'rgba(191,230,255,0.7)';
-        ctx.fillRect(b.x + 16, b.y + b.h / 2 - 5, b.w - 32, 10);
-      }
-      if (b.props > 0) {
-        ctx.fillStyle = 'rgba(0,0,0,0.4)';
-        for (let i = 0; i < b.props; i += 1) {
-          ctx.fillRect(b.x + 20 + i * 22, b.y + b.h - 18, 8, 8);
+    if (city.casino) {
+      const cz = city.casino;
+      if (inView(cz.x, cz.y, 160)) {
+        ctx.fillStyle = '#ffd23e';
+        ctx.font = `bold 17px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('★ CASINO ★', cz.x, cz.y - 108);
+        if (night > 0.4) {
+          ctx.globalAlpha = (night - 0.4) * 0.6;
+          ctx.drawImage(glowSprite, cz.x - 90, cz.y - 110, 180, 180);
+          ctx.globalAlpha = 1;
         }
       }
-      // Neon glow at night: a soft halo over the trim, stamped from the
-      // pre-rendered sprite — never shadowBlur per frame.
+    }
+    if (city.lighthouse) {
+      const lh = city.lighthouse;
+      if (inView(lh.x, lh.y, 340)) {
+        // The beam sweeps the harbor, bright at night.
+        const beamAngle = state.elapsed * 0.9;
+        const beamAlpha = night > 0.3 ? 0.20 : 0.07;
+        ctx.fillStyle = `rgba(255,240,170,${beamAlpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.moveTo(lh.x, lh.y);
+        ctx.lineTo(lh.x + Math.cos(beamAngle - 0.12) * 340, lh.y + Math.sin(beamAngle - 0.12) * 340);
+        ctx.lineTo(lh.x + Math.cos(beamAngle + 0.12) * 340, lh.y + Math.sin(beamAngle + 0.12) * 340);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#fff6c8';
+        ctx.beginPath();
+        ctx.arc(lh.x, lh.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#0e1420';
+        ctx.font = `bold 13px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('LIGHTHOUSE', lh.x, lh.y - 40);
+      }
+    }
+
+    // Garage bay: a teal repair bay on the Old Town crossroads.
+    const garage = city.garage;
+    if (garage && inView(garage.x, garage.y, 90)) {
+      const nearGarage = state.player.inCar && state.player.car
+        && Math.hypot(state.player.car.x - garage.x, state.player.car.y - garage.y) < 120;
+      ctx.strokeStyle = nearGarage ? '#37e0e6' : 'rgba(55,224,230,0.6)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([10, 6]);
+      ctx.strokeRect(garage.x - 44, garage.y - 30, 88, 60);
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(55,224,230,0.18)';
+      ctx.fillRect(garage.x - 44, garage.y - 30, 88, 60);
+      ctx.fillStyle = '#37e0e6';
+      ctx.font = `bold 15px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('GARAGE $150', garage.x, garage.y - 40);
+      ctx.fillText('G', garage.x, garage.y + 6);
+    }
+
+    // Taxi fares: a waving passenger, then their destination.
+    if (state.taxi) {
+      const taxi = state.taxi;
+      if (taxi.state === 'pickup' && taxi.fare && inView(taxi.fare.x, taxi.fare.y, 60)) {
+        const pulse = 1 + Math.sin(state.elapsed * 5) * 0.2;
+        ctx.strokeStyle = '#7be382';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(taxi.fare.x, taxi.fare.y, 22 * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#7be382';
+        ctx.font = `bold 13px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('TAXI FARE', taxi.fare.x, taxi.fare.y - 30);
+      }
+      if (taxi.state === 'dropoff' && taxi.dest && inView(taxi.dest.x, taxi.dest.y, 60)) {
+        ctx.strokeStyle = '#7be382';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(taxi.dest.x, taxi.dest.y, 26, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#7be382';
+        ctx.font = `bold 13px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('DROP-OFF', taxi.dest.x, taxi.dest.y - 34);
+      }
+    }
+
+    // Neon glow at night over the buildings, stamped from the
+    // pre-rendered sprite — never shadowBlur per frame.
+    for (const b of state.city.buildings) {
+      if (!inView(b.x + b.w / 2, b.y + b.h / 2, Math.max(b.w, b.h))) continue;
       if (night > 0.4) {
         ctx.globalAlpha = (night - 0.4) * 0.5;
         ctx.drawImage(glowSprite, b.x - 20, b.y - 20, b.w + 40, b.h + 40);
@@ -512,11 +643,100 @@ export function createRenderer(canvas) {
         if (!inView(unit.x, unit.y, 30)) continue;
         const officer = { ...unit, color: COLORS.police, skin: '#e8b98a', pants: '#1c2f4a', hat: 1, build: 'slim' };
         drawPerson(ctx, unit.x, unit.y, unit.angle, officer, state.elapsed * 8);
+        // A badge disc behind the P, so it reads as a police marker
+        // instead of a floating letter.
+        ctx.fillStyle = '#1c2f4a';
+        ctx.beginPath();
+        ctx.arc(unit.x, unit.y - 20, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
         ctx.fillStyle = '#ffffff';
         ctx.font = `bold 10px ${FONT}`;
         ctx.textAlign = 'center';
         ctx.fillText('P', unit.x, unit.y - 16);
       }
+    }
+
+    // Police helicopter at 4–5 stars: its searchlight cone pins the
+    // player while it circles above them.
+    const heli = state.police.heli;
+    if (heli && heli.active && inView(heli.x, heli.y, 420)) {
+      const px = state.player.x;
+      const py = state.player.y;
+      const dx = px - heli.x;
+      const dy = py - heli.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const ux = dx / dist;
+      const uy = dy / dist;
+      const perpX = -uy;
+      const perpY = ux;
+      ctx.fillStyle = 'rgba(255,240,170,0.16)';
+      ctx.beginPath();
+      ctx.moveTo(heli.x, heli.y);
+      ctx.lineTo(px + perpX * 46, py + perpY * 46);
+      ctx.lineTo(px - perpX * 46, py - perpY * 46);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,170,0.35)';
+      ctx.beginPath();
+      ctx.arc(px, py, 34, 0, Math.PI * 2);
+      ctx.fill();
+      // Shadow on the ground below, then the airframe and spinning rotor.
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(heli.x + 10, heli.y + 14, 22, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.save();
+      ctx.translate(heli.x, heli.y);
+      ctx.rotate(Math.atan2(dy, dx));
+      ctx.fillStyle = '#1c2f4a';
+      ctx.fillRect(-14, -3, 28, 6);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-4, -6, 10, 12);
+      ctx.fillStyle = '#ff3b30';
+      ctx.fillRect(-16, -2, 5, 4);
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 2;
+      const rotor = heli.rotor;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(rotor) * -30, Math.sin(rotor) * -30);
+      ctx.lineTo(Math.cos(rotor) * 30, Math.sin(rotor) * 30);
+      ctx.moveTo(Math.cos(rotor + Math.PI / 2) * -30, Math.sin(rotor + Math.PI / 2) * -30);
+      ctx.lineTo(Math.cos(rotor + Math.PI / 2) * 30, Math.sin(rotor + Math.PI / 2) * 30);
+      ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold 11px ${FONT}`;
+      ctx.textAlign = 'center';
+      ctx.fillText('HELI', heli.x, heli.y - 26);
+    }
+
+    // Spike strips: drawn late, over the cars, so a traffic van can
+    // never hide one — black bar with steel teeth, ringed by a pulsing
+    // amber warning outline so the driver sees it coming and can swerve.
+    for (const strip of state.police.strips) {
+      if (!inView(strip.x, strip.y, 60)) continue;
+      ctx.save();
+      ctx.translate(strip.x, strip.y);
+      ctx.rotate(strip.angle);
+      const warn = 0.45 + 0.35 * Math.sin(state.elapsed * 6);
+      ctx.strokeStyle = `rgba(255,210,62,${warn.toFixed(3)})`;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(-37, -11, 74, 22);
+      ctx.fillStyle = '#14181f';
+      ctx.fillRect(-34, -7, 68, 14);
+      ctx.fillStyle = '#c8cdd6';
+      for (let i = -3; i <= 3; i += 1) {
+        ctx.beginPath();
+        ctx.moveTo(i * 9 - 3, -7);
+        ctx.lineTo(i * 9 + 3, -7);
+        ctx.lineTo(i * 9, -13);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
     }
 
     // Bullets, drawn as streaks along their velocity.
@@ -584,8 +804,28 @@ export function createRenderer(canvas) {
     if (p.inCar && p.car) {
       const car = { ...p.car, color: COLORS.playerCar, kind: 'player' };
       drawCarShape(ctx, car, night);
+      // Popped tires: smoke puffs from the wheels and a sagging look.
+      if (p.car.tiresPopped) {
+        ctx.fillStyle = 'rgba(140,140,150,0.55)';
+        ctx.beginPath();
+        ctx.arc(p.car.x - Math.cos(p.car.angle) * 16, p.car.y - Math.sin(p.car.angle) * 16, 7, 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else {
       drawPlayer(ctx, p, state);
+    }
+
+    // Rain: falling streaks and the splash rings they leave behind.
+    if (state.weather && state.weather.rain) {
+      ctx.strokeStyle = 'rgba(174,194,224,0.45)';
+      ctx.lineWidth = 1.5;
+      for (const drop of state.rainDrops) {
+        if (!inView(drop.x, drop.y, 20)) continue;
+        ctx.beginPath();
+        ctx.moveTo(drop.x, drop.y);
+        ctx.lineTo(drop.x - 4, drop.y - 16);
+        ctx.stroke();
+      }
     }
 
     ctx.restore();
@@ -640,10 +880,13 @@ export function createRenderer(canvas) {
       text(`${speed} km/h`, view.w - 28, view.h - 78, 30, '#ffffff', 'right', 'bold');
       const hp = Math.max(0, Math.round(p.car.hp || 0));
       text(`Car ${hp}%`, view.w - 28, view.h - 100, 12, '#c8cdd6', 'right');
+      if (p.car.tiresPopped) {
+        text('TIRES POPPED — garage $150 (G)', view.w - 16, view.h - 128, 14, '#ff5a3c', 'right', 'bold');
+      }
     }
     // Hints, kept inside the viewport with a margin.
     const hints = p.inCar
-      ? 'E exit · Q weapon · C radio · M mute'
+      ? 'E exit · Q weapon · C radio · G repair · M mute'
       : 'E enter car · R reload · Q weapon · C radio · M mute';
     text(hints, view.w - 16, view.h - 24, 14, '#c8cdd6', 'right');
     // Objective bar: solid pad sized to the text, never under a sprite.
@@ -655,10 +898,15 @@ export function createRenderer(canvas) {
     ctx.fillStyle = COLORS.neonCyan;
     ctx.fillRect(16, view.h - 64, 4, 34);
     text(objective, 30, view.h - 41, 16, '#ffffff', 'left', 'bold');
-    // Radio station, small, under the top-left HUD panel — never over
-    // the dialogue box at the bottom.
+    // Radio station, small, under the top-left HUD panel — with its own
+    // dark pad, so the pink text never fights a bright building behind it.
     if (ui && ui.stationName) {
-      text(`♪ ${ui.stationName}`, 24, 168, 13, COLORS.neonPink, 'left', 'bold');
+      const label = `♪ ${ui.stationName}`;
+      ctx.font = `bold 13px ${FONT}`;
+      const lw = ctx.measureText(label).width;
+      ctx.fillStyle = 'rgba(14,20,32,0.82)';
+      ctx.fillRect(12, 152, lw + 24, 24);
+      text(label, 24, 168, 13, COLORS.neonPink, 'left', 'bold');
     }
     // Minimap.
     drawMinimap(ctx, state, view.w - 216, 16, 200, 150);
@@ -725,7 +973,7 @@ export function createRenderer(canvas) {
     'Steal a car, run the package, lose the heat — and survive the showdown at the docks.',
     'WASD / arrows — move & drive    Mouse — aim    Click / Space — shoot',
     'E — enter / exit car    R — reload    Q — switch weapon    C — radio    O — settings',
-    'Street races, harbor tokens and weapon pickups hide all over the city.',
+    'Street races, taxi fares, harbor tokens and weapon pickups hide all over the city.',
   ];
 
   function drawSettings(ui) {

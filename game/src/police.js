@@ -10,7 +10,11 @@ import { WATER_X, collides, moveCircle, nearestIntersection, pathBlocked } from 
 import { makeCar } from './traffic.js';
 
 export function createPolice() {
-  return { units: [], spawnTimer: 0, arrestTimer: 0, roadblockTimer: 8 };
+  return {
+    units: [], spawnTimer: 0, arrestTimer: 0, roadblockTimer: 8,
+    heli: { active: false, x: 0, y: 0, orbit: 0, rotor: 0 },
+    strips: [], stripTimer: 10,
+  };
 }
 
 export function addWanted(state, stars) {
@@ -170,6 +174,9 @@ function spawnRoadblock(police, state) {
       '#2f6fd0', 'police',
     );
     car.speed = 0;
+    // The flag lives on the car too: collideCars checks the car, not
+    // the unit — without it a hard hit shoves the roadblock aside.
+    car.roadblock = true;
     police.units.push({ kind: 'car', car, health: 3, ramTimer: 0, roadblock: true, static: true });
   }
   police.roadblockTimer = 22;
@@ -182,6 +189,50 @@ export function stepPolice(police, state, dt, rng, events) {
   police.spawnTimer -= dt;
   if (police.roadblockTimer > 0) police.roadblockTimer -= dt;
 
+  // Helicopter unit at 4–5 stars: it circles above the player, its
+  // searchlight pins them, and the ground units get faster, spawn
+  // sooner and shoot straighter while it is up. It stands down below
+  // 3 stars. The wanted clock never cools while the heli is watching.
+  const heli = police.heli;
+  if (wanted >= 4 && !heli.active) {
+    heli.active = true;
+    heli.orbit = 0;
+    heli.x = player.x;
+    heli.y = player.y - 190;
+    events.heli = true;
+  } else if (wanted < 3 && heli.active) {
+    heli.active = false;
+  }
+  if (heli.active) {
+    heli.orbit += dt * 0.55;
+    const px = player.inCar ? player.car.x : player.x;
+    const py = player.inCar ? player.car.y : player.y;
+    heli.x = px + Math.cos(heli.orbit) * 190;
+    heli.y = py + Math.sin(heli.orbit) * 190;
+    heli.rotor += dt * 42;
+  }
+
+  // Spike strips at 4–5 stars: a patrol car drops a strip across the
+  // road ahead of the player's car. Driving over it pops the tires.
+  if (police.stripTimer > 0) police.stripTimer -= dt;
+  for (let i = police.strips.length - 1; i >= 0; i -= 1) {
+    police.strips[i].life -= dt;
+    if (police.strips[i].life <= 0) police.strips.splice(i, 1);
+  }
+  if (wanted >= 4 && police.stripTimer <= 0 && police.strips.length < 3 && player.inCar && player.car) {
+    const car = player.car;
+    const ahead = 260;
+    const sx = car.x + Math.cos(car.angle) * ahead;
+    const sy = car.y + Math.sin(car.angle) * ahead;
+    if (sx > 60 && sx < WATER_X - 60 && sy > 60 && sy < WORLD_H - 60) {
+      police.strips.push({ x: sx, y: sy, angle: car.angle + Math.PI / 2, life: 20 });
+      police.stripTimer = 9;
+      events.stripDeployed = true;
+    } else {
+      police.stripTimer = 4;
+    }
+  }
+
   // Roadblocks at 3+ stars, cleared when the heat drops.
   const hasRoadblock = police.units.some((u) => u.roadblock);
   if (wanted >= 3 && !hasRoadblock && police.roadblockTimer <= 0) {
@@ -192,7 +243,8 @@ export function stepPolice(police, state, dt, rng, events) {
   }
 
   if (police.units.length < want && police.spawnTimer <= 0) {
-    police.spawnTimer = 1.2;
+    // The helicopter's eye makes the response faster.
+    police.spawnTimer = heli.active ? 0.8 : 1.2;
     const inCar = player.inCar;
     spawnPoliceUnit(police, player, rng, inCar && wanted >= 2 ? 'car' : 'foot', state.city);
   }
@@ -220,7 +272,9 @@ export function stepPolice(police, state, dt, rng, events) {
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
       car.angle += Math.max(-3.2 * dt, Math.min(3.2 * dt, diff));
-      car.speed = Math.min(560, car.speed + 380 * dt);
+      // Helicopter overwatch: patrol cars run harder while it is up.
+      const topSpeed = heli.active ? 620 : 560;
+      car.speed = Math.min(topSpeed, car.speed + (heli.active ? 460 : 380) * dt);
       if (unit.ramTimer > 0) unit.ramTimer -= dt;
       // Slide around buildings instead of driving through them.
       const nx = car.x + Math.cos(car.angle) * car.speed * dt;
@@ -262,7 +316,9 @@ export function stepPolice(police, state, dt, rng, events) {
           if (unit.burstTimer <= 0) {
             unit.burstTimer = 0.12;
             unit.burstLeft -= 1;
-            events.enemyShot = { x: unit.x, y: unit.y, angle: unit.angle + (Math.random() - 0.5) * 0.12 };
+            // Under the searchlight the crew shoots straighter.
+            const spread = heli.active ? 0.06 : 0.12;
+            events.enemyShot = { x: unit.x, y: unit.y, angle: unit.angle + (Math.random() - 0.5) * spread };
           }
         } else {
           unit.fireTimer -= dt;
@@ -294,4 +350,7 @@ export function clearPolice(police) {
   police.units.length = 0;
   police.arrestTimer = 0;
   police.roadblockTimer = 0;
+  police.heli.active = false;
+  police.strips.length = 0;
+  police.stripTimer = 10;
 }

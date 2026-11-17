@@ -56,6 +56,14 @@ export const WANTED = {
   decayPerSecond: 0.5,
 };
 
+// Garage: a marked bay on the road where a damaged car is repaired.
+export const GARAGE_COST = 150;
+export const GARAGE_REPAIR = 100;
+
+// Taxi side job: a fare pays a flat fee for a ride across town.
+export const TAXI_FARE = 120;
+export const TAXI_TIME_LIMIT = 45;
+
 export const COLORS = {
   grass: '#2e6b3a',
   grassDark: '#276031',
@@ -78,15 +86,18 @@ export const COLORS = {
   gunman: '#a33327',
 };
 
-// Procedural radio: three stations, each a tempo, a scale (semitone offsets
-// from the root) and a bass pattern the synthwave sequencer plays.
+// Procedural radio: four stations, each a tempo, a scale (semitone offsets
+// from the root) and a bass pattern the synthwave sequencer plays. The tag
+// picks the pattern: synthwave drives, chill floats, drive pushes the hats,
+// lofi (Bayview Static) plays sparse and swung.
 export const RADIO_STATIONS = [
   { name: 'Harbor FM', tag: 'synthwave', bpm: 104, root: 45, scale: [0, 3, 5, 7, 10, 12, 15] },
   { name: 'Neon Nights', tag: 'chill', bpm: 82, root: 48, scale: [0, 2, 3, 7, 9, 12, 14] },
   { name: 'Dockside Drive', tag: 'drive', bpm: 122, root: 43, scale: [0, 3, 5, 6, 7, 10, 12] },
+  { name: 'Bayview Static', tag: 'lofi', bpm: 96, root: 41, scale: [0, 3, 5, 7, 10, 12] },
 ];
 
-export const MISSION_REWARDS = [250, 400, 350, 900];
+export const MISSION_REWARDS = [250, 400, 350, 900, 1200];
 export const RACE_REWARD = 300;
 export const COLLECTIBLE_COUNT = 12;
 export const COLLECTIBLE_VALUE = 50;

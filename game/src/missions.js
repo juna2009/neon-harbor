@@ -1,12 +1,13 @@
-// Neon Harbor — the four chained story missions for Jax Marlowe, a driver
+// Neon Harbor — the five chained story missions for Jax Marlowe, a driver
 // for hire who gets pulled into the harbor crew's war. Each mission has a
 // target marker, dialogue lines and a cash reward; finishing one unlocks
-// the next, and finishing all four leaves the city in free roam. Missions
+// the next, and finishing all five leaves the city in free roam. Missions
 // save a checkpoint at every stage, so Busted/Wasted resumes mid-mission
 // instead of from the start. Side activities run alongside the story: a
-// street race around Downtown, harbor tokens hidden around the city, and
-// weapon pickups (SMG at the plaza, shotgun at the docks).
-import { CHECKPOINT_KEY, COLLECTIBLE_COUNT, COLLECTIBLE_VALUE, MISSION_REWARDS, RACE_REWARD } from './config.js';
+// street race around Downtown, harbor tokens hidden around the city,
+// weapon pickups (SMG at the plaza, shotgun at the docks), taxi fares for
+// quick cash, and a garage that repairs a battered car for $150.
+import { CHECKPOINT_KEY, COLLECTIBLE_COUNT, COLLECTIBLE_VALUE, GARAGE_COST, MISSION_REWARDS, RACE_REWARD, TAXI_FARE, TAXI_TIME_LIMIT } from './config.js';
 import { addWanted, clearPolice, spawnPoliceUnit } from './police.js';
 
 export const MISSION_DEFS = [
@@ -50,6 +51,16 @@ export const MISSION_DEFS = [
       'MARA: Survive the ambush and get to the boat. We leave tonight.',
     ],
   },
+  {
+    title: 'The Last Run',
+    brief: "The crew's cut is stashed at the casino. Grab it, run it to the lighthouse, and Neon Harbor is yours.",
+    objective: 'Grab the cut at the casino, then run it to the lighthouse',
+    reward: MISSION_REWARDS[4],
+    dialogue: [
+      'MARA: One last run, Jax. The crew’s cut is stashed at the casino.',
+      'MARA: Grab it and bring it to the lighthouse. Then we are free.',
+    ],
+  },
 ];
 
 export function createMissionState(savedIndex) {
@@ -72,11 +83,24 @@ function plazaTarget(city) {
 function docksTarget(city) {
   return { x: city.docks.x + 60, y: city.docks.y + 140, label: 'Docks' };
 }
-function marinaTarget(city) {
-  return { x: city.marina.x + 84, y: city.marina.y + 80, label: 'Marina' };
+function casinoTarget(city) {
+  return { x: city.casino.x, y: city.casino.y, label: 'Casino' };
+}
+function lighthouseTarget(city) {
+  return { x: city.lighthouse.x, y: city.lighthouse.y, label: 'Lighthouse' };
 }
 
-/** Save a mid-mission checkpoint (stage + player spot + cash). */
+/** The target a mission/stage should point at (used by start + resume). */
+export function targetForMission(city, index, stage) {
+  if (index === 0) return docksTarget(city);
+  if (index === 1) return stage === 0 ? plazaTarget(city) : marinaTarget(city);
+  if (index === 2) return null;
+  if (index === 3) return docksTarget(city);
+  if (index === 4) return stage === 0 ? casinoTarget(city) : lighthouseTarget(city);
+  return null;
+}
+
+/** Save a mid-mission checkpoint (stage + player spot + cash + wanted + tokens). */
 export function saveCheckpoint(world, label) {
   const mission = world.mission;
   const p = world.player;
@@ -87,6 +111,8 @@ export function saveCheckpoint(world, label) {
     x: p.inCar && p.car ? p.car.x : p.x,
     y: p.inCar && p.car ? p.car.y : p.y,
     cash: world.cash,
+    wanted: world.wanted,
+    taken: world.collectibles.map((c, i) => (c.taken ? i : -1)).filter((i) => i >= 0),
     collected: world.collectibles.filter((c) => c.taken).length,
   };
   mission.checkpoint = cp;
@@ -181,6 +207,8 @@ export function startMission(world, index) {
     mission.target = docksTarget(city);
     world.gunmen = 4;
     for (let i = 0; i < 4; i += 1) spawnPoliceUnit(world.police, world.player, world.rng, 'gunman', world.city);
+  } else if (index === 4) {
+    mission.target = casinoTarget(city);
   }
   saveCheckpoint(world, `${def.title} — start`);
 }
@@ -193,7 +221,7 @@ function completeMission(world) {
   mission.dialogue = [`${def.title} complete — $${def.reward} earned.`];
   mission.dialogueTimer = 4;
   mission.target = null;
-  if (mission.index === 3) {
+  if (mission.index === 4) {
     mission.done = true;
     world.gunmen = 0;
     clearPolice(world.police);
@@ -259,6 +287,16 @@ export function updateMission(world, dt) {
       saveCheckpoint(world, 'Harbor Showdown — crew down');
     }
     if (mission.stage === 1 && near(world, docksTarget(city), 90)) completeMission(world);
+  } else if (mission.index === 4) {
+    if (mission.stage === 0 && near(world, casinoTarget(city), 90)) {
+      mission.stage = 1;
+      mission.target = lighthouseTarget(city);
+      mission.dialogue = ['Cut secured. Now the lighthouse, east end of the docks.'];
+      mission.dialogueTimer = 4;
+      world.events.pickup = true;
+      saveCheckpoint(world, 'The Last Run — cut grabbed');
+    }
+    if (mission.stage === 1 && near(world, lighthouseTarget(city), 90)) completeMission(world);
   }
 }
 
@@ -296,6 +334,99 @@ export function updateRace(world, dt) {
   }
 }
 
+/** Taxi side job: drive to the waving fare, then to their destination. */
+export function createTaxi() {
+  return { state: 'idle', fare: null, dest: null, timer: 0, reward: TAXI_FARE, cooldown: 0 };
+}
+
+function randomRoadSpot(world, minDist) {
+  const p = world.player;
+  for (let tries = 0; tries < 12; tries += 1) {
+    const vertical = world.rng.chance(0.5);
+    let x;
+    let y;
+    if (vertical) {
+      x = world.rng.pick(world.city.roadsV);
+      y = world.rng.range(120, 1800);
+    } else {
+      x = world.rng.range(120, 2300);
+      y = world.rng.pick(world.city.roadsH);
+    }
+    if (Math.hypot(x - p.x, y - p.y) >= minDist) return { x, y };
+  }
+  return { x: world.city.roadsV[2], y: world.city.roadsH[2] };
+}
+
+export function updateTaxi(world, dt) {
+  const taxi = world.taxi;
+  if (!taxi) return;
+  const p = world.player;
+  const px = p.inCar && p.car ? p.car.x : p.x;
+  const py = p.inCar && p.car ? p.car.y : p.y;
+  if (taxi.state === 'idle') {
+    // A fare waves only when Jax is driving a cab — a sedan driver
+    // never gets hijacked by taxi dialogue mid-mission or mid-chase.
+    if (taxi.cooldown > 0) {
+      taxi.cooldown -= dt;
+      return;
+    }
+    if (p.inCar && p.car && p.car.body === 'taxi') {
+      taxi.fare = randomRoadSpot(world, 300);
+      taxi.state = 'pickup';
+      world.mission.dialogue = ['TAXI: A fare is waving down the street — pick them up.'];
+      world.mission.dialogueTimer = 4;
+    }
+    return;
+  }
+  if (taxi.state === 'pickup') {
+    if (Math.hypot(px - taxi.fare.x, py - taxi.fare.y) < 60) {
+      taxi.dest = randomRoadSpot(world, 500);
+      taxi.state = 'dropoff';
+      taxi.timer = TAXI_TIME_LIMIT;
+      world.mission.dialogue = [`TAXI: Passenger aboard — take them to the marker, $${TAXI_FARE} fare.`];
+      world.mission.dialogueTimer = 4;
+    }
+    return;
+  }
+  taxi.timer -= dt;
+  if (Math.hypot(px - taxi.dest.x, py - taxi.dest.y) < 70) {
+    world.cash += taxi.reward;
+    world.events.taxiFare = { reward: taxi.reward };
+    world.events.cash = true;
+    world.mission.dialogue = [`TAXI: Fare complete — $${taxi.reward} earned.`];
+    world.mission.dialogueTimer = 4;
+    taxi.state = 'idle';
+    taxi.fare = null;
+    taxi.dest = null;
+    taxi.cooldown = 20;
+  } else if (taxi.timer <= 0) {
+    world.mission.dialogue = ['TAXI: Too slow — the passenger got out and walked.'];
+    world.mission.dialogueTimer = 4;
+    taxi.state = 'idle';
+    taxi.fare = null;
+    taxi.dest = null;
+    taxi.cooldown = 20;
+  }
+}
+
+/**
+ * Repair the player's car at the garage bay: $150 restores it to full
+ * health and pops the tires back on. Returns 'ok', 'broke', 'fine' or 'far'.
+ */
+export function repairAtGarage(world) {
+  const p = world.player;
+  const g = world.city.garage;
+  if (!p.inCar || !p.car) return 'far';
+  if (Math.hypot(p.car.x - g.x, p.car.y - g.y) > 80) return 'far';
+  if (!p.car.tiresPopped && (p.car.hp === undefined || p.car.hp >= GARAGE_REPAIR)) return 'fine';
+  if (world.cash < GARAGE_COST) return 'broke';
+  world.cash -= GARAGE_COST;
+  p.car.hp = GARAGE_REPAIR;
+  p.car.tiresPopped = false;
+  world.events.repair = true;
+  return 'ok';
+}
+
 /** Collect harbor tokens and weapon pickups the player walks or drives over. */
 export function updatePickups(world) {
   const p = world.player;
@@ -322,6 +453,12 @@ export function updatePickups(world) {
 
 export function currentObjective(world) {
   const mission = world.mission;
+  if (world.taxi && world.taxi.state === 'pickup') {
+    return 'Taxi: pick up the waving fare';
+  }
+  if (world.taxi && world.taxi.state === 'dropoff') {
+    return `Taxi: drop off the passenger — ${Math.max(0, world.taxi.timer).toFixed(0)}s left`;
+  }
   if (world.race && world.race.active) {
     return `Street race: checkpoint ${world.race.index + 1}/${world.race.points.length} — ${world.race.timer.toFixed(1)}s`;
   }
