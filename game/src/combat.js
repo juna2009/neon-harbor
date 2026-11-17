@@ -1,7 +1,9 @@
-// Neon Harbor — pistol combat. Bullets fly from the player's aim or from
-// hostile gunmen, hit buildings, pedestrians and police, and raise the
-// wanted level when the player hurts a bystander in public.
-import { PLAYER } from './config.js';
+// Neon Harbor — combat. Three weapons (pistol, SMG, shotgun) with their
+// own fire rate, spread and pellet count; bullets fly from the player's
+// aim or from hostile gunmen, hit buildings, pedestrians, police and cars,
+// and raise the wanted level when the player hurts a bystander in public.
+// Destroyed cars go up in an explosion of sparks and smoke.
+import { WEAPONS } from './config.js';
 import { buildingAt } from './city.js';
 import { addWanted } from './police.js';
 
@@ -9,14 +11,30 @@ export function createBullets() {
   return [];
 }
 
-export function fireBullet(bullets, x, y, angle, hostile) {
+/** One bullet from a weapon definition, with spread already applied. */
+export function fireBullet(bullets, x, y, angle, hostile, weapon) {
+  const def = weapon || WEAPONS.pistol;
   bullets.push({
     x, y,
-    vx: Math.cos(angle) * PLAYER.bulletSpeed,
-    vy: Math.sin(angle) * PLAYER.bulletSpeed,
+    vx: Math.cos(angle) * def.bulletSpeed,
+    vy: Math.sin(angle) * def.bulletSpeed,
     life: 1.1,
+    damage: def.damage,
     hostile: !!hostile,
   });
+}
+
+/**
+ * Fire a whole shot from `weaponKey` (pellets + spread) at (x, y) along
+ * `angle`. Returns true when a shot was actually fired.
+ */
+export function fireWeapon(bullets, weaponKey, x, y, angle, hostile) {
+  const def = WEAPONS[weaponKey] || WEAPONS.pistol;
+  for (let i = 0; i < def.pellets; i += 1) {
+    const spread = (Math.random() - 0.5) * def.spread * 2;
+    fireBullet(bullets, x, y, angle + spread, hostile, def);
+  }
+  return true;
 }
 
 function hitCircle(bx, by, x, y, r) {
@@ -49,6 +67,22 @@ export function stepBullets(world, dt) {
       }
     }
     if (!dead && !b.hostile) {
+      // Traffic cars can be shot out: they burn and explode.
+      const allCars = world.traffic.cars.concat(world.traffic.parked);
+      for (const car of allCars) {
+        if (car.alive && car.kind !== 'player' && hitCircle(b.x, b.y, car.x, car.y, 26)) {
+          dead = true;
+          car.health -= b.damage;
+          if (car.health <= 0) {
+            car.alive = false;
+            world.events.explosion = { x: car.x, y: car.y };
+            addWanted(world, 1);
+          }
+          break;
+        }
+      }
+    }
+    if (!dead && !b.hostile) {
       for (let u = world.police.units.length - 1; u >= 0; u -= 1) {
         const unit = world.police.units[u];
         const ux = unit.kind === 'car' ? unit.car.x : unit.x;
@@ -56,9 +90,10 @@ export function stepBullets(world, dt) {
         const r = unit.kind === 'car' ? 26 : 14;
         if (hitCircle(b.x, b.y, ux, uy, r)) {
           dead = true;
-          unit.health -= 1;
+          unit.health -= b.damage;
           if (unit.health <= 0) {
             if (unit.kind === 'gunman') world.gunmen = Math.max(0, world.gunmen - 1);
+            if (unit.kind === 'car') world.events.explosion = { x: unit.car.x, y: unit.car.y };
             world.police.units.splice(u, 1);
           }
           break;

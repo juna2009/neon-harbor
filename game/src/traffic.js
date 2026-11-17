@@ -1,6 +1,8 @@
 // Neon Harbor — traffic cars, parked cars and pedestrians. Traffic drives
-// along road centre lines and wraps at the map edge; pedestrians stroll the
-// sidewalks and run from gunfire, sirens and speeding cars.
+// on the road graph: it follows a road to the next intersection, sometimes
+// turns, and stops for the car ahead or for a car already in the crossing.
+// Pedestrians stroll the sidewalks, run from gunfire, sirens and speeding
+// cars, and now look like different people instead of identical dots.
 import { BLOCK, ROAD_W, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, onRoad } from './city.js';
 
@@ -8,25 +10,43 @@ const TRAFFIC_COUNT = 16;
 const PARKED_COUNT = 12;
 const PED_COUNT = 26;
 
-export function makeCar(x, y, angle, color, kind) {
-  return { x, y, angle, speed: 0, color, kind: kind || 'traffic', length: 46, width: 22, alive: true };
+// Body styles: length/width in world pixels. The renderer draws each one
+// differently (sedan, short hatch, long van, yellow taxi).
+export const CAR_BODIES = {
+  sedan: { length: 46, width: 22 },
+  hatch: { length: 40, width: 22 },
+  van: { length: 54, width: 24 },
+  taxi: { length: 46, width: 22 },
+};
+
+export function makeCar(x, y, angle, color, kind, body) {
+  const shape = CAR_BODIES[body || 'sedan'];
+  return {
+    x, y, angle, speed: 0, color, kind: kind || 'traffic',
+    body: body || 'sedan', length: shape.length, width: shape.width,
+    alive: true, health: 2,
+  };
 }
 
 export function createTraffic(city, rng) {
   const cars = [];
   for (let i = 0; i < TRAFFIC_COUNT; i += 1) {
     const vertical = rng.chance(0.5);
+    const body = rng.weighted([['sedan', 5], ['hatch', 3], ['van', 1], ['taxi', 2]]);
+    const color = body === 'taxi' ? '#f7c948' : rng.pick(city.carColors);
     let car;
     if (vertical) {
       const rx = rng.pick(city.roadsV);
-      car = makeCar(rx + (rng.chance(0.5) ? 18 : -18), rng.range(40, WORLD_H - 40), rng.chance(0.5) ? Math.PI / 2 : -Math.PI / 2, rng.pick(city.carColors));
+      car = makeCar(rx + (rng.chance(0.5) ? 18 : -18), rng.range(40, WORLD_H - 40), rng.chance(0.5) ? Math.PI / 2 : -Math.PI / 2, color, 'traffic', body);
       car.axis = 'v';
       car.road = rx;
+      car.dir = car.angle > 0 ? 1 : -1;
     } else {
       const ry = rng.pick(city.roadsH);
-      car = makeCar(rng.range(40, WATER_X - 40), ry + (rng.chance(0.5) ? 18 : -18), rng.chance(0.5) ? 0 : Math.PI, rng.pick(city.carColors));
+      car = makeCar(rng.range(40, WATER_X - 40), ry + (rng.chance(0.5) ? 18 : -18), rng.chance(0.5) ? 0 : Math.PI, color, 'traffic', body);
       car.axis = 'h';
       car.road = ry;
+      car.dir = car.angle === 0 ? 1 : -1;
     }
     car.speed = rng.range(90, 170);
     car.cruise = car.speed;
@@ -35,19 +55,90 @@ export function createTraffic(city, rng) {
   const parked = [];
   for (let i = 0; i < PARKED_COUNT; i += 1) {
     const vertical = rng.chance(0.5);
+    const body = rng.weighted([['sedan', 5], ['hatch', 3], ['van', 1], ['taxi', 1]]);
+    const color = body === 'taxi' ? '#f7c948' : rng.pick(city.carColors);
     if (vertical) {
       const rx = rng.pick(city.roadsV);
-      parked.push(makeCar(rx + 30, rng.range(200, WORLD_H - 200), Math.PI / 2, rng.pick(city.carColors), 'parked'));
+      parked.push(makeCar(rx + 30, rng.range(200, WORLD_H - 200), Math.PI / 2, color, 'parked', body));
     } else {
       const ry = rng.pick(city.roadsH);
-      parked.push(makeCar(rng.range(200, WATER_X - 200), ry + 30, 0, rng.pick(city.carColors), 'parked'));
+      parked.push(makeCar(rng.range(200, WATER_X - 200), ry + 30, 0, color, 'parked', body));
     }
   }
   return { cars, parked };
 }
 
-export function stepTraffic(traffic, dt) {
+/** Next intersection coordinate along the car's road and direction. */
+function nextIntersectionCoord(car, city) {
+  const line = car.axis === 'v' ? city.roadsH : city.roadsV;
+  const at = car.axis === 'v' ? car.y : car.x;
+  let best = null;
+  for (const c of line) {
+    if (car.dir > 0 && c > at + 8) { best = c; break; }
+    if (car.dir < 0 && c < at - 8) best = c;
+  }
+  return best;
+}
+
+/** True when something is directly ahead of `car` within `gap` pixels. */
+function blockedAhead(car, others, gap) {
+  const fx = Math.cos(car.angle);
+  const fy = Math.sin(car.angle);
+  for (const o of others) {
+    if (!o || o === car || o.alive === false) continue;
+    const dx = o.x - car.x;
+    const dy = o.y - car.y;
+    const along = dx * fx + dy * fy;
+    if (along < 0 || along > gap) continue;
+    const side = Math.abs(dx * -fy + dy * fx);
+    if (side < 26) return true;
+  }
+  return false;
+}
+
+/**
+ * One traffic step. `obstacles` are extra cars to stop for (the player's
+ * car, police cars). Cars turn at intersections, queue behind the car
+ * ahead, and wait when the crossing ahead is occupied.
+ */
+export function stepTraffic(traffic, dt, city, obstacles) {
+  const others = traffic.cars.concat(obstacles || []);
   for (const car of traffic.cars) {
+    if (!car.alive) continue;
+    const next = nextIntersectionCoord(car, city);
+    const at = car.axis === 'v' ? car.y : car.x;
+    const distToNext = next === null ? Infinity : Math.abs(next - at);
+
+    // Decide at the intersection: turn sometimes, otherwise carry on.
+    if (distToNext < Math.max(6, car.speed * dt + 2)) {
+      if (Math.random() < 0.38) {
+        // Turn onto the crossing road. The lane offset is re-rolled so
+        // the car exits the corner on a legal lane of the new road.
+        const lane = Math.random() < 0.5 ? 18 : -18;
+        const newDir = Math.random() < 0.5 ? 1 : -1;
+        if (car.axis === 'v') {
+          car.axis = 'h';
+          car.road = next;
+          car.dir = newDir;
+          car.angle = newDir > 0 ? 0 : Math.PI;
+          car.y = next + lane;
+        } else {
+          car.axis = 'v';
+          car.road = next;
+          car.dir = newDir;
+          car.angle = newDir > 0 ? Math.PI / 2 : -Math.PI / 2;
+          car.x = next + lane;
+        }
+      }
+    }
+
+    // Stop for the car ahead, for a car in the crossing, or for an obstacle.
+    let desired = car.cruise;
+    if (blockedAhead(car, others, 78)) desired = 0;
+    if (distToNext < 90 && blockedAhead({ ...car, x: car.x + Math.cos(car.angle) * 60, y: car.y + Math.sin(car.angle) * 60, angle: car.angle }, others, 60)) desired = 0;
+    if (desired === 0) car.speed = Math.max(0, car.speed - 420 * dt);
+    else car.speed = Math.min(desired, car.speed + 240 * dt);
+
     const step = car.speed * dt;
     car.x += Math.cos(car.angle) * step;
     car.y += Math.sin(car.angle) * step;
@@ -58,9 +149,12 @@ export function stepTraffic(traffic, dt) {
   }
 }
 
+const PED_SKINS = ['#e8b98a', '#c98d5f', '#8a5a3b', '#f0c8a0'];
+const PED_SHIRTS = ['#e8e4d8', '#f2a65a', '#7fb5d5', '#c39bd3', '#82e0aa', '#f5b7b1', '#e74c3c', '#2ecc71'];
+const PED_PANTS = ['#2c3e50', '#5d4037', '#37474f', '#4a235a', '#1b4f72'];
+
 export function createPedestrians(city, rng) {
   const peds = [];
-  const palette = ['#e8e4d8', '#f2a65a', '#7fb5d5', '#c39bd3', '#82e0aa', '#f5b7b1'];
   for (let i = 0; i < PED_COUNT; i += 1) {
     const vertical = rng.chance(0.5);
     let x;
@@ -80,7 +174,12 @@ export function createPedestrians(city, rng) {
     peds.push({
       x, y, angle,
       speed: rng.range(28, 52),
-      color: rng.pick(palette),
+      color: rng.pick(PED_SHIRTS),
+      skin: rng.pick(PED_SKINS),
+      pants: rng.pick(PED_PANTS),
+      // 0 no hat, 1 cap, 2 beanie — the renderer draws each differently.
+      hat: rng.weighted([[0, 5], [1, 3], [2, 2]]),
+      build: rng.weighted([['slim', 5], ['wide', 2]]),
       flee: 0,
       alive: true,
       walkPhase: rng.range(0, Math.PI * 2),

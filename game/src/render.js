@@ -214,6 +214,12 @@ export function createRenderer(canvas) {
       drawCarShape(ctx, car);
     } else {
       drawPerson(ctx, p.x, p.y, p.angle, COLORS.player, PLAYER.radius, p.runPhase);
+      // White ring so Jax reads at a glance among the pedestrians.
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, PLAYER.radius + 3, 0, Math.PI * 2);
+      ctx.stroke();
       // Aim line and pistol.
       ctx.strokeStyle = 'rgba(255,210,62,0.8)';
       ctx.lineWidth = 2;
