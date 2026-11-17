@@ -1,9 +1,4 @@
-// Neon Harbor — hydrant jets, wet asphalt and gas fireballs; drawing only: the city, cars, people, effects, the HUD
-// (cash, health, wanted stars, ammo, speed, objective, minimap) and the
-// title, pause, settings and game-over screens. The camera follows the
-// player and pulls back as the car goes faster. Nothing is drawn outside
-// the camera view, and glow/vignette are pre-rendered once to offscreen
-// canvases instead of shadowBlur per frame.
+// Neon Harbor — drawing only: city, cars, people, effects, HUD.
 import { COLORS, PLAYER, UPGRADES, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, districtAt } from './city.js';
 import { currentObjective, garageHot } from './missions.js';
@@ -28,7 +23,6 @@ function rr(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-/** A radial glow sprite, pre-rendered once and stamped wherever light is. */
 function makeGlowSprite(size, inner, outer) {
   const c = document.createElement('canvas');
   c.width = size;
@@ -47,13 +41,11 @@ function drawCarShape(ctx, car, night) {
   const W = car.width;
   ctx.save();
   ctx.translate(car.x, car.y);
-  // Ground shadow: the car reads as sitting on the street, not floating.
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.beginPath();
   ctx.ellipse(2, 3, L / 2 + 2, W / 2 + 2, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.rotate(car.angle);
-  // Headlight cones at night: a pale wedge ahead of the car.
   if (night > 0.3) {
     ctx.fillStyle = `rgba(255,240,170,${(0.10 * night).toFixed(3)})`;
     ctx.beginPath();
@@ -64,7 +56,6 @@ function drawCarShape(ctx, car, night) {
     ctx.closePath();
     ctx.fill();
   }
-  // Body.
   ctx.fillStyle = '#14181f';
   rr(ctx, -L / 2 - 2, -W / 2 - 2, L + 4, W + 4, 6);
   ctx.fill();
@@ -72,13 +63,11 @@ function drawCarShape(ctx, car, night) {
   rr(ctx, -L / 2, -W / 2, L, W, 5);
   ctx.fill();
   if (car.body === 'van') {
-    // Long boxy van: side window strip and a sliding-door seam.
     ctx.fillStyle = '#bfe6ff';
     ctx.fillRect(-L / 2 + 8, -W / 2 + 3, L - 22, W - 6);
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.fillRect(2, -W / 2 + 2, 2, W - 4);
   } else if (car.body === 'taxi') {
-    // Yellow cab: checker strip down the flank and a roof sign.
     ctx.fillStyle = '#20242a';
     for (let i = 0; i < 6; i += 1) {
       if (i % 2 === 0) ctx.fillRect(-L / 2 + 8 + i * 5, -W / 2 + 2, 5, 5);
@@ -87,7 +76,6 @@ function drawCarShape(ctx, car, night) {
     ctx.fillStyle = '#ffd23e';
     ctx.fillRect(-6, -W / 2 - 3, 12, 4);
     if (car.pink) {
-      // The pink taxi's crown air freshener on the roof — its signature.
       ctx.fillStyle = '#ffd23e';
       ctx.beginPath();
       ctx.moveTo(-8, -W / 2 - 8);
@@ -99,7 +87,6 @@ function drawCarShape(ctx, car, night) {
       ctx.fill();
     }
   } else {
-    // Sedan / hatch: roof panel, windshield, rear window.
     ctx.fillStyle = 'rgba(0,0,0,0.28)';
     const roofLen = car.body === 'hatch' ? 16 : 20;
     rr(ctx, -roofLen / 2, -W / 2 + 3, roofLen, W - 6, 3);
@@ -109,7 +96,6 @@ function drawCarShape(ctx, car, night) {
     ctx.fillStyle = '#20242a';
     ctx.fillRect(-L / 2 + 6, -W / 2 + 3, 7, W - 6);
   }
-  // Headlights and taillights.
   ctx.fillStyle = '#fff6c8';
   ctx.fillRect(L / 2 - 2, -W / 2 + 2, 3, 4);
   ctx.fillRect(L / 2 - 2, W / 2 - 6, 3, 4);
@@ -133,31 +119,25 @@ function drawPerson(ctx, x, y, angle, ped, walkPhase) {
   const swing = Math.sin(walkPhase) * 4;
   ctx.save();
   ctx.translate(x, y);
-  // Ground shadow.
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.beginPath();
   ctx.ellipse(0, radius * 0.8, radius, radius * 0.45, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.translate(0, bob);
   ctx.rotate(angle);
-  // Legs, swinging with the walk.
   ctx.fillStyle = ped.pants || '#2c3e50';
   ctx.fillRect(-3, -radius * 0.7, 6, 3);
   ctx.fillRect(-3 + swing * 0.4, radius * 0.7 - 3, 6, 3);
-  // Body: shirt, wider for the wide build.
   ctx.fillStyle = ped.color;
   const bw = ped.build === 'wide' ? radius * 1.5 : radius * 1.2;
   rr(ctx, -radius * 0.7, -bw / 2, radius * 1.4, bw, 4);
   ctx.fill();
-  // Arms.
   ctx.fillStyle = ped.skin || '#e8b98a';
   ctx.fillRect(radius * 0.3, -bw / 2 - 2, 4, 4);
   ctx.fillRect(radius * 0.3, bw / 2 - 2, 4, 4);
-  // Head.
   ctx.beginPath();
   ctx.arc(radius * 0.75, 0, radius * 0.55, 0, Math.PI * 2);
   ctx.fill();
-  // Hat: 1 cap with a brim, 2 beanie.
   if (ped.hat === 1) {
     ctx.fillStyle = '#20242a';
     ctx.beginPath();
@@ -175,7 +155,6 @@ function drawPerson(ctx, x, y, angle, ped, walkPhase) {
     ctx.fill();
   }
   if (ped.photo > 0) {
-    // Phone raised, filming the chase.
     ctx.fillStyle = '#14181f';
     ctx.fillRect(radius * 0.75, -radius - 8, 5, 10);
     ctx.fillStyle = '#bfe6ff';
@@ -184,17 +163,14 @@ function drawPerson(ctx, x, y, angle, ped, walkPhase) {
   ctx.restore();
 }
 
-/** A speedboat: pointed bow, coloured stripe, windshield, outboard motor. */
 function drawBoatShape(ctx, boat) {
   ctx.save();
   ctx.translate(boat.x, boat.y);
-  // Shadow on the water.
   ctx.fillStyle = 'rgba(0,0,0,0.3)';
   ctx.beginPath();
   ctx.ellipse(2, 3, 30, 12, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.rotate(boat.angle);
-  // Hull.
   ctx.fillStyle = boat.color || '#e8e4d8';
   ctx.beginPath();
   ctx.moveTo(28, 0);
@@ -208,18 +184,15 @@ function drawBoatShape(ctx, boat) {
   ctx.fill();
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
   ctx.fillRect(-24, -10, 40, 3);
-  // Windshield and cockpit.
   ctx.fillStyle = '#bfe6ff';
   ctx.fillRect(2, -7, 10, 14);
   ctx.fillStyle = '#20242a';
   ctx.fillRect(-14, -7, 12, 14);
-  // Outboard motor at the stern.
   ctx.fillStyle = '#14181f';
   ctx.fillRect(-32, -5, 6, 10);
   ctx.restore();
 }
 
-/** Jax on foot: yellow jacket, dark pants, cap, pistol in hand — readable at a glance. */
 function drawPlayer(ctx, p, state) {
   const bob = Math.sin(p.runPhase) * 1.5;
   ctx.save();
@@ -230,16 +203,13 @@ function drawPlayer(ctx, p, state) {
   ctx.fill();
   ctx.translate(0, bob);
   ctx.rotate(p.angle);
-  // Pistol in the aiming hand.
   ctx.fillStyle = '#1c1f24';
   ctx.fillRect(10, -2, 12, 4);
-  // Jacket body.
   ctx.fillStyle = COLORS.player;
   rr(ctx, -12, -9, 24, 18, 7);
   ctx.fill();
   ctx.fillStyle = '#1c1f24';
   ctx.fillRect(-12, -2, 24, 3);
-  // Head with a dark cap.
   ctx.fillStyle = '#e8b98a';
   ctx.beginPath();
   ctx.arc(10, 0, 7, 0, Math.PI * 2);
@@ -250,13 +220,11 @@ function drawPlayer(ctx, p, state) {
   ctx.fill();
   ctx.fillRect(10, -7, 8, 3);
   ctx.restore();
-  // White ring so Jax reads at a glance among the pedestrians.
   ctx.strokeStyle = 'rgba(255,255,255,0.9)';
   ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.arc(p.x, p.y, PLAYER.radius + 3, 0, Math.PI * 2);
   ctx.stroke();
-  // Aim line.
   ctx.strokeStyle = 'rgba(255,210,62,0.8)';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -271,9 +239,6 @@ export function createRenderer(canvas) {
   const fonts = new Map();
   const glowSprite = makeGlowSprite(128, 'rgba(255,255,255,0.9)', 'rgba(255,255,255,0)');
   const vignetteSprite = makeGlowSprite(512, 'rgba(0,0,0,0)', 'rgba(0,0,0,0.55)');
-  // Pre-rendered static city: roads, buildings, parks and water painted
-  // once to an offscreen canvas, then stamped per frame with drawImage —
-  // the whole static layer costs one blit instead of hundreds of fills.
   let staticLayer = null;
   let staticCity = null;
 
@@ -364,7 +329,6 @@ export function createRenderer(canvas) {
         }
       }
       if (b.landmark === 'lighthouse') {
-        // Striped tower: red bands over the white pier house.
         g.fillStyle = '#c0392b';
         g.fillRect(b.x + 6, b.y + 8, b.w - 12, 8);
         g.fillRect(b.x + 6, b.y + 28, b.w - 12, 8);
@@ -421,15 +385,12 @@ export function createRenderer(canvas) {
     let camY = state.camera.y;
     camX = vw >= WORLD_W ? WORLD_W / 2 : Math.max(vw / 2, Math.min(WORLD_W - vw / 2, camX));
     camY = vh >= WORLD_H ? WORLD_H / 2 : Math.max(vh / 2, Math.min(WORLD_H - vh / 2, camY));
-    // Screen shake from crashes and explosions.
     if (state.shake > 0) {
       camX += (Math.random() - 0.5) * state.shake;
       camY += (Math.random() - 0.5) * state.shake;
     }
     const ox = view.w / 2 - camX * zoom;
     const oy = view.h / 2 - camY * zoom;
-    // A storm front darkens the sky on top of the day/night cycle.
-    // A blackout kills the light entirely: total darkness, no neon.
     const blackout = !!(state.blackout && state.blackout.active);
     const night = blackout ? 1 : Math.min(1, 1 - state.daylight + (state.weather && state.weather.storm ? 0.22 : 0));
     const inView = (x, y, r) => (
@@ -441,16 +402,12 @@ export function createRenderer(canvas) {
     ctx.translate(ox, oy);
     ctx.scale(zoom, zoom);
 
-    // Static city, pre-rendered once: one drawImage blit for the whole
-    // ground, roads, parks and buildings instead of hundreds of fills.
     if (!staticLayer || staticCity !== state.city) {
       staticLayer = buildStaticLayer(state.city);
       staticCity = state.city;
     }
     ctx.drawImage(staticLayer, camX - vw / 2, camY - vh / 2, vw, vh, camX - vw / 2, camY - vh / 2, vw, vh);
 
-    // Animated harbor water: shimmer dashes that drift with the clock,
-    // drawn only over the visible stretch of water.
     ctx.fillStyle = 'rgba(190,230,255,0.35)';
     const waterTop = Math.max(0, camY - vh / 2);
     const waterBottom = Math.min(WORLD_H, camY + vh / 2);
@@ -460,7 +417,6 @@ export function createRenderer(canvas) {
       ctx.fillRect(WATER_X + 40 - drift, y + 70, 44, 4);
     }
 
-    // Wet asphalt sits beneath vehicles, with a glossy blue-white rim.
     for (const w of state.wet) {
       ctx.globalAlpha = Math.min(1, w.life / 3);
       ctx.fillStyle = 'rgba(20,30,50,0.35)';
@@ -473,7 +429,6 @@ export function createRenderer(canvas) {
     ctx.fillStyle = '#7d8183'; ctx.fillRect(gas.x, gas.y, gas.w, gas.h);
     ctx.strokeStyle = '#f2db96'; ctx.lineWidth = 3;
     ctx.strokeRect(gas.x + 8, gas.y + 8, gas.w - 16, gas.h - 16);
-    // Canopy is behind the pump row so the boxes stay legible from above.
     ctx.fillStyle = '#292f3c'; ctx.fillRect(gas.x + 14, gas.y + 25, gas.w - 28, 55);
     ctx.fillStyle = '#ee594d'; ctx.fillRect(gas.x + 14, gas.y + 25, gas.w - 28, 7);
     ctx.fillStyle = '#c6cbd0';
@@ -501,7 +456,6 @@ export function createRenderer(canvas) {
       ctx.fillStyle = '#892b34'; ctx.fillRect(h.x - 5, h.y - 12, 10, 4);
     }
 
-    // Landmark overlays, drawn live over the static layer.
     const city = state.city;
     if (city.stadium) {
       const s = city.stadium;
@@ -530,8 +484,6 @@ export function createRenderer(canvas) {
         ctx.font = `bold 17px ${FONT}`;
         ctx.textAlign = 'center';
         if (blackout) {
-          // One flickering sign in the dark: the casino sign stutters
-          // on and off while every other neon sign is dead.
           const flick = Math.sin(state.elapsed * 23) + Math.sin(state.elapsed * 7.3) > -0.4 ? 1 : 0.12;
           ctx.globalAlpha = flick;
           ctx.fillText('★ CASINO ★', cz.x, cz.y - 108);
@@ -549,7 +501,6 @@ export function createRenderer(canvas) {
     if (city.lighthouse) {
       const lh = city.lighthouse;
       if (inView(lh.x, lh.y, 340)) {
-        // The beam sweeps the harbor, bright at night.
         const beamAngle = state.elapsed * 0.9;
         const beamAlpha = night > 0.3 ? 0.20 : 0.07;
         ctx.fillStyle = `rgba(255,240,170,${beamAlpha.toFixed(3)})`;
@@ -570,8 +521,6 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Garage bay: a teal repair bay on the Old Town crossroads — closed
-    // while its district is hot (HEAT 60+), the shop refuses service.
     const garage = city.garage;
     if (garage && inView(garage.x, garage.y, 90)) {
       const hot = garageHot(state);
@@ -591,7 +540,35 @@ export function createRenderer(canvas) {
       ctx.fillText('G', garage.x, garage.y + 6);
     }
 
-    // Taxi fares: a waving passenger, then their destination.
+    if (state.pizza) {
+      const pizza = state.pizza;
+      if (pizza.state === 'idle' && inView(pizza.shop.x, pizza.shop.y, 60)) {
+        ctx.fillStyle = '#ff9d4d';
+        ctx.fillRect(pizza.shop.x - 12, pizza.shop.y - 12, 24, 24);
+        ctx.strokeStyle = '#0e1420';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(pizza.shop.x - 12, pizza.shop.y - 12, 24, 24);
+        ctx.fillStyle = '#0e1420';
+        ctx.font = `bold 13px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('P', pizza.shop.x, pizza.shop.y + 5);
+        ctx.fillStyle = '#ff9d4d';
+        ctx.font = `bold 13px ${FONT}`;
+        ctx.fillText('PIZZERIA — grab the box', pizza.shop.x, pizza.shop.y - 22);
+      }
+      if (pizza.state === 'deliver' && pizza.dest && inView(pizza.dest.x, pizza.dest.y, 60)) {
+        ctx.strokeStyle = '#ff9d4d';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(pizza.dest.x, pizza.dest.y, 26, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#ff9d4d';
+        ctx.font = `bold 13px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(`PIZZA DROP — ${Math.max(0, pizza.timer).toFixed(0)}s`, pizza.dest.x, pizza.dest.y - 34);
+      }
+    }
+
     if (state.taxi) {
       const taxi = state.taxi;
       if (taxi.state === 'pickup' && taxi.fare && inView(taxi.fare.x, taxi.fare.y, 60)) {
@@ -619,9 +596,6 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Neon glow at night over the buildings, stamped from the
-    // pre-rendered sprite — never shadowBlur per frame. In a blackout
-    // every neon sign is dead: no glow at all.
     for (const b of state.city.buildings) {
       if (!inView(b.x + b.w / 2, b.y + b.h / 2, Math.max(b.w, b.h))) continue;
       if (!blackout && night > 0.4) {
@@ -631,7 +605,6 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Skid marks, fading with age.
     for (const skid of state.skids) {
       if (!inView(skid.x, skid.y, 30)) continue;
       ctx.save();
@@ -643,7 +616,6 @@ export function createRenderer(canvas) {
       ctx.restore();
     }
 
-    // Collectibles: gold harbor tokens, pulsing.
     for (const c of state.collectibles) {
       if (c.taken || !inView(c.x, c.y, 30)) continue;
       const pulse = 1 + Math.sin(state.elapsed * 5 + c.x) * 0.2;
@@ -660,7 +632,6 @@ export function createRenderer(canvas) {
       ctx.fillText('$', c.x, c.y + 4);
     }
 
-    // Weapon pickups: coloured crates with the weapon's initial.
     for (const pk of state.pickups) {
       if (pk.taken || !inView(pk.x, pk.y, 30)) continue;
       const def = WEAPONS[pk.weapon];
@@ -675,7 +646,6 @@ export function createRenderer(canvas) {
       ctx.fillText(def.name[0], pk.x, pk.y + 5);
     }
 
-    // Street race start flag and checkpoints.
     if (state.race) {
       const race = state.race;
       if (inView(race.start.x, race.start.y, 40)) {
@@ -704,7 +674,6 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Mission marker: a pulsing beacon and a line from the player.
     if (state.mission.target) {
       const t = state.mission.target;
       if (inView(t.x, t.y, 60)) {
@@ -725,7 +694,6 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Parked and traffic cars.
     for (const car of state.traffic.parked) {
       if (car.alive && inView(car.x, car.y, 60)) drawCarShape(ctx, car, night);
     }
@@ -733,16 +701,36 @@ export function createRenderer(canvas) {
       if (car.alive && inView(car.x, car.y, 60)) drawCarShape(ctx, car, night);
     }
 
-    // Pedestrians.
+    if (state.armored && state.armored.truck) {
+      const truck = state.armored.truck;
+      if (truck.alive && inView(truck.x, truck.y, 60)) {
+        drawCarShape(ctx, truck, night);
+        ctx.fillStyle = '#ffd23e';
+        ctx.font = `bold 15px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('$', truck.x, truck.y + 5);
+      }
+    }
+
     for (const ped of state.peds) {
       if (!ped.alive || !inView(ped.x, ped.y, 30)) continue;
       drawPerson(ctx, ped.x, ped.y, ped.angle, ped, ped.walkPhase);
     }
 
-    // Police.
     for (const unit of state.police.units) {
-      if (unit.kind === 'car') {
+      if (unit.kind === 'car' || unit.kind === 'mtruck') {
         if (!inView(unit.car.x, unit.car.y, 60)) continue;
+        if (unit.car.concrete) {
+          ctx.save();
+          ctx.translate(unit.car.x, unit.car.y);
+          ctx.rotate(unit.car.angle);
+          ctx.fillStyle = '#6b6f75';
+          ctx.fillRect(-28, -14, 56, 28);
+          ctx.fillStyle = '#ffd23e';
+          for (let i = 0; i < 4; i += 1) ctx.fillRect(-28 + i * 14, -14, 7, 28);
+          ctx.restore();
+          continue;
+        }
         drawCarShape(ctx, unit.car, night);
         const blink = Math.floor(state.elapsed * 6) % 2 === 0;
         ctx.fillStyle = blink ? '#ff3b30' : '#2f6fd0';
@@ -756,7 +744,6 @@ export function createRenderer(canvas) {
         }
       } else if (unit.kind === 'gunman') {
         if (!inView(unit.x, unit.y, 30)) continue;
-        // Harbor Crew gunman: dark red jacket, bandana, rifle — not police.
         const gunman = { ...unit, color: COLORS.gunman, skin: '#c98d5f', pants: '#1c1f24', hat: 0, build: 'wide' };
         drawPerson(ctx, unit.x, unit.y, unit.angle, gunman, state.elapsed * 8);
         ctx.save();
@@ -769,11 +756,10 @@ export function createRenderer(canvas) {
         ctx.restore();
       } else {
         if (!inView(unit.x, unit.y, 30)) continue;
-        const officer = { ...unit, color: COLORS.police, skin: '#e8b98a', pants: '#1c2f4a', hat: 1, build: 'slim' };
+        const soldier = unit.kind === 'soldier';
+        const officer = { ...unit, color: soldier ? '#5a6b3a' : COLORS.police, skin: '#e8b98a', pants: soldier ? '#3a4426' : '#1c2f4a', hat: 1, build: 'slim' };
         drawPerson(ctx, unit.x, unit.y, unit.angle, officer, state.elapsed * 8);
-        // A badge disc behind the P, so it reads as a police marker
-        // instead of a floating letter.
-        ctx.fillStyle = '#1c2f4a';
+        ctx.fillStyle = soldier ? '#3a4426' : '#1c2f4a';
         ctx.beginPath();
         ctx.arc(unit.x, unit.y - 20, 8, 0, Math.PI * 2);
         ctx.fill();
@@ -783,13 +769,10 @@ export function createRenderer(canvas) {
         ctx.fillStyle = '#ffffff';
         ctx.font = `bold 10px ${FONT}`;
         ctx.textAlign = 'center';
-        ctx.fillText('P', unit.x, unit.y - 16);
+        ctx.fillText(soldier ? 'M' : 'P', unit.x, unit.y - 16);
       }
     }
 
-    // Speedboats on the harbor water, wakes trailing behind them — and
-    // the police boats that answer at 4–5 stars, blue hulls, lights
-    // flashing.
     for (const boat of state.boats || []) {
       if (!boat.alive || !inView(boat.x, boat.y, 120)) continue;
       for (const w of boat.wake) {
@@ -801,7 +784,6 @@ export function createRenderer(canvas) {
       }
       drawBoatShape(ctx, boat);
       if (boat.kind === 'player') {
-        // White outline so Jax's boat reads as his, like a resprayed car.
         ctx.save();
         ctx.translate(boat.x, boat.y);
         ctx.rotate(boat.angle);
@@ -830,8 +812,6 @@ export function createRenderer(canvas) {
       ctx.fill();
     }
 
-    // Police helicopter at 4–5 stars: its searchlight cone pins the
-    // player while it circles above them.
     const heli = state.police.heli;
     if (heli && heli.active && inView(heli.x, heli.y, 420)) {
       const px = state.player.x;
@@ -854,7 +834,6 @@ export function createRenderer(canvas) {
       ctx.beginPath();
       ctx.arc(px, py, 34, 0, Math.PI * 2);
       ctx.fill();
-      // Shadow on the ground below, then the airframe and spinning rotor.
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.beginPath();
       ctx.ellipse(heli.x + 10, heli.y + 14, 22, 10, 0, 0, Math.PI * 2);
@@ -884,9 +863,6 @@ export function createRenderer(canvas) {
       ctx.fillText('HELI', heli.x, heli.y - 26);
     }
 
-    // Spike strips: drawn late, over the cars, so a traffic van can
-    // never hide one — black bar with steel teeth, ringed by a pulsing
-    // amber warning outline so the driver sees it coming and can swerve.
     for (const strip of state.police.strips) {
       if (!inView(strip.x, strip.y, 60)) continue;
       ctx.save();
@@ -910,7 +886,6 @@ export function createRenderer(canvas) {
       ctx.restore();
     }
 
-    // Bullets, drawn as streaks along their velocity.
     ctx.strokeStyle = COLORS.neonYellow;
     ctx.lineWidth = 3;
     for (const b of state.bullets) {
@@ -921,8 +896,6 @@ export function createRenderer(canvas) {
       ctx.stroke();
     }
 
-    // Particles: sparks as streaks, smoke as fading puffs, camera
-    // flashes as white starbursts that pop and fade fast.
     for (const pt of state.particles) {
       if (!inView(pt.x, pt.y, pt.size * 2 + 20)) continue;
       const alpha = Math.max(0, pt.life / pt.maxLife);
@@ -957,7 +930,6 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Muzzle flash: a hot star stamped from the glow sprite.
     if (state.events.muzzle) {
       const m = state.events.muzzle;
       ctx.globalAlpha = 0.95;
@@ -968,13 +940,11 @@ export function createRenderer(canvas) {
       ctx.arc(m.x, m.y, 6, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Impact sparks.
     if (state.events.spark) {
       const s = state.events.spark;
       ctx.drawImage(glowSprite, s.x - 16, s.y - 16, 32, 32);
     }
 
-    // Floating cash text.
     for (const f of state.floaters) {
       if (!inView(f.x, f.y, 40)) continue;
       ctx.globalAlpha = Math.max(0, f.life / 1.4);
@@ -985,8 +955,6 @@ export function createRenderer(canvas) {
       ctx.globalAlpha = 1;
     }
 
-    // Player: on foot with aim, or the car they drive. A resprayed car
-    // keeps its new paint (white outline so it still reads as Jax's).
     const p = state.player;
     if (p.inCar && p.car) {
       const car = { ...p.car, color: p.car.paint || COLORS.playerCar, kind: 'player' };
@@ -1001,7 +969,6 @@ export function createRenderer(canvas) {
         ctx.stroke();
         ctx.restore();
       }
-      // Popped tires: smoke puffs from the wheels and a sagging look.
       if (p.car.tiresPopped) {
         ctx.fillStyle = 'rgba(140,140,150,0.55)';
         ctx.beginPath();
@@ -1009,11 +976,9 @@ export function createRenderer(canvas) {
         ctx.fill();
       }
     } else if (!p.inBoat) {
-      // On foot. In a boat the hull is the player (drawn with the boats).
       drawPlayer(ctx, p, state);
     }
 
-    // Rain: falling streaks and the splash rings they leave behind.
     if (state.weather && state.weather.rain) {
       ctx.strokeStyle = 'rgba(174,194,224,0.45)';
       ctx.lineWidth = 1.5;
@@ -1025,8 +990,6 @@ export function createRenderer(canvas) {
         ctx.stroke();
       }
     }
-
-    // The 3 AM UFO: a saucer with a green beam, hovering over the harbor.
     const ufo = state.ufo;
     if (ufo && ufo.active && inView(ufo.x, ufo.y, 420)) {
       const bob = Math.sin(state.elapsed * 2) * 8;
@@ -1066,23 +1029,15 @@ export function createRenderer(canvas) {
 
     ctx.restore();
 
-    // Lighting: night tint, a warm dawn/dusk wash, then the vignette.
     if (night > 0.05) {
       ctx.fillStyle = `rgba(10,14,44,${(night * 0.48).toFixed(3)})`;
       ctx.fillRect(0, 0, view.w, view.h);
     }
     if (state.daylight > 0.55 && state.daylight < 0.85) {
-      // Dawn/dusk warmth over the blue tint: the sky is orange, not navy.
       ctx.fillStyle = 'rgba(255,140,60,0.08)';
       ctx.fillRect(0, 0, view.w, view.h);
     }
     if (blackout) {
-      // Total darkness: an extra black layer over the night tint, so
-      // the blackout reads as a blackout, not as an ordinary night.
-      // Then the lights punch back through — the helicopter
-      // searchlight, the muzzle flash, the one flickering casino sign,
-      // the mission marker and Jax's ring — re-stamped in screen space
-      // on top of the dark, because the world-space versions are under it.
       ctx.fillStyle = 'rgba(2,4,12,0.45)';
       ctx.fillRect(0, 0, view.w, view.h);
       const sx = (x) => (x - camX) * zoom + view.w / 2;
@@ -1164,20 +1119,37 @@ export function createRenderer(canvas) {
       }
     }
     ctx.drawImage(vignetteSprite, 0, 0, view.w, view.h);
-    // Lightning: the whole frame strobes white for 2 frames.
     if (state.weather && state.weather.storm && state.weather.flash > 0) {
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
       ctx.fillRect(0, 0, view.w, view.h);
+    }
+    if (state.weather && state.weather.flash > 0 && state.weather.bolt && state.weather.bolt.points) {
+      const pts = state.weather.bolt.points;
+      const bx = (x) => (x - camX) * zoom + view.w / 2;
+      const by = (y) => (y - camY) * zoom + view.h / 2;
+      ctx.strokeStyle = '#3b6fe0';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(bx(pts[0].x), by(pts[0].y));
+      for (let i = 1; i < pts.length; i += 1) ctx.lineTo(bx(pts[i].x), by(pts[i].y));
+      ctx.stroke();
+      ctx.strokeStyle = '#eaf2ff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(bx(pts[0].x), by(pts[0].y));
+      for (let i = 1; i < pts.length; i += 1) ctx.lineTo(bx(pts[i].x), by(pts[i].y));
+      ctx.stroke();
     }
     return { camX, camY };
   }
 
   function drawStars(ctx2, wanted, x, y) {
     const full = Math.floor(wanted);
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 6; i += 1) {
       const cx = x + i * 26;
       const filled = i < full;
-      ctx2.fillStyle = filled ? COLORS.neonYellow : 'rgba(255,255,255,0.25)';
+      // The 6th star is the military: red, not gold.
+      ctx2.fillStyle = filled ? (i === 5 ? '#ff5a3c' : COLORS.neonYellow) : 'rgba(255,255,255,0.25)';
       ctx2.font = `bold 22px ${FONT}`;
       ctx2.textAlign = 'left';
       ctx2.textBaseline = 'alphabetic';
@@ -1192,7 +1164,6 @@ export function createRenderer(canvas) {
     ctx.fillRect(12, 12, 250, 132);
     text(`$${state.cash}`, 24, 40, 26, COLORS.cash, 'left', 'bold');
     text(`Best $${best}`, 150, 40, 15, '#c8cdd6', 'left');
-    // Health bar.
     ctx.fillStyle = '#3a0d0d';
     ctx.fillRect(24, 52, 160, 14);
     ctx.fillStyle = p.health > 30 ? '#4ade80' : '#ef4444';
@@ -1202,7 +1173,6 @@ export function createRenderer(canvas) {
     const weapon = WEAPONS[p.weapon];
     text(`${weapon.name}  ${p.ammo} / ${p.reserve}`, 24, 118, 15, '#eef1f5', 'left');
     text(`◆ ${collected}/${state.collectibles.length}`, 24, 138, 14, COLORS.neonYellow, 'left', 'bold');
-    // Speed gets its own panel, clear of the hints line — car or boat.
     if ((p.inCar && p.car) || (p.inBoat && p.boat)) {
       const vehicle = p.inCar ? p.car : p.boat;
       const speed = Math.round(Math.abs(vehicle.speed) * 0.36);
@@ -1219,14 +1189,12 @@ export function createRenderer(canvas) {
         text('TIRES POPPED — garage $150 (G)', view.w - 16, view.h - 128, 14, '#ff5a3c', 'right', 'bold');
       }
     }
-    // Hints, kept inside the viewport with a margin.
     const hints = p.inCar
       ? 'E exit · Q weapon · C radio · G repair/respray · M mute'
       : p.inBoat
         ? 'E step ashore · C radio · M mute'
         : 'E enter car / boat · R reload · Q weapon · C radio · M mute';
     text(hints, view.w - 16, view.h - 24, 14, '#c8cdd6', 'right');
-    // Objective bar: solid pad sized to the text, never under a sprite.
     const objective = currentObjective(state);
     ctx.font = `bold 16px ${FONT}`;
     const ow = Math.min(view.w - 32, ctx.measureText(objective).width + 44);
@@ -1235,8 +1203,6 @@ export function createRenderer(canvas) {
     ctx.fillStyle = COLORS.neonCyan;
     ctx.fillRect(16, view.h - 64, 4, 34);
     text(objective, 30, view.h - 41, 16, '#ffffff', 'left', 'bold');
-    // Radio station, small, under the top-left HUD panel — with its own
-    // dark pad, so the pink text never fights a bright building behind it.
     if (ui && ui.stationName) {
       const label = `♪ ${ui.stationName}`;
       ctx.font = `bold 13px ${FONT}`;
@@ -1245,10 +1211,7 @@ export function createRenderer(canvas) {
       ctx.fillRect(12, 152, lw + 24, 24);
       text(label, 24, 168, 13, COLORS.neonPink, 'left', 'bold');
     }
-    // Minimap.
     drawMinimap(ctx, state, view.w - 216, 16, 200, 150);
-    // Day / time / district / heat readout, top centre: the city
-    // remembers what happened in each district.
     const total = state.clock ? state.clock.total : 0;
     const day = 1 + Math.floor(total / 1440);
     const hh = String(Math.floor(total / 60) % 24).padStart(2, '0');
@@ -1266,7 +1229,14 @@ export function createRenderer(canvas) {
     ctx.fillStyle = hot ? '#ff8a7a' : COLORS.neonCyan;
     ctx.fillRect((view.w - rw) / 2, 12, 4, 28);
     text(readout, view.w / 2, 31, 15, hot ? '#ff8a7a' : '#ffffff', 'center', 'bold');
-    // Dialogue box.
+    if (state.wanted >= 6) {
+      const banner = '⚠ MILITARY RESPONSE ⚠';
+      ctx.font = `bold 15px ${FONT}`;
+      const bw = ctx.measureText(banner).width + 28;
+      ctx.fillStyle = 'rgba(120,10,10,0.9)';
+      ctx.fillRect((view.w - bw) / 2, 44, bw, 28);
+      text(banner, view.w / 2, 63, 15, '#ffffff', 'center', 'bold');
+    }
     if (state.mission.dialogueTimer > 0 && state.mission.dialogue.length > 0) {
       const line = state.mission.dialogue[0];
       ctx.fillStyle = 'rgba(14,20,32,0.88)';
@@ -1276,7 +1246,6 @@ export function createRenderer(canvas) {
       text(line, 30, view.h - 126, 16, '#ffffff', 'left');
       text('MARA — Harbor Crew', 30, view.h - 104, 13, COLORS.neonPink, 'left', 'bold');
     }
-    // Wanted flash.
     if (state.wanted >= 3) {
       ctx.fillStyle = 'rgba(239,68,68,0.08)';
       ctx.fillRect(0, 0, view.w, view.h);
@@ -1301,7 +1270,6 @@ export function createRenderer(canvas) {
   }
 
   function drawSkyline() {
-    // A neon skyline silhouette along the bottom of the title screen.
     const base = view.h - 120;
     ctx.fillStyle = '#0a0f1c';
     ctx.fillRect(0, base, view.w, 120);
@@ -1380,8 +1348,6 @@ export function createRenderer(canvas) {
     text('GARAGE — UPGRADE SHOP', view.w / 2, y + 58, 30, '#ffffff', 'center', 'bold');
     text(`Cash $${state.cash} — fitted for good, kept for this visit`, view.w / 2, y + 88, 15, COLORS.cash, 'center');
     if (closed) {
-      // A hot district closes the shop: the panel says so, and no
-      // upgrade can be bought until the heat cools (buyUpgrade: 'closed').
       const g = state.city.garage;
       const d = districtAt(state.city, g.x, g.y);
       const heat = state.heat ? Math.round(state.heat[state.city.districts.indexOf(d)] || 0) : 0;
@@ -1407,7 +1373,6 @@ export function createRenderer(canvas) {
     ctx.fillStyle = '#0e1420';
     ctx.fillRect(0, 0, view.w, view.h);
     if (screen === SCREEN_TITLE) {
-      // Title backdrop: the city itself, camera drifting over downtown.
       const saved = { ...state.camera };
       state.camera.x = 1120 + Math.sin(state.elapsed * 0.1) * 200;
       state.camera.y = 960;
@@ -1415,7 +1380,6 @@ export function createRenderer(canvas) {
       state.camera.x = saved.x;
       state.camera.y = saved.y;
       drawSkyline();
-      // Neon logo glow, stamped from the pre-rendered sprite.
       ctx.globalAlpha = 0.5;
       ctx.drawImage(glowSprite, view.w / 2 - 320, 60, 640, 130);
       ctx.globalAlpha = 1;

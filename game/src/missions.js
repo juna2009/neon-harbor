@@ -1,29 +1,8 @@
-// Neon Harbor — the twelve missions for Jax Marlowe, a driver for hire
-// who gets pulled into the harbor crew's war. Missions 1–5 are the
-// chained story (the Mara twist, the evidence-vault finale); missions
-// 6–12 are shorter side jobs across days 2 and 3 — taxi shifts, a
-// vigilante standoff, a courier dash, a race win, a token hunt, losing
-// a four-star tail, and a dawn boat run to the marina. Each mission has
-// a target marker, dialogue lines and a cash reward; finishing one
-// unlocks the next, and finishing all twelve leaves the city in free
-// roam. Missions save a checkpoint at every stage, so Busted/Wasted
-// resumes mid-mission instead of from the start. Side activities run
-// alongside the story: a street race around Downtown, harbor token
-// collectibles, weapon pickups (SMG at the plaza, shotgun at the docks),
-// taxi fares for quick cash, stealable speedboats on the harbor, a
-// garage that repairs a battered car for $150 — or resprays it for $150
-// to drop one wanted star — and a bubblegum-pink taxi worth $1,000 to
-// the crew if Jax steals it. A hot district (HEAT 60+) closes the
-// garage upgrade shop until it cools down.
-//
-// The story twist: Mara is the police commissioner's daughter. She tipped
-// off the police in mission 3 ("Lose the Heat" was her setup, not bad
-// luck) to protect Jax from a crew that was going to kill him. In the
-// finale she flips: she helps Jax rob the police evidence vault for the
-// ledger that proves her father is corrupt.
-import { CHECKPOINT_KEY, COLLECTIBLE_COUNT, COLLECTIBLE_VALUE, GARAGE_COST, GARAGE_REPAIR, MISSION_REWARDS, PINK_TAXI_REWARD, RACE_REWARD, RESPRAY_COST, RESPRAY_STARS, TAXI_FARE, TAXI_TIME_LIMIT, UPGRADES } from './config.js';
+// Neon Harbor — missions — taxi — race — armored — pizza — tokens.
+import { ARMORED_HAUL, ARMORED_HP, ARMORED_RESPAWN, CHECKPOINT_KEY, COLLECTIBLE_COUNT, COLLECTIBLE_VALUE, GARAGE_COST, GARAGE_REPAIR, MISSION_REWARDS, NIGHT_RACE_BET, NIGHT_RACE_PRIZE, PINK_TAXI_REWARD, PIZZA_FARE, PIZZA_TIME_LIMIT, RACE_REWARD, RESPRAY_COST, RESPRAY_STARS, TAXI_FARE, TAXI_TIME_LIMIT, UPGRADES } from './config.js';
 import { WATER_X } from './city.js';
 import { addWanted, clearPolice, dropWanted, spawnPoliceUnit } from './police.js';
+import { makeCar } from './traffic.js';
 
 export const MISSION_DEFS = [
   {
@@ -76,7 +55,6 @@ export const MISSION_DEFS = [
       'MARA: I cut the power to the district. Grab the ledger, get to the lighthouse. Then we are free.',
     ],
   },
-  // Side jobs, days 2–3 — the crew still needs a driver after the vault.
   {
     title: 'Night Taxi',
     brief: 'Day 2 — the ledger is ours, but the crew still needs cash. Drive a cab and finish two fares.',
@@ -174,29 +152,22 @@ function marinaTarget(city) {
   return { x: city.marina.x + 84, y: city.marina.y + 80, label: 'Marina' };
 }
 // The marina from the water: the same pier, but on the harbor side, so
-// a speedboat can actually reach it (the land marker is 124 px from
-// the water's edge — out of reach for mission 12's boat run).
 function marinaWaterTarget(city) {
   return { x: WATER_X + 40, y: city.marina.y + 80, label: 'Marina' };
 }
 function casinoTarget(city) {
   return { x: city.casino.x, y: city.casino.y, label: 'Casino' };
 }
-// The finale's target is the police evidence vault — the same Downtown
-// tower as the old casino stash, retargeted for the heist against Mara's
-// father. One objective change, same building, new story.
 function vaultTarget(city) {
   return { x: city.casino.x, y: city.casino.y, label: 'Evidence Vault' };
 }
 function lighthouseTarget(city) {
   return { x: city.lighthouse.x, y: city.lighthouse.y, label: 'Lighthouse' };
 }
-// The street race start — same crossroads createRace() uses.
 function raceStartTarget(city) {
   return { x: city.roadsV[4], y: city.roadsH[1], label: 'RACE' };
 }
 
-/** The target a mission/stage should point at (used by start + resume). */
 export function targetForMission(city, index, stage) {
   if (index === 0) return docksTarget(city);
   if (index === 1) return stage === 0 ? plazaTarget(city) : marinaTarget(city);
@@ -215,7 +186,6 @@ export function targetForMission(city, index, stage) {
   return null;
 }
 
-/** Save a mid-mission checkpoint (stage + player spot + cash + wanted + tokens). */
 export function saveCheckpoint(world, label) {
   const mission = world.mission;
   const p = world.player;
@@ -229,15 +199,12 @@ export function saveCheckpoint(world, label) {
     wanted: world.wanted,
     taken: world.collectibles.map((c, i) => (c.taken ? i : -1)).filter((i) => i >= 0),
     collected: world.collectibles.filter((c) => c.taken).length,
-    // District heat rides along with the checkpoint: the city remembers
-    // what happened, even after Busted/Wasted (see world.js reset()).
     heat: Array.isArray(world.heat) ? world.heat.slice() : [0, 0, 0],
   };
   mission.checkpoint = cp;
   try {
     window.localStorage.setItem(CHECKPOINT_KEY, JSON.stringify(cp));
   } catch {
-    // Storage can be off; the checkpoint then lasts this visit only.
   }
   return cp;
 }
@@ -258,11 +225,9 @@ export function clearCheckpoint() {
   try {
     window.localStorage.removeItem(CHECKPOINT_KEY);
   } catch {
-    // Ignore.
   }
 }
 
-/** Street race: five checkpoints in a loop around Downtown. */
 export function createRace(city) {
   const points = [
     { x: city.roadsV[4], y: city.roadsH[2], label: '1' },
@@ -278,10 +243,11 @@ export function createRace(city) {
     index: 0,
     timer: 0,
     best: 0,
+    night: false,
+    bet: false,
   };
 }
 
-/** Twelve harbor tokens hidden at seeded spots: parks, docks, marina. */
 export function createCollectibles(city, rng) {
   const spots = [];
   for (const park of city.parks) spots.push({ x: park.x + park.w / 2, y: park.y + park.h / 2 });
@@ -296,7 +262,6 @@ export function createCollectibles(city, rng) {
   return picked.map((s) => ({ x: s.x, y: s.y, taken: false }));
 }
 
-/** Weapon pickups: SMG at the plaza, shotgun at the docks, ammo at the marina. */
 export function createWeaponPickups(city) {
   return [
     { x: city.roadsV[2] + 46, y: city.roadsH[1] + 46, weapon: 'smg', taken: false },
@@ -327,41 +292,29 @@ export function startMission(world, index) {
     for (let i = 0; i < 4; i += 1) spawnPoliceUnit(world.police, world.player, world.rng, 'gunman', world.city);
   } else if (index === 4) {
     mission.target = vaultTarget(city);
-    // Mara cut the power to the district: the finale runs in a
-    // blackout — 30 seconds of darkness, headlights and searchlight
-    // only (world.js counts the timer down; the staged shot pins it).
     if (world.blackout) {
       world.blackout.active = true;
       world.blackout.timer = 30;
     }
   } else if (index === 5) {
-    // Night Taxi: count fares from here (world.taxiFaresDone).
     mission.target = null;
     mission.count = world.taxiFaresDone || 0;
   } else if (index === 6) {
-    // Vigilante Shift: three stars for sixty seconds.
     mission.target = null;
     addWanted(world, 3);
   } else if (index === 7) {
-    // Courier Dash: three drops on a 150-second clock.
     mission.target = plazaTarget(city);
     mission.limit = 150;
   } else if (index === 8) {
-    // The Long Way Home: the race start is the target. Count race wins
-    // from here (a persistent counter, not the per-step event — events
-    // are wiped at the top of every step, before updateMission runs).
     mission.target = raceStartTarget(city);
     mission.count = world.raceWins || 0;
   } else if (index === 9) {
-    // Token Hunt: four more tokens from the ones still out there.
     mission.target = null;
     mission.count = world.collectibles.filter((c) => c.taken).length;
   } else if (index === 10) {
-    // Ghost Town: four stars, then vanish.
     mission.target = null;
     addWanted(world, 4);
   } else if (index === 11) {
-    // The Harbor King: the marina is the target; the boat is the job.
     mission.target = marinaWaterTarget(city);
   }
   saveCheckpoint(world, `${def.title} — start`);
@@ -376,7 +329,6 @@ function completeMission(world) {
   mission.dialogueTimer = 4;
   mission.target = null;
   if (mission.index === MISSION_DEFS.length - 1) {
-    // The twelfth mission ends the chain: free roam, the harbor is Jax's.
     mission.done = true;
     world.gunmen = 0;
     clearPolice(world.police);
@@ -385,9 +337,6 @@ function completeMission(world) {
     clearCheckpoint();
   } else {
     if (mission.index === 4) {
-      // The story finale ends the same way it always did — the ledger
-      // run clears the police off Jax's tail — but the chain rolls on
-      // into the day 2/3 side jobs instead of stopping at five.
       world.gunmen = 0;
       clearPolice(world.police);
     }
@@ -398,7 +347,6 @@ function completeMission(world) {
   try {
     window.localStorage.setItem('neon-harbor-mission', String(mission.index));
   } catch {
-    // Storage can be off; progress then lasts this visit only.
   }
 }
 
@@ -409,7 +357,6 @@ function near(world, target, radius) {
   return Math.hypot(x - target.x, y - target.y) < radius;
 }
 
-/** Advance the active mission; call every step while playing. */
 export function updateMission(world, dt) {
   const mission = world.mission;
   if (mission.dialogueTimer > 0) mission.dialogueTimer -= dt;
@@ -441,7 +388,6 @@ export function updateMission(world, dt) {
   } else if (mission.index === 2) {
     if (world.wanted <= 0) completeMission(world);
   } else if (mission.index === 3) {
-    // The ambush ends when the crew is down — or after 30 s at the latest.
     if (mission.stage === 0 && (world.gunmen <= 0 || mission.timer > 30)) {
       mission.stage = 1;
       mission.dialogue = ['MARA: That was all of them. The boat is waiting!'];
@@ -456,25 +402,17 @@ export function updateMission(world, dt) {
       mission.dialogue = ['Ledger secured. Now the lighthouse, east end of the docks.'];
       mission.dialogueTimer = 4;
       world.events.pickup = true;
-      // The ledger is grabbed — the power comes back on. The blackout
-      // is the vault grab, not the whole finale (the getaway runs in
-      // normal night light).
       if (world.blackout) world.blackout.active = false;
       saveCheckpoint(world, 'The Last Run — ledger grabbed');
     }
     if (mission.stage === 1 && near(world, lighthouseTarget(city), 90)) completeMission(world);
   } else if (mission.index === 5) {
-    // Night Taxi: two fares finished since the mission started.
     const done = (world.taxiFaresDone || 0) - (mission.count || 0);
     if (done >= 2) completeMission(world);
   } else if (mission.index === 6) {
-    // Vigilante Shift: still standing after 60 seconds at 3 stars.
-    // The crew keeps coming: top the wanted level back up to 3 so the
-    // minute is really spent at three stars, not cooling off.
     if (world.wanted < 3) addWanted(world, 3 - world.wanted);
     if (mission.timer > 60) completeMission(world);
   } else if (mission.index === 7) {
-    // Courier Dash: plaza → marina → lighthouse against the clock.
     if (mission.stage === 0 && near(world, plazaTarget(city), 60)) {
       mission.stage = 1;
       mission.target = marinaTarget(city);
@@ -492,7 +430,6 @@ export function updateMission(world, dt) {
     } else if (mission.stage === 2 && near(world, lighthouseTarget(city), 90)) {
       completeMission(world);
     } else if (mission.timer > (mission.limit || 150)) {
-      // Too slow: the client walks, the job restarts from its start.
       mission.stage = 0;
       mission.timer = 0;
       mission.target = plazaTarget(city);
@@ -500,22 +437,17 @@ export function updateMission(world, dt) {
       mission.dialogueTimer = 5;
     }
   } else if (mission.index === 8) {
-    // The Long Way Home: a race win since the job started.
     if ((world.raceWins || 0) > (mission.count || 0)) completeMission(world);
   } else if (mission.index === 9) {
-    // Token Hunt: four more tokens since the mission started.
     const got = world.collectibles.filter((c) => c.taken).length - (mission.count || 0);
     if (got >= 4) completeMission(world);
   } else if (mission.index === 10) {
-    // Ghost Town: the four stars are gone.
     if (world.wanted <= 0) completeMission(world);
   } else if (mission.index === 11) {
-    // The Harbor King: in a boat, at the marina (water side).
     if (world.player.inBoat && near(world, marinaWaterTarget(city), 90)) completeMission(world);
   }
 }
 
-/** Advance the street race; call every step while playing. */
 export function updateRace(world, dt) {
   const race = world.race;
   const p = world.player;
@@ -526,8 +458,17 @@ export function updateRace(world, dt) {
       race.active = true;
       race.index = 0;
       race.timer = 0;
+      // Night race: started after dark, it is a bet race — $100 in
+      race.night = world.daylight < 0.35;
+      race.bet = false;
+      if (race.night && world.cash >= NIGHT_RACE_BET) {
+        world.cash -= NIGHT_RACE_BET;
+        race.bet = true;
+      }
       world.events.raceStart = true;
-      world.mission.dialogue = ['RACE: Five checkpoints around Downtown. Fastest wins $300.'];
+      world.mission.dialogue = race.night
+        ? [`NIGHT RACE — $${NIGHT_RACE_BET} BET. Five checkpoints — win and take $${NIGHT_RACE_PRIZE}.`]
+        : ['RACE: Five checkpoints around Downtown. Fastest wins $300.'];
       world.mission.dialogueTimer = 4;
     }
     return;
@@ -541,18 +482,19 @@ export function updateRace(world, dt) {
       race.active = false;
       const time = race.timer;
       if (race.best === 0 || time < race.best) race.best = time;
-      world.cash += RACE_REWARD;
+      const reward = race.bet ? NIGHT_RACE_PRIZE : RACE_REWARD;
+      world.cash += reward;
       // A persistent win count: the per-step events object is wiped at
-      // the top of every step, so a mission cannot watch raceWin.
       world.raceWins = (world.raceWins || 0) + 1;
-      world.events.raceWin = { time, reward: RACE_REWARD };
-      world.mission.dialogue = [`RACE WON in ${time.toFixed(1)}s — $${RACE_REWARD} earned.`];
+      world.events.raceWin = { time, reward };
+      world.mission.dialogue = [`RACE WON in ${time.toFixed(1)}s — $${reward} earned.`];
       world.mission.dialogueTimer = 5;
+      race.bet = false;
+      race.night = false;
     }
   }
 }
 
-/** Taxi side job: drive to the waving fare, then to their destination. */
 export function createTaxi() {
   return { state: 'idle', fare: null, dest: null, timer: 0, reward: TAXI_FARE, cooldown: 0 };
 }
@@ -582,8 +524,6 @@ export function updateTaxi(world, dt) {
   const px = p.inCar && p.car ? p.car.x : p.x;
   const py = p.inCar && p.car ? p.car.y : p.y;
   if (taxi.state === 'idle') {
-    // A fare waves only when Jax is driving a cab — a sedan driver
-    // never gets hijacked by taxi dialogue mid-mission or mid-chase.
     if (taxi.cooldown > 0) {
       taxi.cooldown -= dt;
       return;
@@ -628,10 +568,129 @@ export function updateTaxi(world, dt) {
   }
 }
 
-/**
- * Repair the player's car at the garage bay: $150 restores it to full
- * health and pops the tires back on. Returns 'ok', 'broke', 'fine' or 'far'.
- */
+export function createArmored() {
+  return { truck: null, cooldown: 30, ramTimer: 0 };
+}
+
+function spawnArmoredTruck(world) {
+  const vertical = world.rng.chance(0.5);
+  let x;
+  let y;
+  let angle;
+  if (vertical) {
+    x = world.rng.pick(world.city.roadsV);
+    y = world.rng.range(200, 1700);
+    angle = world.rng.chance(0.5) ? Math.PI / 2 : -Math.PI / 2;
+  } else {
+    x = world.rng.range(200, 2300);
+    y = world.rng.pick(world.city.roadsH);
+    angle = world.rng.chance(0.5) ? 0 : Math.PI;
+  }
+  const truck = makeCar(x, y, angle, '#4a5240', 'armored', 'van');
+  truck.hp = ARMORED_HP;
+  truck.speed = 55;
+  truck.cruise = 55;
+  truck.axis = vertical ? 'v' : 'h';
+  truck.road = vertical ? x : y;
+  truck.dir = angle === 0 || angle === Math.PI / 2 ? 1 : -1;
+  return truck;
+}
+
+export function updateArmored(world, dt) {
+  const armored = world.armored;
+  if (!armored) return;
+  if (!armored.truck) {
+    armored.cooldown -= dt;
+    if (armored.cooldown <= 0) {
+      armored.truck = spawnArmoredTruck(world);
+      world.mission.dialogue = ['ARMORED TRUCK on the streets — crack it open for $350.'];
+      world.mission.dialogueTimer = 4;
+    }
+    return;
+  }
+  const truck = armored.truck;
+  if (armored.ramTimer > 0) armored.ramTimer -= dt;
+  if (truck.axis === 'h') {
+    truck.x += truck.dir * truck.speed * dt;
+    if (truck.x < 120 || truck.x > WATER_X - 120) { truck.dir *= -1; truck.angle += Math.PI; }
+  } else {
+    truck.y += truck.dir * truck.speed * dt;
+    if (truck.y < 120 || truck.y > 1800) { truck.dir *= -1; truck.angle += Math.PI; }
+  }
+  for (let i = world.bullets.length - 1; i >= 0; i -= 1) {
+    const b = world.bullets[i];
+    if (!b.hostile && Math.hypot(b.x - truck.x, b.y - truck.y) < 30) {
+      world.bullets.splice(i, 1);
+      truck.hp -= b.damage;
+    }
+  }
+  const p = world.player;
+  if (p.inCar && p.car && armored.ramTimer <= 0
+    && Math.hypot(p.car.x - truck.x, p.car.y - truck.y) < 48 && Math.abs(p.car.speed) > 80) {
+    armored.ramTimer = 1;
+    truck.hp -= 15;
+    p.car.speed *= 0.6;
+    world.shake = Math.max(world.shake, 6);
+    world.events.crash = true;
+  }
+  if (truck.hp <= 0) {
+    armored.truck = null;
+    armored.cooldown = ARMORED_RESPAWN;
+    world.cash += ARMORED_HAUL;
+    addWanted(world, 1);
+    world.floaters.push({ x: truck.x, y: truck.y, value: `+$${ARMORED_HAUL}`, color: '#7be382', life: 1.4 });
+    world.events.armoredHaul = { reward: ARMORED_HAUL };
+    world.mission.dialogue = [`ARMORED TRUCK CRACKED — $${ARMORED_HAUL} haul. The heat is on you now.`];
+    world.mission.dialogueTimer = 5;
+  }
+}
+
+export function createPizza(city) {
+  return {
+    state: 'idle',
+    shop: { x: city.roadsV[1], y: city.roadsH[2], label: 'Pizzeria' },
+    dest: null,
+    timer: 0,
+    cooldown: 10,
+  };
+}
+
+export function updatePizza(world, dt) {
+  const pizza = world.pizza;
+  if (!pizza) return;
+  const p = world.player;
+  const px = p.inCar && p.car ? p.car.x : p.x;
+  const py = p.inCar && p.car ? p.car.y : p.y;
+  if (pizza.state === 'idle') {
+    if (pizza.cooldown > 0) { pizza.cooldown -= dt; return; }
+    if (!p.inCar && !p.inBoat && Math.hypot(p.x - pizza.shop.x, p.y - pizza.shop.y) < 70) {
+      pizza.dest = randomRoadSpot(world, 500);
+      pizza.state = 'deliver';
+      pizza.timer = PIZZA_TIME_LIMIT;
+      world.mission.dialogue = [`PIZZA: Hot box in hand — deliver it in ${PIZZA_TIME_LIMIT}s for $${PIZZA_FARE}.`];
+      world.mission.dialogueTimer = 4;
+    }
+    return;
+  }
+  pizza.timer -= dt;
+  if (Math.hypot(px - pizza.dest.x, py - pizza.dest.y) < 70) {
+    world.cash += PIZZA_FARE;
+    world.events.pizzaPaid = { reward: PIZZA_FARE };
+    world.floaters.push({ x: pizza.dest.x, y: pizza.dest.y, value: `+$${PIZZA_FARE}`, color: '#7be382', life: 1.4 });
+    world.mission.dialogue = [`PIZZA: Delivered hot — $${PIZZA_FARE} earned.`];
+    world.mission.dialogueTimer = 4;
+    pizza.state = 'idle';
+    pizza.dest = null;
+    pizza.cooldown = 20;
+  } else if (pizza.timer <= 0) {
+    world.mission.dialogue = ['PIZZA: Too slow — cold pizza, no tip. The box is back at the shop.'];
+    world.mission.dialogueTimer = 4;
+    pizza.state = 'idle';
+    pizza.dest = null;
+    pizza.cooldown = 20;
+  }
+}
+
 export function repairAtGarage(world) {
   const p = world.player;
   const g = world.city.garage;
@@ -646,12 +705,10 @@ export function repairAtGarage(world) {
   return 'ok';
 }
 
-/** Full car health: 100, or 150 with the Armored Hull upgrade. */
 export function maxCarHp(world) {
   return world.upgrades && world.upgrades.armor ? 150 : GARAGE_REPAIR;
 }
 
-/** True when the player (on foot or in a car) is at the garage bay. */
 export function nearGarage(world) {
   const p = world.player;
   const g = world.city.garage;
@@ -660,11 +717,6 @@ export function nearGarage(world) {
   return Math.hypot(x - g.x, y - g.y) <= 80;
 }
 
-/**
- * True when the garage's district is hot (HEAT 60+): the crew will not
- * work a bay the police are watching. Repair/respray still run — the
- * shop is what closes, not the garage itself.
- */
 export function garageHot(world) {
   if (!world.heat || !world.city) return false;
   const g = world.city.garage;
@@ -672,11 +724,6 @@ export function garageHot(world) {
   return d >= 0 && (world.heat[d] || 0) >= 60;
 }
 
-/**
- * Buy a garage upgrade (U at the garage bay): cash for a permanent
- * system effect. Returns 'ok', 'broke', 'owned', 'closed' (district
- * too hot) or 'far'.
- */
 export function buyUpgrade(world, id) {
   const def = UPGRADES.find((u) => u.id === id);
   if (!def) return 'far';
@@ -693,11 +740,6 @@ export function buyUpgrade(world, id) {
   return 'ok';
 }
 
-/**
- * Respray the player's car at the garage bay: $150 for a fresh paint
- * job, and the heat drops by one star — new colour, new plate, cooler
- * trail. Returns 'ok', 'broke', 'clean' (no heat to lose) or 'far'.
- */
 export function resprayAtGarage(world) {
   const p = world.player;
   const g = world.city.garage;
@@ -715,7 +757,6 @@ export function resprayAtGarage(world) {
   return 'ok';
 }
 
-/** The pink-taxi bounty: stealing the bubblegum-pink cab pays $1,000. */
 export function claimPinkTaxi(world) {
   const car = world.player.car;
   if (!car || !car.pink || car.pinkClaimed) return false;
@@ -727,7 +768,6 @@ export function claimPinkTaxi(world) {
   return true;
 }
 
-/** Collect harbor tokens and weapon pickups the player walks or drives over. */
 export function updatePickups(world) {
   const p = world.player;
   const px = p.inCar && p.car ? p.car.x : p.x;
@@ -759,13 +799,20 @@ export function currentObjective(world) {
   if (world.taxi && world.taxi.state === 'dropoff') {
     return `Taxi: drop off the passenger — ${Math.max(0, world.taxi.timer).toFixed(0)}s left`;
   }
+  if (world.pizza && world.pizza.state === 'deliver') {
+    return `Pizza delivery: ${Math.max(0, world.pizza.timer).toFixed(0)}s left — $${PIZZA_FARE}`;
+  }
+  if (world.armored && world.armored.truck && !world.armored.truck.looted) {
+    return 'Armored truck on the streets — crack it for $350';
+  }
   if (world.race && world.race.active) {
-    return `Street race: checkpoint ${world.race.index + 1}/${world.race.points.length} — ${world.race.timer.toFixed(1)}s`;
+    return world.race.bet
+      ? `NIGHT RACE ($100 bet): checkpoint ${world.race.index + 1}/${world.race.points.length} — ${world.race.timer.toFixed(1)}s`
+      : `Street race: checkpoint ${world.race.index + 1}/${world.race.points.length} — ${world.race.timer.toFixed(1)}s`;
   }
   if (mission.done) return 'Free roam — explore Neon Harbor';
   const def = MISSION_DEFS[mission.index];
   const n = `${mission.index + 1}/${MISSION_DEFS.length}`;
-  // Side jobs with live progress read it in the objective bar.
   if (mission.index === 5) {
     const done = (world.taxiFaresDone || 0) - (mission.count || 0);
     return `${n} Night Taxi: fares ${Math.min(2, done)}/2 — grab a cab`;

@@ -1,17 +1,9 @@
-// Neon Harbor — hydrants, an open gas forecourt and the procedural city. A seeded grid of roads, building
-// blocks, parks and a harbor edge on the east side. The layout is fixed by
-// the seed, so every player with the same seed walks the same streets.
-// Three districts give the city its geography: Old Town in the west,
-// neon Downtown in the middle, and the Harbor docks in the east. The road
-// graph (roads + intersections) is what traffic and police steer on.
+// Neon Harbor — city — roads — blocks — districts — landmarks.
 import { BLOCK, ROAD_W, WORLD_H, WORLD_W } from './config.js';
 
 export const WATER_X = 2448;
 
 const ROOF_COLORS = [
-  // One palette per district, so the neighbourhoods read apart at a
-  // glance: warm brick and ochre in Old Town, cool glass and steel
-  // Downtown, teal and sand by the Harbor.
   ['#b8455a', '#c98a3d', '#a85a32', '#8a4a6b'],
   ['#4a7fb5', '#7a5fb5', '#3f8f9f', '#5a6b8a'],
   ['#3f8f6f', '#e8e4d8', '#4a9db5', '#c98a3d'],
@@ -24,7 +16,6 @@ export const DISTRICTS = [
   { name: 'Harbor', x: 1760, y: 0, w: WATER_X - 1760, h: WORLD_H, ground: '#2f6b5a', accent: '#37e0e6' },
 ];
 
-/** The district whose rectangle contains (x, y), or the last one. */
 export function districtAt(city, x, y) {
   for (const d of city.districts) {
     if (x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h) return d;
@@ -32,14 +23,12 @@ export function districtAt(city, x, y) {
   return city.districts[city.districts.length - 1];
 }
 
-/** True when (x, y) lies on a road surface (centre lines every BLOCK px). */
 export function onRoad(city, x, y) {
   for (const rx of city.roadsV) if (Math.abs(x - rx) <= ROAD_W / 2) return true;
   for (const ry of city.roadsH) if (Math.abs(y - ry) <= ROAD_W / 2) return true;
   return false;
 }
 
-/** The building whose footprint contains (x, y) expanded by r, or null. */
 export function buildingAt(city, x, y, r) {
   for (const b of city.buildings) {
     if (x > b.x - r && x < b.x + b.w + r && y > b.y - r && y < b.y + b.h + r) return b;
@@ -47,14 +36,12 @@ export function buildingAt(city, x, y, r) {
   return null;
 }
 
-/** True when a circle of radius r at (x, y) cannot stand there. */
 export function collides(city, x, y, r) {
   if (x < r || y < r || x > WORLD_W - r || y > WORLD_H - r) return true;
   if (x > WATER_X - r) return true;
   return buildingAt(city, x, y, r) !== null;
 }
 
-/** Slide a circle out of buildings/water by axis: try x, then y. */
 export function moveCircle(city, pos, dx, dy, r) {
   const nx = pos.x + dx;
   if (!collides(city, nx, pos.y, r)) pos.x = nx;
@@ -62,7 +49,6 @@ export function moveCircle(city, pos, dx, dy, r) {
   if (!collides(city, pos.x, ny, r)) pos.y = ny;
 }
 
-/** The intersection nearest (x, y), from the road graph. */
 export function nearestIntersection(city, x, y) {
   let best = city.intersections[0];
   let bestD = Infinity;
@@ -73,11 +59,6 @@ export function nearestIntersection(city, x, y) {
   return best;
 }
 
-/**
- * The point on the road graph nearest (x, y): the closest road centre
- * line, clamped to the intersection grid. Traffic and police use it to
- * snap a chase target onto a street they can actually drive.
- */
 export function nearestRoadPoint(city, x, y) {
   let bestV = city.roadsV[0];
   let bestD = Infinity;
@@ -95,7 +76,6 @@ export function nearestRoadPoint(city, x, y) {
   return { x, y: bestH };
 }
 
-/** True when the straight segment (x1,y1)-(x2,y2) is blocked by a building. */
 export function pathBlocked(city, x1, y1, x2, y2) {
   for (let t = 0.15; t < 1; t += 0.15) {
     const x = x1 + (x2 - x1) * t;
@@ -147,20 +127,14 @@ export function buildCity(rng) {
           color: rng.pick(ROOF_COLORS[district]),
           neon: rng.pick(['#ff4d9d', '#37e0e6', '#ffd23e', '#9d6bff']),
           height: rng.int(1, 3),
-          // Roof variety: 0 plain slab, 1 AC units, 2 skylight strip.
           roof: rng.weighted([[0, 4], [1, 3], [2, 2]]),
           district,
-          // A few roof props, seeded so the skyline never repeats twice.
           props: rng.int(0, 3),
         });
       }
     }
   }
 
-  // Landmarks: the casino tower (the tallest Downtown block, gold trim),
-  // the stadium (an Old Town park turned into a floodlit bowl) and the
-  // lighthouse on the docks pier (its beam sweeps the harbor at night).
-  // The lighthouse stands clear of every generated block (east of x 2350).
   let casino = buildings[0];
   let casinoD = Infinity;
   for (const b of buildings) {
@@ -184,7 +158,6 @@ export function buildCity(rng) {
   });
   const lighthouse = buildings[buildings.length - 1];
 
-  // Reserve a separate Old Town block for the gas forecourt, clear of roads.
   const gasStation = { x: 850, y: 1490, w: 210, h: 210, label: 'Gas',
     pumps: [900, 960, 1020].map((x) => ({ x, y: 1610, alive: true })) };
   const overlapsLot = (b) => b.x < 1080 && b.x + (b.w || b.r || 0) > 836
@@ -192,7 +165,6 @@ export function buildCity(rng) {
   for (const list of [buildings, parks, trees]) {
     for (let i = list.length - 1; i >= 0; i -= 1) if (overlapsLot(list[i])) list.splice(i, 1);
   }
-  // Kerb corners are outside both road surfaces, before building setbacks.
   const candidates = intersections.filter((pt) => pt.x < WATER_X - 80 && !(pt.x === 800 && pt.y === 1440));
   const hydrants = [{ x: 842, y: 1398, burst: false }];
   while (hydrants.length < 8 && candidates.length) {
@@ -213,7 +185,6 @@ export function buildCity(rng) {
     water: { x: WATER_X, y: 0, w: WORLD_W - WATER_X, h: WORLD_H },
     docks: { x: 2320, y: 1480, w: 128, h: 280 },
     marina: { x: 2280, y: 120, w: 168, h: 160 },
-    // The garage: a marked repair bay on the Old Town crossroads.
     garage: { x: 480, y: 1440, label: 'Garage' },
     casino: casino ? { x: casino.x + casino.w / 2, y: casino.y + casino.h / 2, label: 'Casino' } : { x: 1440, y: 800, label: 'Casino' },
     lighthouse: { x: lighthouse.x + lighthouse.w / 2, y: lighthouse.y + lighthouse.h / 2, label: 'Lighthouse' },

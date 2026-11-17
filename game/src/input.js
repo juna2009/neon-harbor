@@ -1,9 +1,4 @@
-// Neon Harbor — keyboard and mouse state. Keys are tracked by code so the
-// layout never depends on the player's language; mouse aim is in canvas
-// pixels and converted to world coordinates by the caller. Bindings are
-// remappable from the settings menu and saved in localStorage, so a
-// player can put Interact, Reload, Mute, Weapon and Radio wherever their
-// fingers live.
+// Neon Harbor — keys, mouse — bindings — settings — mute.
 export const ACTION_CONFIRM = 'confirm';
 export const ACTION_PAUSE = 'pause';
 export const ACTION_INTERACT = 'interact';
@@ -45,7 +40,6 @@ export function actionLabel(action) {
   return ACTION_LABELS[action] || action;
 }
 
-/** Human-readable key name for the settings screen (KeyE → E). */
 export function keyLabel(code) {
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
@@ -71,7 +65,6 @@ export function createInput(canvas) {
       event.preventDefault();
     }
     if (capture) {
-      // Rebind capture: the next key becomes the binding, Escape cancels.
       if (event.code !== 'Escape') {
         bindings[capture.action] = [event.code];
       }

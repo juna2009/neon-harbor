@@ -1,7 +1,4 @@
-// Neon Harbor — a small seeded RNG (mulberry32) so ?seed=N replays the
-// same city, traffic and pedestrians every time. The extra helpers
-// (shuffle, weighted, bell) keep every random choice in the game on the
-// same deterministic stream instead of Math.random.
+// Neon Harbor — seeded RNG — mulberry32 — replays seeds — pick.
 export function createRandom(seed) {
   let state = (seed >>> 0) || 0x9e3779b9;
   function next() {
@@ -23,7 +20,6 @@ export function createRandom(seed) {
   function chance(p) {
     return next() < p;
   }
-  /** In-place Fisher-Yates shuffle of a copy; the input is untouched. */
   function shuffle(list) {
     const out = list.slice();
     for (let i = out.length - 1; i > 0; i -= 1) {
@@ -34,7 +30,6 @@ export function createRandom(seed) {
     }
     return out;
   }
-  /** Pick one entry from [[value, weight], ...] by its weight. */
   function weighted(pairs) {
     let total = 0;
     for (const [, w] of pairs) total += w;
@@ -45,7 +40,6 @@ export function createRandom(seed) {
     }
     return pairs[pairs.length - 1][0];
   }
-  /** Roughly bell-shaped value in [0, 1): the average of three draws. */
   function bell() {
     return (next() + next() + next()) / 3;
   }

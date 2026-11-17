@@ -1,15 +1,4 @@
-// Neon Harbor — The Mara Job: boot and the one loop: input is read every
-// frame, the world advances in fixed 1/60 s steps, and the renderer paints
-// what is there. Screens: title, play, paused, settings, garage upgrade
-// shop, game over (busted / wasted). The opening drops Jax straight into
-// action: mission 1 starts with him already behind the wheel. Busted/
-// Wasted offers a resume from the last mission checkpoint. C switches the
-// procedural radio station, O opens settings (volume, station, key remap),
-// U opens the garage upgrade shop at the garage bay.
-//
-// ?seed=N fixes the city. ?shot=chase|onfoot|mission|police|boat|blackout|shop
-// (with &seed=N) stages that scene instead of running the loop, paints it
-// twice and sets window.__shotReady for a screenshot.
+// Neon Harbor — Mara Job — boot — loop — shots — handle.
 import { BEST_KEY, PROGRESS_KEY, RADIO_STATIONS, SETTINGS_KEY, STEP, UPGRADES } from './config.js';
 import { createRandom } from './random.js';
 import { createWorld, EVENT_BUSTED, EVENT_OVER } from './world.js';
@@ -19,7 +8,6 @@ import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_SETTING
 import { buyUpgrade, loadCheckpoint, nearGarage } from './missions.js';
 import { stageShot } from './shots.js';
 
-/** The longest frame the loop catches up on; a longer stall is dropped. */
 const MAX_FRAME = 0.25;
 
 const params = new URLSearchParams(window.location.search);
@@ -42,7 +30,6 @@ function saveNumber(key, value) {
   try {
     window.localStorage.setItem(key, String(value));
   } catch {
-    // Storage can be off (private windows): progress then lasts this visit only.
   }
 }
 
@@ -71,8 +58,6 @@ function runShot(name) {
   const scene = stageShot(name, world);
   let painted = 0;
   function paint() {
-    // A scene may carry its own UI (the shop scene picks a row);
-    // otherwise the radio station label is the only UI needed.
     renderer.draw(world.state, scene.screen, scene.best, scene.ui || { stationName: RADIO_STATIONS[settings.station].name });
     painted += 1;
     if (painted < 2) requestAnimationFrame(paint);
@@ -104,7 +89,6 @@ function runGame() {
         bindings: input.getBindings(),
       }));
     } catch {
-      // Storage can be off; settings then last this visit only.
     }
   }
 
@@ -119,8 +103,6 @@ function runGame() {
     screen = SCREEN_PLAY;
     audio.unlock();
     audio.startRadio(settings.station);
-    // The opening drops Jax straight into action: mission 1 starts with
-    // him already behind the wheel of a parked car, engine running.
     if (world.state.mission.index === 0) {
       const car = world.nearestCar(400);
       if (car) world.enterCar(car);
@@ -329,9 +311,6 @@ function runGame() {
     } else {
       accumulator = 0;
     }
-    // Clear edge-triggered presses every frame, not only in step():
-    // step() never runs on the title/pause/settings/over screens, so
-    // without this a P press would stay latched and instantly unpause.
     input.endFrame();
     renderer.draw(world.state, screen, best, settingsUi());
   }
@@ -345,7 +324,6 @@ function runGame() {
 
   announce('Neon Harbor. Press Enter or click to start.');
   // Read-only handle for live verification (checkpoint-resume tests and
-  // soak checks read the state; it never changes the game).
   window.__neonHarbor = {
     get state() { return world.state; },
     get screen() { return screen; },

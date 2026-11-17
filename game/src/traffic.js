@@ -1,8 +1,4 @@
-// Neon Harbor — traffic cars, parked cars and pedestrians. Traffic drives
-// on the road graph: it follows a road to the next intersection, sometimes
-// turns, and stops for the car ahead or for a car already in the crossing.
-// Pedestrians stroll the sidewalks, run from gunfire, sirens and speeding
-// cars, and now look like different people instead of identical dots.
+// Neon Harbor — traffic cars — parked cars — pedestrians — the pink taxi — cruise.
 import { BLOCK, ROAD_W, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, onRoad } from './city.js';
 
@@ -10,8 +6,6 @@ const TRAFFIC_COUNT = 16;
 const PARKED_COUNT = 12;
 const PED_COUNT = 26;
 
-// Body styles: length/width in world pixels. The renderer draws each one
-// differently (sedan, short hatch, long van, yellow taxi).
 export const CAR_BODIES = {
   sedan: { length: 46, width: 22 },
   hatch: { length: 40, width: 22 },
@@ -52,9 +46,6 @@ export function createTraffic(city, rng) {
     car.cruise = car.speed;
     cars.push(car);
   }
-  // The pink taxi: one bubblegum-pink cab with a crown air freshener
-  // cruises the city — the rarest ride in Neon Harbor, worth $1,000
-  // to the crew if Jax steals it (see enterCar in world.js).
   const cab = cars.find((c) => c.body === 'taxi') || cars[0];
   cab.body = 'taxi';
   cab.color = '#ff7fc0';
@@ -75,7 +66,6 @@ export function createTraffic(city, rng) {
   return { cars, parked };
 }
 
-/** Next intersection coordinate along the car's road and direction. */
 function nextIntersectionCoord(car, city) {
   const line = car.axis === 'v' ? city.roadsH : city.roadsV;
   const at = car.axis === 'v' ? car.y : car.x;
@@ -87,7 +77,6 @@ function nextIntersectionCoord(car, city) {
   return best;
 }
 
-/** True when something is directly ahead of `car` within `gap` pixels. */
 function blockedAhead(car, others, gap) {
   const fx = Math.cos(car.angle);
   const fy = Math.sin(car.angle);
@@ -103,32 +92,17 @@ function blockedAhead(car, others, gap) {
   return false;
 }
 
-/**
- * One traffic step. `obstacles` are extra cars to stop for (the player's
- * car, police cars). Cars turn at intersections, queue behind the car
- * ahead, and wait when the crossing ahead is occupied.
- */
 export function stepTraffic(traffic, dt, city, obstacles) {
-  // Traffic stops for the car ahead — but only when that car is slow.
-  // A car flying up behind at speed is dodged around, never a brick
-  // wall the player rear-ends at full speed.
   const slowObstacles = (obstacles || []).filter((o) => Math.abs(o.speed || 0) < 150);
   const others = traffic.cars.concat(slowObstacles);
   for (const car of traffic.cars) {
-    // Round-3 fix: a car Jax is driving is his, not the traffic AI's.
-    // Before this, starting mission 1 in a moving traffic car meant
-    // the AI kept steering it — it randomly turned at intersections
-    // and fought the player's wheel.
     if (!car.alive || car.kind === 'player') continue;
     const next = nextIntersectionCoord(car, city);
     const at = car.axis === 'v' ? car.y : car.x;
     const distToNext = next === null ? Infinity : Math.abs(next - at);
 
-    // Decide at the intersection: turn sometimes, otherwise carry on.
     if (distToNext < Math.max(6, car.speed * dt + 2)) {
       if (Math.random() < 0.38) {
-        // Turn onto the crossing road. The lane offset is re-rolled so
-        // the car exits the corner on a legal lane of the new road.
         const lane = Math.random() < 0.5 ? 18 : -18;
         const newDir = Math.random() < 0.5 ? 1 : -1;
         if (car.axis === 'v') {
@@ -147,7 +121,6 @@ export function stepTraffic(traffic, dt, city, obstacles) {
       }
     }
 
-    // Stop for the car ahead, for a car in the crossing, or for an obstacle.
     let desired = car.cruise;
     if (blockedAhead(car, others, 78)) desired = 0;
     if (distToNext < 90 && blockedAhead({ ...car, x: car.x + Math.cos(car.angle) * 60, y: car.y + Math.sin(car.angle) * 60, angle: car.angle }, others, 60)) desired = 0;
@@ -192,14 +165,11 @@ export function createPedestrians(city, rng) {
       color: rng.pick(PED_SHIRTS),
       skin: rng.pick(PED_SKINS),
       pants: rng.pick(PED_PANTS),
-      // 0 no hat, 1 cap, 2 beanie — the renderer draws each differently.
       hat: rng.weighted([[0, 5], [1, 3], [2, 2]]),
       build: rng.weighted([['slim', 5], ['wide', 2]]),
       flee: 0,
       alive: true,
       walkPhase: rng.range(0, Math.PI * 2),
-      // Photo mode: at 3+ stars a nearby ped stops, raises their phone
-      // and films the chase (see stepPedestrians).
       photo: 0,
       flashTimer: 0,
     });
@@ -207,21 +177,11 @@ export function createPedestrians(city, rng) {
   return peds;
 }
 
-/**
- * One pedestrian step. `danger` is a gunshot or a speeding car to run
- * from; `chase` is the player's position while the heat is 3+ stars —
- * then nearby peds stop, raise their phones and film the chase, their
- * camera flashes popping along the sidewalk. Returns the flash positions
- * (world coords) so the caller can spawn flash particles for them.
- */
 export function stepPedestrians(peds, dt, city, danger, chase) {
   const flashes = [];
   for (const ped of peds) {
     if (!ped.alive) continue;
     ped.walkPhase += dt * 8;
-    // A chase rolling past at 3+ stars turns bystanders into an
-    // audience: stop, face the action, phone up. Filming beats fleeing
-    // — but only while they are not already running for their life.
     if (chase && ped.flee <= 0) {
       const cdx = ped.x - chase.x;
       const cdy = ped.y - chase.y;

@@ -1,17 +1,10 @@
-// Neon Harbor — the Living Harbor, cut down to boats only (no
-// drawbridge). Three stealable speedboats ride the water strip east of
-// the docks and marina: board one on foot at the pier (E), throttle it
-// up and down the harbor, and leave a white wake behind. The Harbor
-// Police answer with their own boats at 4–5 stars. Boats only ever
-// live on water (WATER_X < x < WORLD_W); the player can only step
-// ashore next to a pier, where the land is clear of buildings.
+// Neon Harbor — the Living Harbor — speedboats — police boats — wakes — piers.
 import { WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
 
 export const BOAT_MAX_SPEED = 620;
 export const BOAT_ACCEL = 520;
 
-/** Three speedboats, moored along the water edge: marina, mid-harbor, docks. */
 export function createBoats(city, rng) {
   const spots = [
     { x: WATER_X + 40, y: city.marina.y + 80, angle: -Math.PI / 2 },
@@ -25,7 +18,6 @@ export function createBoats(city, rng) {
   }));
 }
 
-/** The nearest boat within maxDist of (x, y), or null. */
 export function nearestBoat(boats, x, y, maxDist) {
   let best = null;
   let bestD = maxDist;
@@ -37,10 +29,6 @@ export function nearestBoat(boats, x, y, maxDist) {
   return best;
 }
 
-/**
- * One boat step: wakes age out, and a fast boat throws spray. Called
- * from the world step for every boat (player's and moored alike).
- */
 export function stepBoats(state, dt) {
   for (const b of state.boats) {
     for (let i = b.wake.length - 1; i >= 0; i -= 1) {
@@ -58,7 +46,6 @@ export function stepBoats(state, dt) {
   }
 }
 
-/** True when (x, y) is on open water (not the pier land). */
 export function onWater(x, y) {
   return x > WATER_X + 8 && x < WORLD_W - 8 && y > 8 && y < WORLD_H - 8;
 }

@@ -1,9 +1,4 @@
-// Neon Harbor — all sound is synthesised with WebAudio, no audio files.
-// The context is created on the first user gesture; every call is guarded
-// so a headless screenshot run (no gesture, no audio) stays silent and
-// error-free. M toggles mute. The radio is a procedural synthwave loop:
-// a lookahead step sequencer plays a bassline, an arpeggio and hats from
-// the station's scale — three stations, switched with C.
+// Neon Harbor — WebAudio — no files — radio — sfx.
 import { RADIO_STATIONS } from './config.js';
 
 function midiToFreq(midi) {
@@ -65,7 +60,6 @@ export function createAudio() {
       osc.start(t0);
       osc.stop(t0 + duration + 0.02);
     } catch {
-      // Audio is decoration; never let it break the game.
     }
   }
 
@@ -94,14 +88,9 @@ export function createAudio() {
       node.connect(gain).connect(master);
       src.start(t0);
     } catch {
-      // Ignore audio failures.
     }
   }
 
-  // Radio: 16-step loop. The pattern depends on the station's tag:
-  // synthwave drives (bass on the beat, arp every other step), chill
-  // floats (sparse arp), drive pushes hats on every step, lofi plays
-  // sparse and swung — bass every other bar, arp on the off-beat.
   function scheduleRadioStep(step, time) {
     const station = RADIO_STATIONS[stationIndex];
     const scale = station.scale;
@@ -126,7 +115,6 @@ export function createAudio() {
     const hatOn = tag === 'drive' ? true : tag === 'lofi' ? step % 4 === 3 : step % 2 === 1;
     if (hatOn) noise(0.03, tag === 'lofi' ? 0.03 : 0.05, 6000, time);
     if (step % 16 === 0) {
-      // A soft pad chord at the top of each bar.
       const chord = [0, 2, 4].map((d) => station.root + 12 + scale[d % scale.length]);
       for (const n of chord) tone(midiToFreq(n), 1.4, 'sine', 0.03, null, time);
     }
@@ -207,7 +195,6 @@ export function createAudio() {
       setTimeout(() => tone(1568, 0.16, 'triangle', 0.14), 140);
     },
     repair() {
-      // A little wrench jingle: two metallic pings, then a rising chord.
       tone(1244, 0.07, 'square', 0.08);
       setTimeout(() => tone(1568, 0.07, 'square', 0.08), 90);
       setTimeout(() => tone(2093, 0.18, 'triangle', 0.12), 180);
@@ -226,8 +213,6 @@ export function createAudio() {
       noise(0.25, 0.25, 900);
     },
     thunder() {
-      // A low rumble half a second after the flash: filtered noise
-      // that decays, plus a deep tone sliding down.
       noise(1.4, 0.35, 160);
       tone(70, 1.1, 'sine', 0.16, 38);
     },
@@ -249,7 +234,6 @@ export function createAudio() {
         engineNodes.osc.frequency.value = 55 + speed01 * 140;
         engineNodes.gain.gain.value = 0.03 + speed01 * 0.04;
       } catch {
-        // Ignore audio failures.
       }
     },
     engineOff() {
@@ -257,7 +241,6 @@ export function createAudio() {
         try {
           engineNodes.gain.gain.value = 0;
         } catch {
-          // Ignore.
         }
       }
     },
@@ -283,7 +266,6 @@ export function createAudio() {
         lfo.start();
         sirenNodes = { osc, lfo, gain };
       } catch {
-        // Ignore audio failures.
       }
     },
     stopSiren() {
@@ -292,7 +274,6 @@ export function createAudio() {
         sirenNodes.osc.stop();
         sirenNodes.lfo.stop();
       } catch {
-        // Already stopped.
       }
       sirenNodes = null;
     },

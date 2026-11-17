@@ -1,8 +1,4 @@
-// Neon Harbor — combat, including player bullets igniting gas pumps. Three weapons (pistol, SMG, shotgun) with their
-// own fire rate, spread and pellet count; bullets fly from the player's
-// aim or from hostile gunmen, hit buildings, pedestrians, police and cars,
-// and raise the wanted level when the player hurts a bystander in public.
-// Destroyed cars go up in an explosion of sparks and smoke.
+// Neon Harbor — combat — bullets — weapons — hits — pumps — wanted heat.
 import { WEAPONS } from './config.js';
 import { buildingAt } from './city.js';
 import { addWanted } from './police.js';
@@ -11,7 +7,6 @@ export function createBullets() {
   return [];
 }
 
-/** One bullet from a weapon definition, with spread already applied. */
 export function fireBullet(bullets, x, y, angle, hostile, weapon) {
   const def = weapon || WEAPONS.pistol;
   bullets.push({
@@ -24,10 +19,6 @@ export function fireBullet(bullets, x, y, angle, hostile, weapon) {
   });
 }
 
-/**
- * Fire a whole shot from `weaponKey` (pellets + spread) at (x, y) along
- * `angle`. Returns true when a shot was actually fired.
- */
 export function fireWeapon(bullets, weaponKey, x, y, angle, hostile, rng) {
   const def = WEAPONS[weaponKey] || WEAPONS.pistol;
   for (let i = 0; i < def.pellets; i += 1) {
@@ -67,7 +58,6 @@ export function stepBullets(world, dt) {
       }
     }
     if (!dead && !b.hostile) {
-      // Traffic cars can be shot out: they burn and explode.
       const allCars = world.traffic.cars.concat(world.traffic.parked);
       for (const car of allCars) {
         if (car.alive && car.kind !== 'player' && hitCircle(b.x, b.y, car.x, car.y, 26)) {
