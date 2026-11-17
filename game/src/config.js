@@ -118,7 +118,7 @@ export const RADIO_STATIONS = [
   { name: 'Bayview Static', tag: 'lofi', bpm: 96, root: 41, scale: [0, 3, 5, 7, 10, 12] },
 ];
 
-export const MISSION_REWARDS = [250, 400, 350, 900, 1200];
+export const MISSION_REWARDS = [250, 400, 350, 900, 1200, 240, 300, 450, 300, 200, 350, 600];
 export const RACE_REWARD = 300;
 export const COLLECTIBLE_COUNT = 12;
 export const COLLECTIBLE_VALUE = 50;

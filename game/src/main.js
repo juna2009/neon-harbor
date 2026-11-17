@@ -7,9 +7,9 @@
 // procedural radio station, O opens settings (volume, station, key remap),
 // U opens the garage upgrade shop at the garage bay.
 //
-// ?seed=N fixes the city. ?shot=chase|onfoot|mission|police (with &seed=N)
-// stages that scene instead of running the loop, paints it twice and sets
-// window.__shotReady for a screenshot.
+// ?seed=N fixes the city. ?shot=chase|onfoot|mission|police|boat|blackout|shop
+// (with &seed=N) stages that scene instead of running the loop, paints it
+// twice and sets window.__shotReady for a screenshot.
 import { BEST_KEY, PROGRESS_KEY, RADIO_STATIONS, SETTINGS_KEY, STEP, UPGRADES } from './config.js';
 import { createRandom } from './random.js';
 import { createWorld, EVENT_BUSTED, EVENT_OVER } from './world.js';
@@ -62,7 +62,7 @@ function loadSettings() {
   }
 }
 
-const savedMission = Math.min(4, Math.max(0, readNumber(PROGRESS_KEY)));
+const savedMission = Math.min(11, Math.max(0, readNumber(PROGRESS_KEY)));
 const world = createWorld(createRandom(seed), savedMission);
 const renderer = createRenderer(canvas);
 const settings = loadSettings();
@@ -71,7 +71,9 @@ function runShot(name) {
   const scene = stageShot(name, world);
   let painted = 0;
   function paint() {
-    renderer.draw(world.state, scene.screen, scene.best, { stationName: RADIO_STATIONS[settings.station].name });
+    // A scene may carry its own UI (the shop scene picks a row);
+    // otherwise the radio station label is the only UI needed.
+    renderer.draw(world.state, scene.screen, scene.best, scene.ui || { stationName: RADIO_STATIONS[settings.station].name });
     painted += 1;
     if (painted < 2) requestAnimationFrame(paint);
     else window.__shotReady = true;
@@ -112,7 +114,7 @@ function runGame() {
 
   function startGame() {
     world.reset();
-    world.state.mission.index = Math.min(4, Math.max(0, readNumber(PROGRESS_KEY)));
+    world.state.mission.index = Math.min(11, Math.max(0, readNumber(PROGRESS_KEY)));
     accumulator = 0;
     screen = SCREEN_PLAY;
     audio.unlock();
@@ -181,6 +183,7 @@ function runGame() {
         audio.repair();
         announce(`${UPGRADES[shopIndex].name} fitted.`);
       } else if (result === 'broke') announce('Not enough cash for that upgrade.');
+      else if (result === 'closed') announce('The shop is closed — this district is too hot.');
       else if (result === 'owned') announce('Already fitted.');
     } else if (input.wasPressed(ACTION_PAUSE)) {
       screen = SCREEN_PLAY;

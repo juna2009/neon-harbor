@@ -6,19 +6,23 @@
 // and writes /output/dossier.json, the summary the judge reads, with the
 // vendored make.fun library. The game itself: Jax Marlowe drives for his
 // fixer Mara — who set him up in mission 3 to save his life, then helps
-// him rob the police evidence vault in the finale. A seeded procedural
-// city (Old Town, Downtown, Harbor) explored on foot and by car, with
-// traffic that turns and queues at intersections, pedestrians who film a
-// chase at 3+ stars, car stealing, a 0–5 star wanted level with police
-// chases, roadblocks, a helicopter and spike strips, five chained story
-// missions with mid-mission checkpoints, a street race, harbor token
-// collectibles, three weapons, a day/night cycle with neon lighting,
-// lightning storms, a 3 AM UFO over the harbor, a garage that repairs,
-// resprays and sells six upgrades, district heat that remembers crimes,
-// a pink taxi worth $1,000, taxi fares, particles, a procedural radio, a
-// live minimap, settings with key remap, and localStorage saves — all
-// shown in its four screenshots, the first by name being the cover. Put
-// 3 or 4 PNG or JPEG screenshots in screenshots/ and run it.
+// him rob the police evidence vault in the finale, in a blackout she
+// triggers by cutting the district power. A seeded procedural city (Old
+// Town, Downtown, Harbor) explored on foot, by car and by speedboat,
+// with traffic that turns and queues at intersections, pedestrians who
+// film a chase at 3+ stars, car and boat stealing, a 0–5 star wanted
+// level with police chases, roadblocks, a helicopter, spike strips and
+// police boats on the water, twelve missions across three days with
+// mid-mission checkpoints, a street race, harbor token collectibles,
+// three weapons, a day/night cycle with neon lighting, lightning storms,
+// a 3 AM UFO over the harbor, a garage that repairs, resprays and sells
+// six upgrades (closed while its district is hot), district heat that
+// remembers crimes across days and restarts — hot districts spawn extra
+// police and close the shop — a pink taxi worth $1,000, taxi fares,
+// particles, a procedural radio, a live minimap, settings with key
+// remap, and localStorage saves — all shown in its four screenshots,
+// the first by name being the cover. Put 3 or 4 PNG or JPEG screenshots
+// in screenshots/ and run it.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:

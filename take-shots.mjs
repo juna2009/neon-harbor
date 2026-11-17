@@ -21,14 +21,24 @@ const exe = '/home/hatch/.cache/ms-playwright/chromium-1255/chrome-linux64/chrom
 const browser = await chromium.launch({ executablePath: exe, args: ['--no-sandbox'] });
 const errors = [];
 
+// Round 5 final set: chase (cover), boat (dawn harbor chase), blackout
+// (finale in total darkness), police (sunset roadblock). The onfoot,
+// mission and shop scenes are still staged and captured for review, but
+// they live in /tmp — NOT in screenshots/, so the dossier never exceeds
+// its 4-image cap. The shop frame is a menu frame; the mission frame is
+// the same vault moment the blackout frame shows, only less dramatic;
+// onfoot's shootout is covered by the blackout frame's muzzle flash.
 const shots = [
-  ['1-chase.jpg', '?shot=chase&seed=7'],
-  ['2-onfoot.jpg', '?shot=onfoot&seed=7'],
-  ['3-mission.jpg', '?shot=mission&seed=7'],
-  ['4-police.jpg', '?shot=police&seed=7'],
+  ['1-chase.jpg', '?shot=chase&seed=7', `${SHOTS}`],
+  ['2-boat.jpg', '?shot=boat&seed=7', `${SHOTS}`],
+  ['3-blackout.jpg', '?shot=blackout&seed=7', `${SHOTS}`],
+  ['4-police.jpg', '?shot=police&seed=7', `${SHOTS}`],
+  ['neon-harbor-shop5.jpg', '?shot=shop&seed=7', '/tmp'],
+  ['neon-harbor-onfoot5.jpg', '?shot=onfoot&seed=7', '/tmp'],
+  ['neon-harbor-mission5.jpg', '?shot=mission&seed=7', '/tmp'],
 ];
 
-for (const [file, query] of shots) {
+for (const [file, query, dir] of shots) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`${file}: ${m.text()}`); });
   page.on('pageerror', (e) => errors.push(`${file}: pageerror ${e.message}`));
@@ -36,8 +46,8 @@ for (const [file, query] of shots) {
   await page.goto(`http://localhost:${PORT}/${query}`, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => window.__shotReady === true, null, { timeout: 20000 });
   await page.waitForTimeout(300);
-  await page.screenshot({ path: `${SHOTS}/${file}`, type: 'jpeg', quality: 80 });
-  const size = statSync(`${SHOTS}/${file}`).size;
+  await page.screenshot({ path: `${dir}/${file}`, type: 'jpeg', quality: 80 });
+  const size = statSync(`${dir}/${file}`).size;
   console.log(`shot ${file}: ${size} bytes`);
   await page.close();
 }

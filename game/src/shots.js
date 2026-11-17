@@ -1,24 +1,33 @@
-// Neon Harbor — the four screenshot scenes behind ?shot=chase|onfoot|
-// mission|police. Each one stages a real world from the seed, places the
-// player and the police where the scene needs them, then plays the real
-// rules forward with a scripted driver, so the frame is what a short
-// game really looks like and the same seed always gives the same frame.
+// Neon Harbor — the screenshot scenes behind ?shot=chase|onfoot|
+// mission|police|boat|blackout|shop. Each one stages a real world from
+// the seed, places the player and the police where the scene needs them,
+// then plays the real rules forward with a scripted driver, so the frame
+// is what a short game really looks like and the same seed always gives
+// the same frame.
 // The cover is a night chase (the finale ledger run); on-foot is a street
 // shootout with muzzle flash; mission is the ledger grab at the evidence
 // vault; police is a sunset roadblock at the harbor — every officer and
-// car placed on a road, never on grass.
+// car placed on a road, never on grass. Round 5 adds the dawn boat chase
+// (a stolen speedboat on the harbor, police boat behind, helicopter
+// above), the blackout heist (the finale in total darkness — the real
+// blackout state, only headlights, muzzle flashes, the searchlight and
+// one flickering casino sign), and the garage upgrade shop (six items,
+// one owned, cash visible).
 // Round 4: the chase and police scenes also stage pedestrians filming
 // the chase, phones raised, camera flashes popping. Cash is staged at
 // $2,150 — the late-game total (missions 1–4 $1,900 + race $300 + tokens
 // $100 − respray $150) — and district heat is staged to match the stars
 // (10 heat per star, the game's own rate) in the district the final
-// frame shows, after the drive-in crosses district lines.
+// frame shows, after the drive-in crosses district lines. The boat scene
+// stages $3,470 — the later total (missions 1–5 $3,100 + race $300 +
+// tokens $100 + one taxi fare $120 − respray $150); the shop scene
+// stages $1,750 — $2,150 after buying the $400 Dockside Turbo.
 import { STEP } from './config.js';
-import { startMission, targetForMission } from './missions.js';
+import { buyUpgrade, startMission, targetForMission } from './missions.js';
 import { addWanted, spawnPoliceUnit } from './police.js';
-import { districtAt } from './city.js';
+import { WATER_X, districtAt } from './city.js';
 import { makeCar } from './traffic.js';
-import { SCREEN_PLAY } from './render.js';
+import { SCREEN_PLAY, SCREEN_SHOP } from './render.js';
 
 /** A stand-in for the live input object, driven by a script. */
 function scriptedInput() {
@@ -51,6 +60,15 @@ function driveEastFor(world, input, seconds) {
     } else {
       input.setMove(0, 0);
     }
+    world.step(STEP, input, view);
+    input.clearPresses();
+  }
+}
+
+function driveBoatNorthFor(world, input, seconds) {
+  const view = { w: 1280, h: 800 };
+  for (let i = 0; i < seconds / STEP; i += 1) {
+    input.setMove(0, -1);
     world.step(STEP, input, view);
     input.clearPresses();
   }
@@ -206,6 +224,9 @@ export function stageShot(name, world) {
     startMission(state, 4);
     state.mission.stage = 1;
     state.mission.target = targetForMission(state.city, 4, 1);
+    // The chase is the getaway (stage 1): the power is back on — the
+    // blackout belongs to the vault grab, not to this frame.
+    state.blackout.active = false;
     state.mission.dialogue = ['MARA: Ledger is ours — run it to the lighthouse!'];
     state.mission.dialogueTimer = 30;
     // Drive in first (no heat yet), then raise the wanted level where
@@ -296,6 +317,115 @@ export function stageShot(name, world) {
       { x: pp.x - 120, y: 800 - 48 },
       { x: pp.x + 90, y: 800 + 48 },
     ]);
+  } else if (name === 'boat') {
+    // Dawn boat chase — the Living Harbor shot: Jax steals a speedboat
+    // and runs it north up the harbor at dawn, a police boat on his
+    // wake, the helicopter circling above, the skyline to the west.
+    // Boarding uses the real interact path (E at the pier), the drive
+    // uses the real boat rules, and the police boat is a real unit.
+    // Zoomed in (1.4): the water strip is only 112 px wide, so the
+    // boat has to read large. The drive is long enough (1.5 s) that
+    // the marina marker — the mission target — is in frame, but short
+    // enough that the boat does not reach it (reaching it would
+    // complete mission 12 mid-staging and lose the objective line).
+    // The helicopter is pinned west of the player so it is in frame too.
+    setLight(world, 0.8);
+    state.clock.total = 2 * 1440 + 5 * 60 + 40; // DAY 3 · 05:40
+    state.cash = 3470;
+    state.zoom = 1.4;
+    state.zoomLock = true;
+    const boat = state.boats[2];
+    boat.x = WATER_X + 40;
+    boat.y = 1200;
+    boat.angle = -Math.PI / 2;
+    boat.speed = 0;
+    placePlayerOnFoot(world, WATER_X - 18, 1200);
+    input.press('interact');
+    world.step(STEP, input, { w: 1280, h: 800 });
+    input.clearPresses();
+    state.player.boat.speed = 520;
+    startMission(state, 11);
+    state.mission.dialogue = ['MARA: Dawn run — take the boat to the marina and we are kings of the harbor!'];
+    state.mission.dialogueTimer = 30;
+    addWanted(state, 4);
+    // A police boat on the wake, and the helicopter spins up with the
+    // 4th star during the drive north.
+    spawnPoliceUnit(state.police, state.player, state.rng, 'boat', state.city);
+    const pursuit = state.police.units[state.police.units.length - 1];
+    pursuit.x = state.player.x;
+    pursuit.y = state.player.y + 120;
+    pursuit.angle = -Math.PI / 2;
+    pursuit.speed = 560;
+    driveBoatNorthFor(world, input, 1.5);
+    // Pin the helicopter west of the player for the frame: its orbit
+    // would otherwise put it east of the world edge, out of frame.
+    state.police.heli.orbit = Math.PI;
+    state.police.heli.x = state.player.x - 190;
+    state.police.heli.y = state.player.y;
+    stageHeat(world);
+  } else if (name === 'blackout') {
+    // The blackout heist — the finale in total darkness: Mara cut the
+    // power, so the frame is the real blackout state (startMission(4)
+    // switches it on): every neon sign dead, only headlight cones,
+    // muzzle flashes, the helicopter searchlight and one flickering
+    // casino sign. Jax on foot at the evidence vault, gunmen close,
+    // firing the whole time so the still shows the flash.
+    setLight(world, 0.05);
+    state.clock.total = 1 * 1440 + 23 * 60 + 40; // DAY 2 · 23:40
+    state.zoom = 1.5;
+    state.zoomLock = true;
+    const vault = state.city.casino;
+    // Jax stands south of the vault, close enough that the gold
+    // Evidence Vault marker is in frame (screen y 205 at zoom 1.5) and
+    // the flickering casino sign above it too (screen y 43) — on the
+    // road, never inside a building.
+    placePlayerOnFoot(world, vault.x - 100, vault.y + 130);
+    startMission(state, 4);
+    state.mission.dialogue = ['MARA: I cut the power to the district. Grab the ledger — the vault is dark, the cops are blind.'];
+    state.mission.dialogueTimer = 30;
+    addWanted(state, 4);
+    // Gunmen on the roads, never inside a building: one north on the
+    // cross street, one east on the south sidewalk.
+    const gunSpots = [
+      [state.city.roadsV[3], vault.y + 40],
+      [vault.x + 50, state.city.roadsH[3] + 32],
+    ];
+    for (let i = 0; i < 2; i += 1) {
+      spawnPoliceUnit(state.police, state.player, state.rng, 'gunman', state.city);
+      const unit = state.police.units[state.police.units.length - 1];
+      unit.x = gunSpots[i][0];
+      unit.y = gunSpots[i][1];
+    }
+    input.setMouse(900, 400);
+    input.setShoot(true);
+    walkFor(world, input, 1.4, 0, 0);
+    if (!state.events.muzzle) {
+      const p = state.player;
+      state.events.muzzle = {
+        x: p.x + Math.cos(p.angle) * 22,
+        y: p.y + Math.sin(p.angle) * 22,
+        angle: p.angle,
+      };
+    }
+    // The staged gunfire added stars past 4 (each shot near police is
+    // +0.2); pin the scene back to the intended 4 stars, so the HUD,
+    // the heat and the helicopter all agree — as the chase scene does.
+    state.wanted = 4;
+    stageHeat(world);
+  } else if (name === 'shop') {
+    // The garage upgrade shop: Jax at the bay, Dockside Turbo bought
+    // with the real buyUpgrade call ($2,150 → $1,750, OWNED), Armored
+    // Hull selected. The panel is drawn over the live world.
+    setLight(world, 0.9);
+    state.cash = 2150;
+    const g = state.city.garage;
+    placePlayerOnFoot(world, g.x, g.y);
+    state.camera.x = g.x;
+    state.camera.y = g.y;
+    buyUpgrade(state, 'turbo');
+    state.camera.x = state.player.x;
+    state.camera.y = state.player.y;
+    return { screen: SCREEN_SHOP, best: state.cash, ui: { shopIndex: 2, stationName: 'Harbor FM' } };
   } else {
     // onfoot: a street shootout — Jax firing east at Harbor Crew gunmen
     // on the road, muzzle flash lit, pedestrians fleeing. Zoomed in to

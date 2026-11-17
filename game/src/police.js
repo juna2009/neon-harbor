@@ -79,6 +79,16 @@ function spawnPointNear(player, rng, distance, city) {
 }
 
 export function spawnPoliceUnit(police, player, rng, kind, city) {
+  if (kind === 'boat') {
+    // A police boat answers on the water, near the player's boat —
+    // never on a road, never inside a building.
+    const bx = WATER_X + 30 + rng.range(0, 60);
+    const by = Math.max(60, Math.min(WORLD_H - 60, player.y + rng.range(-500, 500)));
+    police.units.push({
+      kind: 'boat', x: bx, y: by, angle: 0, speed: 0, health: 3, ramTimer: 0, wake: [],
+    });
+    return;
+  }
   const at = spawnPointNear(player, rng, 520, city);
   if (kind === 'car') {
     const car = makeCar(at.x, at.y, 0, '#2f6fd0', 'police');
@@ -193,7 +203,14 @@ function spawnRoadblock(police, state) {
 export function stepPolice(police, state, dt, rng, events) {
   const player = state.player;
   const wanted = Math.ceil(state.wanted);
-  const want = wantedUnitCount(wanted) + state.gunmen;
+  // A hot district (HEAT 60+) puts extra units on the street beyond
+  // the wanted-based count — the city remembers, and it answers.
+  const district = districtAt(state.city, player.x, player.y);
+  const districtHeat = state.heat ? state.heat[state.city.districts.indexOf(district)] || 0 : 0;
+  const hotExtra = wanted >= 1 && districtHeat >= 60 ? 2 : 0;
+  const want = wantedUnitCount(wanted) + state.gunmen + hotExtra;
+  // Police boats only chase a boat: once Jax is ashore, they stand down.
+  if (!player.inBoat) police.units = police.units.filter((u) => u.kind !== 'boat');
   police.spawnTimer -= dt;
   if (police.roadblockTimer > 0) police.roadblockTimer -= dt;
 
@@ -253,11 +270,10 @@ export function stepPolice(police, state, dt, rng, events) {
   if (police.units.length < want && police.spawnTimer <= 0) {
     // The helicopter's eye makes the response faster — and so does a
     // hot district: at HEAT 60+ the police are already on edge.
-    const district = districtAt(state.city, player.x, player.y);
-    const heat = state.heat ? state.heat[state.city.districts.indexOf(district)] || 0 : 0;
-    police.spawnTimer = heli.active ? 0.8 : (heat >= 60 ? 0.9 : 1.2);
-    const inCar = player.inCar;
-    spawnPoliceUnit(police, player, rng, inCar && wanted >= 2 ? 'car' : 'foot', state.city);
+    police.spawnTimer = heli.active ? 0.8 : (districtHeat >= 60 ? 0.9 : 1.2);
+    // On the water the answer is a boat, not a patrol car.
+    const kind = player.inBoat ? 'boat' : (player.inCar && wanted >= 2 ? 'car' : 'foot');
+    spawnPoliceUnit(police, player, rng, kind, state.city);
   }
   // Gunmen (harbor crew) are spawned by the mission, not by wanted level.
   let busted = false;
@@ -265,7 +281,45 @@ export function stepPolice(police, state, dt, rng, events) {
     const unit = police.units[i];
     const px = player.inCar ? player.car.x : player.x;
     const py = player.inCar ? player.car.y : player.y;
-    if (unit.kind === 'car') {
+    if (unit.kind === 'boat') {
+      // A police boat chases on the water only: steer at the player's
+      // boat, run it down, and ram it.
+      const dx = px - unit.x;
+      const dy = py - unit.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const targetAngle = Math.atan2(dy, dx);
+      let diff = targetAngle - unit.angle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      unit.angle += Math.max(-3.4 * dt, Math.min(3.4 * dt, diff));
+      // A touch slower than the player's boat (620): a fleeing driver
+      // can outrun them, a slow one gets caught and rammed.
+      unit.speed = Math.min(600, unit.speed + 480 * dt);
+      unit.x += Math.cos(unit.angle) * unit.speed * dt;
+      unit.y += Math.sin(unit.angle) * unit.speed * dt;
+      unit.x = Math.max(WATER_X + 16, Math.min(WORLD_W - 16, unit.x));
+      unit.y = Math.max(16, Math.min(WORLD_H - 16, unit.y));
+      if (Math.abs(unit.speed) > 120) {
+        unit.wake.push({
+          x: unit.x - Math.cos(unit.angle) * 30,
+          y: unit.y - Math.sin(unit.angle) * 30,
+          life: 1.4, maxLife: 1.4,
+        });
+        if (unit.wake.length > 80) unit.wake.splice(0, unit.wake.length - 80);
+      }
+      for (let w = unit.wake.length - 1; w >= 0; w -= 1) {
+        unit.wake[w].life -= dt;
+        if (unit.wake[w].life <= 0) unit.wake.splice(w, 1);
+      }
+      if (unit.ramTimer > 0) unit.ramTimer -= dt;
+      if (dist < 52 && unit.ramTimer <= 0) {
+        unit.ramTimer = 0.8;
+        events.crash = true;
+        state.player.health = Math.max(0, state.player.health - 3);
+        if (player.boat) player.boat.speed *= 0.8;
+        unit.speed *= 0.5;
+      }
+    } else if (unit.kind === 'car') {
       const car = unit.car;
       if (unit.static) continue; // Roadblock cars hold their ground.
       const dx = px - car.x;

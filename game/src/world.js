@@ -4,10 +4,17 @@
 // explosions, the day/night cycle and the speed-based camera zoom all
 // meet here — along with lightning storms, pedestrians who film a chase,
 // the garage respray and six-upgrade shop, district heat that remembers
-// crimes, the pink taxi bounty, the game clock and the 3 AM UFO.
+// crimes, the pink taxi bounty, the game clock and the 3 AM UFO, the
+// stealable speedboats of the Living Harbor (with police boats at 4–5
+// stars), the blackout that kills the lights during the finale, and the
+// twelve-mission chain. Heat persistence rule: district heat is never
+// zeroed by the game — it survives the day boundary, a game-over
+// restart and a checkpoint resume, and only ever falls by slow decay
+// (or a fresh page load, which starts a new visit at zero).
 import { CAR, PLAYER, STEP, UFO_DURATION, UFO_HOUR, WANTED, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, buildCity, collides, districtAt, moveCircle } from './city.js';
 import { createBullets, fireWeapon, stepBullets } from './combat.js';
+import { BOAT_ACCEL, BOAT_MAX_SPEED, createBoats, nearestBoat, stepBoats } from './boats.js';
 import { claimPinkTaxi, createCollectibles, createMissionState, createRace, createTaxi, createWeaponPickups, loadCheckpoint, maxCarHp, repairAtGarage, resprayAtGarage, saveCheckpoint, targetForMission, updateMission, updatePickups, updateRace, updateTaxi } from './missions.js';
 import { addWanted, clearPolice, createPolice, decayWanted, spawnPoliceUnit, stepPolice } from './police.js';
 import { createPedestrians, createTraffic, stepPedestrians, stepTraffic } from './traffic.js';
@@ -30,7 +37,15 @@ export function createWorld(rng, savedMission) {
     collectibles: createCollectibles(city, rng),
     pickups: createWeaponPickups(city),
     race: createRace(city),
+    raceWins: 0,
     taxi: createTaxi(),
+    taxiFaresDone: 0,
+    // The Living Harbor: three stealable speedboats moored on the water
+    // strip east of the docks and marina.
+    boats: createBoats(city, rng),
+    // Blackout: the finale kills the district power for 30 seconds —
+    // darkness, headlights and the helicopter searchlight only.
+    blackout: { active: false, timer: 0 },
     weather: { rain: false, timer: 55, duration: 0, storm: false, boltTimer: 0, flash: 0, thunderIn: 0 },
     rainDrops: [],
     // Game clock: 1 real second is 1 game minute, starting at 21:00 on
@@ -63,6 +78,8 @@ export function createWorld(rng, savedMission) {
       fireTimer: 0,
       inCar: false,
       car: null,
+      inBoat: false,
+      boat: null,
       runPhase: 0,
     },
     cash: 0,
@@ -97,6 +114,8 @@ export function createWorld(rng, savedMission) {
     state.player.fireTimer = 0;
     state.player.inCar = false;
     state.player.car = null;
+    state.player.inBoat = false;
+    state.player.boat = null;
     state.cash = 0;
     state.wanted = 0;
     state.wantedTimer = 0;
@@ -104,6 +123,10 @@ export function createWorld(rng, savedMission) {
     state.elapsed = 0;
     state.over = false;
     state.overKind = '';
+    state.taxiFaresDone = 0;
+    state.raceWins = 0;
+    state.blackout = { active: false, timer: 0 };
+    state.boats = createBoats(city, rng);
     state.bullets.length = 0;
     state.particles.length = 0;
     state.skids.length = 0;
@@ -120,7 +143,9 @@ export function createWorld(rng, savedMission) {
     state.weather = { rain: false, timer: 55, duration: 0, storm: false, boltTimer: 0, flash: 0, thunderIn: 0 };
     state.rainDrops.length = 0;
     state.clock = { total: 21 * 60 };
-    state.heat = [0, 0, 0];
+    // Heat is NOT reset here: the city remembers. A game-over restart
+    // keeps the heat of every district (it only ever falls by decay),
+    // and the day boundary never touches it either.
     state.ufo = { active: false, timer: 0, seen: false, x: WATER_X + 56, y: 620 };
     for (const c of state.collectibles) c.taken = false;
     for (const pk of state.pickups) pk.taken = false;
@@ -151,6 +176,15 @@ export function createWorld(rng, savedMission) {
     // with — resetting it to 0 instantly completed "Lose the Heat".
     state.wanted = typeof cp.wanted === 'number' ? cp.wanted : 0;
     state.wantedTimer = 0;
+    // Round-5: the checkpoint carries the district heat too — the city
+    // remembers, even after Busted/Wasted.
+    if (Array.isArray(cp.heat) && cp.heat.length === 3) state.heat = cp.heat.slice();
+    // Resuming the finale re-cuts the power — but only for the vault
+    // grab (stage 0); a stage-1 checkpoint is already past the blackout.
+    if (cp.mission === 4 && cp.stage === 0) {
+      state.blackout.active = true;
+      state.blackout.timer = 30;
+    }
     // Restore exactly which harbor tokens were already collected.
     if (Array.isArray(cp.taken)) {
       for (const i of cp.taken) {
@@ -219,6 +253,55 @@ export function createWorld(rng, savedMission) {
     }
     p.car.speed = 0;
     p.car = null;
+  }
+
+  /** Board a speedboat at the pier: first lift is a crime, like a car. */
+  function enterBoat(boat) {
+    const p = state.player;
+    p.inBoat = true;
+    p.boat = boat;
+    boat.kind = 'player';
+    if (!boat.stolen) {
+      boat.stolen = true;
+      if (!state.upgrades.ghost && (state.wanted > 0 || nearPolice(p.x, p.y, 300))) addWanted(state, 1);
+    }
+  }
+
+  /** Step ashore next to the pier: the water strip is only ever exited land-side. */
+  function exitBoat() {
+    const p = state.player;
+    if (!p.boat) return;
+    p.inBoat = false;
+    p.x = WATER_X - 40;
+    p.y = Math.max(40, Math.min(WORLD_H - 40, p.boat.y));
+    p.boat.speed = 0;
+    p.boat = null;
+  }
+
+  /** Drive a speedboat: throttle and steer like a car, but only on water. */
+  function driveBoat(boat, input, dt) {
+    const throttle = -input.moveY();
+    const steer = input.moveX();
+    if (throttle > 0) boat.speed += BOAT_ACCEL * dt;
+    else if (throttle < 0) boat.speed -= BOAT_ACCEL * 0.6 * dt;
+    else boat.speed -= boat.speed * 1.2 * dt;
+    boat.speed = Math.max(-170, Math.min(BOAT_MAX_SPEED, boat.speed));
+    if (Math.abs(boat.speed) > 5) {
+      boat.angle += steer * 2.4 * dt * Math.sign(boat.speed) * Math.min(1, Math.abs(boat.speed) / 150);
+    }
+    boat.x += Math.cos(boat.angle) * boat.speed * dt;
+    boat.y += Math.sin(boat.angle) * boat.speed * dt;
+    boat.x = Math.max(WATER_X + 16, Math.min(WORLD_W - 16, boat.x));
+    boat.y = Math.max(16, Math.min(WORLD_H - 16, boat.y));
+    // A wake trails the stern while the boat is moving.
+    if (Math.abs(boat.speed) > 120) {
+      boat.wake.push({
+        x: boat.x - Math.cos(boat.angle) * 30,
+        y: boat.y - Math.sin(boat.angle) * 30,
+        life: 1.4, maxLife: 1.4,
+      });
+      if (boat.wake.length > 80) boat.wake.splice(0, boat.wake.length - 80);
+    }
   }
 
   /** A burst of sparks, flame and smoke at (x, y); also shakes the camera. */
@@ -452,14 +535,22 @@ export function createWorld(rng, savedMission) {
     }
 
     if (input.wasPressed && input.wasPressed('interact')) {
-      if (p.inCar) exitCar();
+      if (p.inBoat) exitBoat();
+      else if (p.inCar) exitCar();
       else {
-        const car = nearestCar(70);
-        if (car) {
-          enterCar(car);
-          if (car.body === 'taxi') {
-            state.mission.dialogue = ['TAXI: This cab picks up fares — watch for waving passengers.'];
-            state.mission.dialogueTimer = 4;
+        // A boat at the pier beats a car on the street: board whichever
+        // is nearer, boats first when both are in reach.
+        const boat = nearestBoat(state.boats, p.x, p.y, 70);
+        if (boat) {
+          enterBoat(boat);
+        } else {
+          const car = nearestCar(70);
+          if (car) {
+            enterCar(car);
+            if (car.body === 'taxi') {
+              state.mission.dialogue = ['TAXI: This cab picks up fares — watch for waving passengers.'];
+              state.mission.dialogueTimer = 4;
+            }
           }
         }
       }
@@ -584,7 +675,19 @@ export function createWorld(rng, savedMission) {
       ufo.seen = false;
     }
 
-    if (p.inCar && p.car) {
+    // The blackout counts down: when the timer ends, the power — and
+    // the neon — comes back.
+    if (state.blackout.active) {
+      state.blackout.timer -= dt;
+      if (state.blackout.timer <= 0) state.blackout.active = false;
+    }
+
+    if (p.inBoat && p.boat) {
+      driveBoat(p.boat, input, dt);
+      p.x = p.boat.x;
+      p.y = p.boat.y;
+      p.angle = p.boat.angle;
+    } else if (p.inCar && p.car) {
       driveCar(p.car, input, dt);
       p.x = p.car.x;
       p.y = p.car.y;
@@ -660,6 +763,7 @@ export function createWorld(rng, savedMission) {
     updateRace(state, dt);
     updateTaxi(state, dt);
     updatePickups(state);
+    stepBoats(state, dt);
     stepParticles(dt);
 
     // District heat: crimes committed this step heat up the district
@@ -678,10 +782,13 @@ export function createWorld(rng, savedMission) {
     }
 
     // Camera follows the player (or their car), clamped to the world.
-    // Zoom: close on foot, pulling back as the car goes faster.
+    // Zoom: close on foot, pulling back as the car — or boat — goes faster.
     if (!state.zoomLock) {
-      const targetZoom = p.inCar && p.car
-        ? 1.0 - Math.min(0.22, (Math.abs(p.car.speed) / CAR.maxSpeed) * 0.22)
+      const vehicleSpeed = p.inCar && p.car
+        ? Math.abs(p.car.speed)
+        : p.inBoat && p.boat ? Math.abs(p.boat.speed) : 0;
+      const targetZoom = vehicleSpeed > 0
+        ? 1.0 - Math.min(0.22, (vehicleSpeed / CAR.maxSpeed) * 0.22)
         : 1.12;
       state.zoom += (targetZoom - state.zoom) * Math.min(1, dt * 3);
     }
@@ -703,7 +810,7 @@ export function createWorld(rng, savedMission) {
     return 0;
   }
 
-  return { state, reset, step, enterCar, exitCar, nearestCar, restoreCheckpoint, saveCheckpoint };
+  return { state, reset, step, enterCar, exitCar, enterBoat, exitBoat, nearestCar, restoreCheckpoint, saveCheckpoint };
 }
 
 export { STEP };

@@ -91,11 +91,22 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   for (const strip of state.police.strips) {
     ctx.fillRect(x + strip.x * sx - 2, y + strip.y * sy - 2, 4, 4);
   }
+  // Speedboats on the harbor (white dots), police boats (blue squares).
+  for (const boat of state.boats || []) {
+    if (!boat.alive) continue;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(x + boat.x * sx, y + boat.y * sy, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
   // Police (blue), gunmen (red), roadblocks (red squares).
   for (const unit of state.police.units) {
     const ux = unit.kind === 'car' ? unit.car.x : unit.x;
     const uy = unit.kind === 'car' ? unit.car.y : unit.y;
-    if (unit.kind === 'gunman') {
+    if (unit.kind === 'boat') {
+      ctx.fillStyle = '#5aa0ff';
+      ctx.fillRect(x + ux * sx - 2, y + uy * sy - 2, 4, 4);
+    } else if (unit.kind === 'gunman') {
       ctx.fillStyle = '#ff5a3c';
       ctx.beginPath();
       ctx.arc(x + ux * sx, y + uy * sy, 3, 0, Math.PI * 2);

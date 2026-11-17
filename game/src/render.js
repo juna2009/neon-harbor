@@ -6,7 +6,7 @@
 // canvases instead of shadowBlur per frame.
 import { COLORS, PLAYER, UPGRADES, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, districtAt } from './city.js';
-import { currentObjective } from './missions.js';
+import { currentObjective, garageHot } from './missions.js';
 import { drawMinimap } from './minimap.js';
 
 export const SCREEN_TITLE = 'title';
@@ -181,6 +181,41 @@ function drawPerson(ctx, x, y, angle, ped, walkPhase) {
     ctx.fillStyle = '#bfe6ff';
     ctx.fillRect(radius * 0.75 + 1, -radius - 7, 3, 8);
   }
+  ctx.restore();
+}
+
+/** A speedboat: pointed bow, coloured stripe, windshield, outboard motor. */
+function drawBoatShape(ctx, boat) {
+  ctx.save();
+  ctx.translate(boat.x, boat.y);
+  // Shadow on the water.
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(2, 3, 30, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.rotate(boat.angle);
+  // Hull.
+  ctx.fillStyle = boat.color || '#e8e4d8';
+  ctx.beginPath();
+  ctx.moveTo(28, 0);
+  ctx.lineTo(16, -10);
+  ctx.lineTo(-24, -10);
+  ctx.lineTo(-28, -6);
+  ctx.lineTo(-28, 6);
+  ctx.lineTo(-24, 10);
+  ctx.lineTo(16, 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.fillRect(-24, -10, 40, 3);
+  // Windshield and cockpit.
+  ctx.fillStyle = '#bfe6ff';
+  ctx.fillRect(2, -7, 10, 14);
+  ctx.fillStyle = '#20242a';
+  ctx.fillRect(-14, -7, 12, 14);
+  // Outboard motor at the stern.
+  ctx.fillStyle = '#14181f';
+  ctx.fillRect(-32, -5, 6, 10);
   ctx.restore();
 }
 
@@ -377,7 +412,9 @@ export function createRenderer(canvas) {
     const ox = view.w / 2 - camX * zoom;
     const oy = view.h / 2 - camY * zoom;
     // A storm front darkens the sky on top of the day/night cycle.
-    const night = Math.min(1, 1 - state.daylight + (state.weather && state.weather.storm ? 0.22 : 0));
+    // A blackout kills the light entirely: total darkness, no neon.
+    const blackout = !!(state.blackout && state.blackout.active);
+    const night = blackout ? 1 : Math.min(1, 1 - state.daylight + (state.weather && state.weather.storm ? 0.22 : 0));
     const inView = (x, y, r) => (
       x > camX - vw / 2 - r && x < camX + vw / 2 + r
       && y > camY - vh / 2 - r && y < camY + vh / 2 + r
@@ -434,11 +471,20 @@ export function createRenderer(canvas) {
         ctx.fillStyle = '#ffd23e';
         ctx.font = `bold 17px ${FONT}`;
         ctx.textAlign = 'center';
-        ctx.fillText('★ CASINO ★', cz.x, cz.y - 108);
-        if (night > 0.4) {
-          ctx.globalAlpha = (night - 0.4) * 0.6;
-          ctx.drawImage(glowSprite, cz.x - 90, cz.y - 110, 180, 180);
+        if (blackout) {
+          // One flickering sign in the dark: the casino sign stutters
+          // on and off while every other neon sign is dead.
+          const flick = Math.sin(state.elapsed * 23) + Math.sin(state.elapsed * 7.3) > -0.4 ? 1 : 0.12;
+          ctx.globalAlpha = flick;
+          ctx.fillText('★ CASINO ★', cz.x, cz.y - 108);
           ctx.globalAlpha = 1;
+        } else {
+          ctx.fillText('★ CASINO ★', cz.x, cz.y - 108);
+          if (night > 0.4) {
+            ctx.globalAlpha = (night - 0.4) * 0.6;
+            ctx.drawImage(glowSprite, cz.x - 90, cz.y - 110, 180, 180);
+            ctx.globalAlpha = 1;
+          }
         }
       }
     }
@@ -466,22 +512,24 @@ export function createRenderer(canvas) {
       }
     }
 
-    // Garage bay: a teal repair bay on the Old Town crossroads.
+    // Garage bay: a teal repair bay on the Old Town crossroads — closed
+    // while its district is hot (HEAT 60+), the shop refuses service.
     const garage = city.garage;
     if (garage && inView(garage.x, garage.y, 90)) {
+      const hot = garageHot(state);
       const nearGarage = state.player.inCar && state.player.car
         && Math.hypot(state.player.car.x - garage.x, state.player.car.y - garage.y) < 120;
-      ctx.strokeStyle = nearGarage ? '#37e0e6' : 'rgba(55,224,230,0.6)';
+      ctx.strokeStyle = hot ? '#ff5a3c' : nearGarage ? '#37e0e6' : 'rgba(55,224,230,0.6)';
       ctx.lineWidth = 3;
       ctx.setLineDash([10, 6]);
       ctx.strokeRect(garage.x - 44, garage.y - 30, 88, 60);
       ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(55,224,230,0.18)';
+      ctx.fillStyle = hot ? 'rgba(255,90,60,0.18)' : 'rgba(55,224,230,0.18)';
       ctx.fillRect(garage.x - 44, garage.y - 30, 88, 60);
-      ctx.fillStyle = '#37e0e6';
+      ctx.fillStyle = hot ? '#ff8a7a' : '#37e0e6';
       ctx.font = `bold 15px ${FONT}`;
       ctx.textAlign = 'center';
-      ctx.fillText('GARAGE $150 · G repair / respray · U shop', garage.x, garage.y - 40);
+      ctx.fillText(hot ? 'GARAGE — CLOSED · district too hot' : 'GARAGE $150 · G repair / respray · U shop', garage.x, garage.y - 40);
       ctx.fillText('G', garage.x, garage.y + 6);
     }
 
@@ -514,10 +562,11 @@ export function createRenderer(canvas) {
     }
 
     // Neon glow at night over the buildings, stamped from the
-    // pre-rendered sprite — never shadowBlur per frame.
+    // pre-rendered sprite — never shadowBlur per frame. In a blackout
+    // every neon sign is dead: no glow at all.
     for (const b of state.city.buildings) {
       if (!inView(b.x + b.w / 2, b.y + b.h / 2, Math.max(b.w, b.h))) continue;
-      if (night > 0.4) {
+      if (!blackout && night > 0.4) {
         ctx.globalAlpha = (night - 0.4) * 0.5;
         ctx.drawImage(glowSprite, b.x - 20, b.y - 20, b.w + 40, b.h + 40);
         ctx.globalAlpha = 1;
@@ -678,6 +727,49 @@ export function createRenderer(canvas) {
         ctx.textAlign = 'center';
         ctx.fillText('P', unit.x, unit.y - 16);
       }
+    }
+
+    // Speedboats on the harbor water, wakes trailing behind them — and
+    // the police boats that answer at 4–5 stars, blue hulls, lights
+    // flashing.
+    for (const boat of state.boats || []) {
+      if (!boat.alive || !inView(boat.x, boat.y, 120)) continue;
+      for (const w of boat.wake) {
+        const alpha = Math.max(0, w.life / w.maxLife);
+        ctx.fillStyle = `rgba(230,245,255,${(alpha * 0.5).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.ellipse(w.x, w.y, 14 * alpha + 4, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      drawBoatShape(ctx, boat);
+      if (boat.kind === 'player') {
+        // White outline so Jax's boat reads as his, like a resprayed car.
+        ctx.save();
+        ctx.translate(boat.x, boat.y);
+        ctx.rotate(boat.angle);
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 32, 14, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    for (const unit of state.police.units) {
+      if (unit.kind !== 'boat' || !inView(unit.x, unit.y, 120)) continue;
+      for (const w of unit.wake || []) {
+        const alpha = Math.max(0, w.life / w.maxLife);
+        ctx.fillStyle = `rgba(230,245,255,${(alpha * 0.5).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.ellipse(w.x, w.y, 14 * alpha + 4, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      drawBoatShape(ctx, { ...unit, color: '#2f6fd0' });
+      const blink = Math.floor(state.elapsed * 6) % 2 === 0;
+      ctx.fillStyle = blink ? '#ff3b30' : '#2f6fd0';
+      ctx.beginPath();
+      ctx.arc(unit.x, unit.y - 12, 4, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // Police helicopter at 4–5 stars: its searchlight cone pins the
@@ -856,7 +948,8 @@ export function createRenderer(canvas) {
         ctx.arc(p.car.x - Math.cos(p.car.angle) * 16, p.car.y - Math.sin(p.car.angle) * 16, 7, 0, Math.PI * 2);
         ctx.fill();
       }
-    } else {
+    } else if (!p.inBoat) {
+      // On foot. In a boat the hull is the player (drawn with the boats).
       drawPlayer(ctx, p, state);
     }
 
@@ -913,13 +1006,99 @@ export function createRenderer(canvas) {
 
     ctx.restore();
 
-    // Lighting: night tint, a warm sunset wash, then the vignette.
+    // Lighting: night tint, a warm dawn/dusk wash, then the vignette.
     if (night > 0.05) {
       ctx.fillStyle = `rgba(10,14,44,${(night * 0.48).toFixed(3)})`;
       ctx.fillRect(0, 0, view.w, view.h);
-    } else if (state.daylight < 0.6 && state.daylight > 0.25) {
-      ctx.fillStyle = 'rgba(255,120,40,0.07)';
+    }
+    if (state.daylight > 0.55 && state.daylight < 0.85) {
+      // Dawn/dusk warmth over the blue tint: the sky is orange, not navy.
+      ctx.fillStyle = 'rgba(255,140,60,0.08)';
       ctx.fillRect(0, 0, view.w, view.h);
+    }
+    if (blackout) {
+      // Total darkness: an extra black layer over the night tint, so
+      // the blackout reads as a blackout, not as an ordinary night.
+      // Then the lights punch back through — the helicopter
+      // searchlight, the muzzle flash, the one flickering casino sign,
+      // the mission marker and Jax's ring — re-stamped in screen space
+      // on top of the dark, because the world-space versions are under it.
+      ctx.fillStyle = 'rgba(2,4,12,0.45)';
+      ctx.fillRect(0, 0, view.w, view.h);
+      const sx = (x) => (x - camX) * zoom + view.w / 2;
+      const sy = (y) => (y - camY) * zoom + view.h / 2;
+      const heli2 = state.police.heli;
+      if (heli2 && heli2.active) {
+        const px = sx(state.player.x);
+        const py = sy(state.player.y);
+        const hx = sx(heli2.x);
+        const hy = sy(heli2.y);
+        const dx = px - hx;
+        const dy = py - hy;
+        const dist = Math.hypot(dx, dy) || 1;
+        const ux = dx / dist;
+        const uy = dy / dist;
+        const perpX = -uy;
+        const perpY = ux;
+        ctx.fillStyle = 'rgba(255,240,170,0.16)';
+        ctx.beginPath();
+        ctx.moveTo(hx, hy);
+        ctx.lineTo(px + perpX * 46 * zoom, py + perpY * 46 * zoom);
+        ctx.lineTo(px - perpX * 46 * zoom, py - perpY * 46 * zoom);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,240,170,0.35)';
+        ctx.beginPath();
+        ctx.arc(px, py, 34 * zoom, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (state.events.muzzle) {
+        const m = state.events.muzzle;
+        ctx.globalAlpha = 0.95;
+        ctx.drawImage(glowSprite, sx(m.x) - 26 * zoom, sy(m.y) - 26 * zoom, 52 * zoom, 52 * zoom);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = '#fff6c8';
+        ctx.beginPath();
+        ctx.arc(sx(m.x), sy(m.y), 6 * zoom, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (city.casino) {
+        const flick = Math.sin(state.elapsed * 23) + Math.sin(state.elapsed * 7.3) > -0.4 ? 1 : 0.12;
+        ctx.globalAlpha = flick;
+        ctx.fillStyle = '#ffd23e';
+        ctx.font = `bold ${Math.round(17 * zoom)}px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('★ CASINO ★', sx(city.casino.x), sy(city.casino.y) - 108 * zoom);
+        ctx.globalAlpha = 1;
+      }
+      if (state.mission.target) {
+        const t = state.mission.target;
+        ctx.strokeStyle = COLORS.neonYellow;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(sx(t.x), sy(t.y), 26 * zoom, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = COLORS.neonYellow;
+        ctx.beginPath();
+        ctx.arc(sx(t.x), sy(t.y), 7 * zoom, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffd23e';
+        ctx.font = `bold ${Math.round(13 * zoom)}px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.fillText(t.label, sx(t.x), sy(t.y) - 34 * zoom);
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(sx(state.player.x), sy(state.player.y), (PLAYER.radius + 3) * zoom, 0, Math.PI * 2);
+      ctx.stroke();
+      for (const unit of state.police.units) {
+        if (unit.kind !== 'gunman') continue;
+        ctx.fillStyle = '#a33327';
+        ctx.beginPath();
+        ctx.arc(sx(unit.x), sy(unit.y), 9 * zoom, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     ctx.drawImage(vignetteSprite, 0, 0, view.w, view.h);
     // Lightning: the whole frame strobes white for 2 frames.
@@ -960,22 +1139,29 @@ export function createRenderer(canvas) {
     const weapon = WEAPONS[p.weapon];
     text(`${weapon.name}  ${p.ammo} / ${p.reserve}`, 24, 118, 15, '#eef1f5', 'left');
     text(`◆ ${collected}/${state.collectibles.length}`, 24, 138, 14, COLORS.neonYellow, 'left', 'bold');
-    // Speed gets its own panel, clear of the hints line.
-    if (p.inCar && p.car) {
-      const speed = Math.round(Math.abs(p.car.speed) * 0.36);
+    // Speed gets its own panel, clear of the hints line — car or boat.
+    if ((p.inCar && p.car) || (p.inBoat && p.boat)) {
+      const vehicle = p.inCar ? p.car : p.boat;
+      const speed = Math.round(Math.abs(vehicle.speed) * 0.36);
       ctx.fillStyle = 'rgba(14,20,32,0.82)';
       ctx.fillRect(view.w - 188, view.h - 116, 172, 52);
       text(`${speed} km/h`, view.w - 28, view.h - 78, 30, '#ffffff', 'right', 'bold');
-      const hp = Math.max(0, Math.round(p.car.hp || 0));
-      text(`Car ${hp}%`, view.w - 28, view.h - 100, 12, '#c8cdd6', 'right');
-      if (p.car.tiresPopped) {
+      if (p.inCar && p.car) {
+        const hp = Math.max(0, Math.round(p.car.hp || 0));
+        text(`Car ${hp}%`, view.w - 28, view.h - 100, 12, '#c8cdd6', 'right');
+      } else {
+        text('Speedboat', view.w - 28, view.h - 100, 12, '#c8cdd6', 'right');
+      }
+      if (p.car && p.car.tiresPopped) {
         text('TIRES POPPED — garage $150 (G)', view.w - 16, view.h - 128, 14, '#ff5a3c', 'right', 'bold');
       }
     }
     // Hints, kept inside the viewport with a margin.
     const hints = p.inCar
       ? 'E exit · Q weapon · C radio · G repair/respray · M mute'
-      : 'E enter car · R reload · Q weapon · C radio · M mute';
+      : p.inBoat
+        ? 'E step ashore · C radio · M mute'
+        : 'E enter car / boat · R reload · Q weapon · C radio · M mute';
     text(hints, view.w - 16, view.h - 24, 14, '#c8cdd6', 'right');
     // Objective bar: solid pad sized to the text, never under a sprite.
     const objective = currentObjective(state);
@@ -1008,7 +1194,8 @@ export function createRenderer(canvas) {
     const heatIdx = state.city.districts.indexOf(district);
     const heat = state.heat ? Math.round(state.heat[heatIdx] || 0) : 0;
     const hot = heat >= 60;
-    const readout = `DAY ${day} · ${hh}:${mm} · ${district.name.toUpperCase()} · HEAT ${heat}${hot ? ' HOT!' : ''}`;
+    const blackout = state.blackout && state.blackout.active;
+    const readout = `DAY ${day} · ${hh}:${mm} · ${district.name.toUpperCase()} · HEAT ${heat}${hot ? ' HOT!' : ''}${blackout ? ' · BLACKOUT' : ''}`;
     ctx.font = `bold 15px ${FONT}`;
     const rw = ctx.measureText(readout).width + 28;
     ctx.fillStyle = 'rgba(14,20,32,0.82)';
@@ -1078,9 +1265,9 @@ export function createRenderer(canvas) {
   const TITLE_LINES = [
     'Jax Marlowe came to Neon Harbor to drive. The harbor crew had other plans.',
     'His fixer Mara set him up — to save his life. Now they rob the police evidence vault together.',
-    'Steal a car, run the package, lose the heat — and survive the showdown at the docks.',
+    'Steal a car or a speedboat, run the package, lose the heat — twelve missions across three days.',
     'WASD / arrows — move & drive    Mouse — aim    Click / Space — shoot',
-    'E — enter / exit car    R — reload    Q — switch weapon    C — radio',
+    'E — enter / exit car or boat    R — reload    Q — switch weapon    C — radio',
     'G — garage repair / respray    U — upgrade shop    O — settings',
     'Street races, taxi fares, harbor tokens and weapon pickups hide all over the city.',
   ];
@@ -1117,9 +1304,10 @@ export function createRenderer(canvas) {
   }
 
   function drawShop(state, ui) {
+    const closed = garageHot(state);
     const width = Math.min(680, view.w - 48);
     const lineH = 52;
-    const height = 150 + UPGRADES.length * lineH + 60;
+    const height = 150 + UPGRADES.length * lineH + 60 + (closed ? 30 : 0);
     const x = (view.w - width) / 2;
     const y = (view.h - height) / 2;
     ctx.fillStyle = 'rgba(14,20,32,0.95)';
@@ -1128,10 +1316,18 @@ export function createRenderer(canvas) {
     ctx.fillRect(x, y, width, 5);
     text('GARAGE — UPGRADE SHOP', view.w / 2, y + 58, 30, '#ffffff', 'center', 'bold');
     text(`Cash $${state.cash} — fitted for good, kept for this visit`, view.w / 2, y + 88, 15, COLORS.cash, 'center');
+    if (closed) {
+      // A hot district closes the shop: the panel says so, and no
+      // upgrade can be bought until the heat cools (buyUpgrade: 'closed').
+      const g = state.city.garage;
+      const d = districtAt(state.city, g.x, g.y);
+      const heat = state.heat ? Math.round(state.heat[state.city.districts.indexOf(d)] || 0) : 0;
+      text(`CLOSED — ${d.name} is too hot (HEAT ${heat}). Come back when it cools.`, view.w / 2, y + 112, 15, '#ff8a7a', 'center', 'bold');
+    }
     UPGRADES.forEach((u, i) => {
       const owned = state.upgrades && state.upgrades[u.id];
       const selected = i === ui.shopIndex;
-      const rowY = y + 108 + i * lineH;
+      const rowY = y + 108 + (closed ? 30 : 0) + i * lineH;
       if (selected) {
         ctx.fillStyle = 'rgba(55,224,230,0.18)';
         ctx.fillRect(x + 16, rowY, width - 32, lineH - 8);
