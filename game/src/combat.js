@@ -1,12 +1,9 @@
-// Neon Harbor — combat — bullets — weapons — hits — pumps — wanted heat.
 import { WEAPONS } from './config.js';
 import { buildingAt } from './city.js';
 import { addWanted } from './police.js';
-
 export function createBullets() {
   return [];
 }
-
 export function fireBullet(bullets, x, y, angle, hostile, weapon) {
   const def = weapon || WEAPONS.pistol;
   bullets.push({
@@ -18,7 +15,6 @@ export function fireBullet(bullets, x, y, angle, hostile, weapon) {
     hostile: !!hostile,
   });
 }
-
 export function fireWeapon(bullets, weaponKey, x, y, angle, hostile, rng) {
   const def = WEAPONS[weaponKey] || WEAPONS.pistol;
   for (let i = 0; i < def.pellets; i += 1) {
@@ -27,11 +23,9 @@ export function fireWeapon(bullets, weaponKey, x, y, angle, hostile, rng) {
   }
   return true;
 }
-
 function hitCircle(bx, by, x, y, r) {
   return Math.hypot(bx - x, by - y) < r;
 }
-
 export function stepBullets(world, dt) {
   const bullets = world.bullets;
   const city = world.city;

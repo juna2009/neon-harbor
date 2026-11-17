@@ -1,4 +1,3 @@
-// Neon Harbor — seeded RNG — mulberry32 — replays seeds — pick.
 export function createRandom(seed) {
   let state = (seed >>> 0) || 0x9e3779b9;
   function next() {

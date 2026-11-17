@@ -1,4 +1,3 @@
-// Neon Harbor — Mara Job — boot — loop — shots — handle.
 import { BEST_KEY, PROGRESS_KEY, RADIO_STATIONS, SETTINGS_KEY, STEP, UPGRADES } from './config.js';
 import { createRandom } from './random.js';
 import { createWorld, EVENT_BUSTED, EVENT_OVER } from './world.js';
@@ -7,18 +6,14 @@ import { createAudio } from './audio.js';
 import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_SETTINGS, SCREEN_SHOP, SCREEN_TITLE } from './render.js';
 import { buyUpgrade, loadCheckpoint, nearGarage } from './missions.js';
 import { stageShot } from './shots.js';
-
 const MAX_FRAME = 0.25;
-
 const params = new URLSearchParams(window.location.search);
 const shot = params.get('shot');
 const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
 const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() * 4294967296);
-
 const canvas = document.getElementById('game');
 const status = document.getElementById('status');
 const audio = createAudio();
-
 function readNumber(key) {
   try {
     return Number.parseInt(window.localStorage.getItem(key) ?? '0', 10) || 0;
@@ -32,7 +27,6 @@ function saveNumber(key, value) {
   } catch {
   }
 }
-
 function loadSettings() {
   const defaults = { volume: 0.8, station: 0, bindings: null };
   try {
@@ -48,12 +42,10 @@ function loadSettings() {
     return defaults;
   }
 }
-
 const savedMission = Math.min(11, Math.max(0, readNumber(PROGRESS_KEY)));
 const world = createWorld(createRandom(seed), savedMission);
 const renderer = createRenderer(canvas);
 const settings = loadSettings();
-
 function runShot(name) {
   const scene = stageShot(name, world);
   let painted = 0;
@@ -65,7 +57,6 @@ function runShot(name) {
   }
   requestAnimationFrame(paint);
 }
-
 function runGame() {
   const input = createInput(canvas);
   if (settings.bindings) input.setBindings(settings.bindings);
@@ -86,7 +77,6 @@ function runGame() {
   let shopIndex = 0;
   let capturingRow = -1;
   const prevKeys = { up: false, down: false, left: false, right: false };
-
   function saveSettings() {
     try {
       window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({
@@ -97,11 +87,9 @@ function runGame() {
     } catch {
     }
   }
-
   function announce(message) {
     status.textContent = message;
   }
-
   function startGame() {
     world.reset();
     world.state.mission.index = Math.min(11, Math.max(0, readNumber(PROGRESS_KEY)));
@@ -120,7 +108,6 @@ function runGame() {
     }
     announce('Playing Neon Harbor. Steal a car and drive to the docks.');
   }
-
   function resumeFromCheckpoint() {
     if (!loadCheckpoint()) return;
     world.restoreCheckpoint();
@@ -135,7 +122,6 @@ function runGame() {
     audio.startRadio(settings.station);
     announce('Resumed from the last checkpoint.');
   }
-
   function endGame(kind) {
     screen = SCREEN_OVER;
     if (world.state.cash > best) {
@@ -148,7 +134,6 @@ function runGame() {
     else audio.busted();
     announce(kind === 'busted' ? 'Busted. The Harbor Police caught Jax.' : 'Wasted. Jax went down in Neon Harbor.');
   }
-
   function settingsUi() {
     const bindings = input.getBindings();
     return {
@@ -168,7 +153,6 @@ function runGame() {
       shopIndex,
     };
   }
-
   function handleShopKeys() {
     const up = input.keys.has('ArrowUp');
     const down = input.keys.has('ArrowDown');
@@ -189,7 +173,6 @@ function runGame() {
       announce('Playing.');
     }
   }
-
   function handleSettingsKeys() {
     if (input.isCapturing()) return;
     const up = input.keys.has('ArrowUp');
@@ -228,7 +211,6 @@ function runGame() {
       screen = previousScreen;
     }
   }
-
   function handleActions() {
     if (input.wasPressed(ACTION_MUTE)) {
       const muted = audio.toggleMute();
@@ -279,7 +261,6 @@ function runGame() {
     if (input.mouse.clicked && screen === SCREEN_TITLE) startGame();
     else if (input.mouse.clicked && screen === SCREEN_OVER) startGame();
   }
-
   function step() {
     if (screen === SCREEN_TITLE) return;
     const events = world.step(STEP * ts, input, { w: renderer.view.w, h: renderer.view.h });
@@ -329,7 +310,6 @@ function runGame() {
     else audio.stopSiren();
     input.endFrame();
   }
-
   function frame(now) {
     requestAnimationFrame(frame);
     accumulator += Math.min((now - last) / 1000, MAX_FRAME);
@@ -346,16 +326,13 @@ function runGame() {
     input.endFrame();
     renderer.draw(world.state, screen, best, settingsUi());
   }
-
   document.addEventListener('visibilitychange', () => {
     if (document.hidden && screen === SCREEN_PLAY) {
       screen = SCREEN_PAUSED;
       announce('Paused.');
     }
   });
-
   announce('Neon Harbor. Press Enter or click to start.');
-  // Read-only handle for live verification (checkpoint-resume tests and
   window.__neonHarbor = {
     get state() { return world.state; },
     get screen() { return screen; },
@@ -363,6 +340,5 @@ function runGame() {
   };
   requestAnimationFrame(frame);
 }
-
 if (shot) runShot(shot);
 else runGame();

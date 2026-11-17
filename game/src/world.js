@@ -1,4 +1,3 @@
-// Neon Harbor — world — state — step — storms — heat — boats.
 import { CAR, PLAYER, STEP, UFO_DURATION, UFO_HOUR, WANTED, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, buildCity, collides, districtAt, moveCircle } from './city.js';
 import { createBullets, fireWeapon, stepBullets } from './combat.js';
@@ -7,10 +6,8 @@ import { claimPinkTaxi, createArmored, createCollectibles, createMissionState, c
 import { addWanted, clearPolice, createPolice, decayWanted, spawnPoliceUnit, stepPolice } from './police.js';
 import { createPedestrians, createTraffic, stepPedestrians, stepTraffic } from './traffic.js';
 import { createBridge, stepBridge } from './drawbridge.js';
-
 export const EVENT_OVER = 1;
 export const EVENT_BUSTED = 2;
-
 export function createWorld(rng, savedMission) {
   const city = buildCity(rng);
   const traffic = createTraffic(city, rng);
@@ -81,7 +78,6 @@ export function createWorld(rng, savedMission) {
     over: false,
     overKind: '',
   };
-
   function reset() {
     state.player.x = city.playerStart.x;
     state.player.y = city.playerStart.y;
@@ -134,7 +130,6 @@ export function createWorld(rng, savedMission) {
     state.weather = { rain: false, timer: 55, duration: 0, storm: false, heavy: false, bolt: null, boltTimer: 0, flash: 0, thunderIn: 0 };
     state.rainDrops.length = 0;
     state.clock = { total: 21 * 60 };
-    // Heat is NOT reset here: the city remembers. A game-over restart
     state.ufo = { active: false, timer: 0, seen: false, x: WATER_X + 56, y: 620 };
     state.bridge = createBridge();
     for (const c of state.collectibles) c.taken = false;
@@ -143,7 +138,6 @@ export function createWorld(rng, savedMission) {
     for (const car of traffic.cars) { car.alive = true; car.health = 2; }
     for (const car of traffic.parked) { car.alive = true; car.health = 2; }
   }
-
   function restoreCheckpoint() {
     const cp = loadCheckpoint();
     if (!cp) return false;
@@ -151,7 +145,6 @@ export function createWorld(rng, savedMission) {
     state.mission = createMissionState(cp.mission);
     state.mission.stage = cp.stage;
     state.mission.started = true;
-    // Round-3 fix: the restored mission needs its target marker back —
     state.mission.target = targetForMission(city, cp.mission, cp.stage);
     state.mission.dialogue = [`Checkpoint — ${cp.label}. Pick up where you left off.`];
     state.mission.dialogueTimer = 5;
@@ -178,7 +171,6 @@ export function createWorld(rng, savedMission) {
     }
     return true;
   }
-
   function nearestCar(maxDist) {
     const p = state.player;
     let best = null;
@@ -194,7 +186,6 @@ export function createWorld(rng, savedMission) {
     }
     return best;
   }
-
   function enterCar(car) {
     const p = state.player;
     p.inCar = true;
@@ -207,17 +198,15 @@ export function createWorld(rng, savedMission) {
     }
     if (car.pink) claimPinkTaxi(state);
   }
-
   function nearPolice(x, y, radius) {
     for (const unit of state.police.units) {
-      if (unit.kind === 'gunman') continue; // Harbor Crew are not police.
+      if (unit.kind === 'gunman') continue;
       const ux = unit.kind === 'car' ? unit.car.x : unit.x;
       const uy = unit.kind === 'car' ? unit.car.y : unit.y;
       if (Math.hypot(ux - x, uy - y) < radius) return true;
     }
     return false;
   }
-
   function exitCar() {
     const p = state.player;
     if (!p.car) return;
@@ -232,7 +221,6 @@ export function createWorld(rng, savedMission) {
     p.car.speed = 0;
     p.car = null;
   }
-
   function enterBoat(boat) {
     const p = state.player;
     p.inBoat = true;
@@ -243,7 +231,6 @@ export function createWorld(rng, savedMission) {
       if (!state.upgrades.ghost && (state.wanted > 0 || nearPolice(p.x, p.y, 300))) addWanted(state, 1);
     }
   }
-
   function exitBoat() {
     const p = state.player;
     if (!p.boat) return;
@@ -253,7 +240,6 @@ export function createWorld(rng, savedMission) {
     p.boat.speed = 0;
     p.boat = null;
   }
-
   function driveBoat(boat, input, dt) {
     const throttle = -input.moveY();
     const steer = input.moveX();
@@ -277,7 +263,6 @@ export function createWorld(rng, savedMission) {
       if (boat.wake.length > 80) boat.wake.splice(0, boat.wake.length - 80);
     }
   }
-
   function spawnExplosion(x, y, opts = {}) {
     for (let i = 0; i < 26; i += 1) {
       const a = state.rng.range(0, Math.PI * 2);
@@ -310,7 +295,6 @@ export function createWorld(rng, savedMission) {
     state.shake = Math.max(state.shake, opts.big ? 14 : 9);
     state.events.crash = true;
   }
-
   function explodePump(pump) {
     if (!pump || !pump.alive) return;
     const station = state.gasStation;
@@ -323,7 +307,6 @@ export function createWorld(rng, savedMission) {
     spawnExplosion(pump.x, pump.y, { big: true });
     if (Math.hypot(state.player.x - pump.x, state.player.y - pump.y) < 120) state.player.health -= 25;
   }
-
   function hitScenery(car) {
     if (!car.alive) return;
     for (const h of state.hydrants) {
@@ -338,7 +321,6 @@ export function createWorld(rng, savedMission) {
       if (pump.alive && Math.abs(car.speed) > 80 && Math.hypot(car.x - pump.x, car.y - pump.y) < 34) explodePump(pump);
     }
   }
-
   function strikeLightning(state) {
     const p = state.player;
     const px = p.inCar && p.car ? p.car.x : p.x;
@@ -378,7 +360,6 @@ export function createWorld(rng, savedMission) {
       }
     }
   }
-
   function stepScenery(dt) {
     const station = state.gasStation;
     if (station.chainTimer > 0) {
@@ -399,16 +380,13 @@ export function createWorld(rng, savedMission) {
       });
     }
   }
-
   function addSkid(x, y, angle) {
     state.skids.push({ x, y, angle, life: 5 });
     if (state.skids.length > 220) state.skids.splice(0, state.skids.length - 220);
   }
-
   function addFloater(x, y, value, color) {
     state.floaters.push({ x, y, value, color: color || '#7be382', life: 1.4 });
   }
-
   function collideCars(car, dt) {
     const armoredTruck = state.armored && state.armored.truck ? [state.armored.truck] : [];
     const others = state.traffic.cars.concat(state.traffic.parked)
@@ -457,9 +435,7 @@ export function createWorld(rng, savedMission) {
       }
     }
   }
-
   function driveCar(car, input, dt) {
-    // Round-3 fix: W / Up is the gas. moveY() returns -1 for Up (north
     const throttle = -input.moveY();
     const steer = input.moveX();
     const speedAlong = car.speed;
@@ -529,7 +505,6 @@ export function createWorld(rng, savedMission) {
       }
     }
   }
-
   function walkPlayer(input, dt, aimAngle) {
     const p = state.player;
     const mx = input.moveX();
@@ -542,14 +517,12 @@ export function createWorld(rng, savedMission) {
     }
     p.angle = aimAngle;
   }
-
   function aimAngle(input, camera, viewW, viewH) {
     const p = state.player;
     const sx = (p.x - camera.x) * state.zoom + viewW / 2;
     const sy = (p.y - camera.y) * state.zoom + viewH / 2;
     return Math.atan2(input.mouse.y - sy, input.mouse.x - sx);
   }
-
   function stepParticles(dt) {
     for (let i = state.particles.length - 1; i >= 0; i -= 1) {
       const pt = state.particles[i];
@@ -571,14 +544,12 @@ export function createWorld(rng, savedMission) {
     }
     if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 26);
   }
-
   function syncAmmo() {
     const p = state.player;
     const w = p.weapons[p.weapon];
     p.ammo = w.ammo;
     p.reserve = w.reserve;
   }
-
   function step(dt, input, view) {
     if (state.over) return EVENT_OVER;
     state.elapsed += dt;
@@ -586,11 +557,9 @@ export function createWorld(rng, savedMission) {
     const p = state.player;
     const events = state.events;
     const wantedBefore = state.wanted;
-
     if (!state.daylightManual) {
       state.daylight = 0.55 + 0.45 * Math.sin(state.elapsed * 0.013);
     }
-
     if (input.wasPressed && input.wasPressed('interact')) {
       if (p.inBoat) exitBoat();
       else if (p.inCar) exitCar();
@@ -649,7 +618,6 @@ export function createWorld(rng, savedMission) {
         }
       }
     }
-
     const weather = state.weather;
     if (!weather.rain) {
       weather.timer -= dt;
@@ -657,7 +625,6 @@ export function createWorld(rng, savedMission) {
         weather.rain = true;
         weather.duration = 25;
         weather.storm = state.rng.chance(0.5);
-        // Half the storms turn heavy: slick roads and lightning that
         weather.heavy = weather.storm && state.rng.chance(0.5);
         weather.bolt = null;
         weather.boltTimer = state.rng.range(2, 5);
@@ -716,7 +683,6 @@ export function createWorld(rng, savedMission) {
         }
       }
     }
-
     state.clock.total += dt;
     const hour = Math.floor(state.clock.total / 60) % 24;
     const ufo = state.ufo;
@@ -733,12 +699,10 @@ export function createWorld(rng, savedMission) {
     } else if (hour !== UFO_HOUR) {
       ufo.seen = false;
     }
-
     if (state.blackout.active) {
       state.blackout.timer -= dt;
       if (state.blackout.timer <= 0) state.blackout.active = false;
     }
-
     if (p.inBoat && p.boat) {
       driveBoat(p.boat, input, dt);
       p.x = p.boat.x;
@@ -768,7 +732,6 @@ export function createWorld(rng, savedMission) {
         if (!aimingAtPump && (nearPolice(p.x, p.y, 420) || state.wanted > 0)) addWanted(state, 0.2);
       }
     }
-
     stepScenery(dt);
     stepBullets(state, dt);
     if (events.pumpHit) {
@@ -798,7 +761,6 @@ export function createWorld(rng, savedMission) {
       syncAmmo();
       addFloater(p.x, p.y - 24, def.name, def.color);
     }
-
     const obstacles = [];
     if (p.inCar && p.car) obstacles.push(p.car);
     for (const unit of state.police.units) {
@@ -828,7 +790,6 @@ export function createWorld(rng, savedMission) {
     updatePickups(state);
     stepBoats(state, dt);
     stepParticles(dt);
-
     const heatGain = state.wanted - wantedBefore;
     if (heatGain > 0) {
       const d = districtAt(city, p.x, p.y);
@@ -839,7 +800,6 @@ export function createWorld(rng, savedMission) {
     for (let i = 0; i < state.heat.length; i += 1) {
       state.heat[i] = Math.max(0, state.heat[i] - coolRate * dt);
     }
-
     if (!state.zoomLock) {
       const vehicleSpeed = p.inCar && p.car
         ? Math.abs(p.car.speed)
@@ -853,7 +813,6 @@ export function createWorld(rng, savedMission) {
     const ty = p.y;
     state.camera.x += (tx - state.camera.x) * Math.min(1, dt * 6);
     state.camera.y += (ty - state.camera.y) * Math.min(1, dt * 6);
-
     if (p.health <= 0) {
       state.over = true;
       state.overKind = 'wasted';
@@ -866,8 +825,6 @@ export function createWorld(rng, savedMission) {
     }
     return 0;
   }
-
   return { state, reset, step, enterCar, exitCar, enterBoat, exitBoat, nearestCar, restoreCheckpoint, saveCheckpoint };
 }
-
 export { STEP };

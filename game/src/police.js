@@ -1,8 +1,6 @@
-// Neon Harbor — wanted — police — 6-star military — barriers — heli.
 import { WANTED, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, collides, districtAt, moveCircle, nearestIntersection, pathBlocked } from './city.js';
 import { makeCar } from './traffic.js';
-
 export function createPolice() {
   return {
     units: [], spawnTimer: 0, arrestTimer: 0, roadblockTimer: 8, barrierTimer: 8,
@@ -10,12 +8,10 @@ export function createPolice() {
     strips: [], stripTimer: 10,
   };
 }
-
 export function addWanted(state, stars) {
   state.wanted = Math.max(0, Math.min(WANTED.maxStars, state.wanted + stars));
   state.wantedTimer = 0;
 }
-
 export function decayWanted(state, dt) {
   if (state.wanted <= 0) return;
   state.wantedTimer += dt;
@@ -25,12 +21,10 @@ export function decayWanted(state, dt) {
     if (state.wanted < 0.001) state.wanted = 0;
   }
 }
-
 export function dropWanted(state, stars) {
   state.wanted = Math.max(0, state.wanted - stars);
   state.wantedTimer = 0;
 }
-
 function wantedUnitCount(wanted) {
   if (wanted <= 0) return 0;
   if (wanted < 2) return 2;
@@ -40,9 +34,7 @@ function wantedUnitCount(wanted) {
   if (wanted < 6) return 9;
   return 11;
 }
-
 function spawnPointNear(player, rng, distance, city) {
-  // Never spawn dead ahead of a fast-moving car: a patrol car appearing
   let angle;
   if (player.inCar && player.car && Math.abs(player.car.speed) > 100) {
     angle = player.car.angle + Math.PI + rng.range(-0.9, 0.9);
@@ -67,7 +59,6 @@ function spawnPointNear(player, rng, distance, city) {
   else y = bestH;
   return { x, y };
 }
-
 export function spawnPoliceUnit(police, player, rng, kind, city) {
   if (kind === 'boat') {
     const bx = WATER_X + 30 + rng.range(0, 60);
@@ -121,7 +112,6 @@ export function spawnPoliceUnit(police, player, rng, kind, city) {
     });
   }
 }
-
 function pursuitWaypoint(city, car, px, py) {
   if (!pathBlocked(city, car.x, car.y, px, py)) return { x: px, y: py };
   const near = nearestIntersection(city, car.x, car.y);
@@ -136,7 +126,6 @@ function pursuitWaypoint(city, car, px, py) {
   }
   return best;
 }
-
 function spawnRoadblock(police, state, concrete) {
   const p = state.player;
   const px = p.inCar ? p.car.x : p.x;
@@ -156,7 +145,6 @@ function spawnRoadblock(police, state, concrete) {
     if (d < bestD) { bestD = d; bestH = ry; }
   }
   const vertical = Math.abs(bestV - px) < Math.abs(bestH - py);
-  // Far enough ahead that a speeding player sees the block and can
   const ahead = 700;
   let bx;
   let by;
@@ -180,7 +168,6 @@ function spawnRoadblock(police, state, concrete) {
       concrete ? '#6b6f75' : '#2f6fd0', 'police', concrete ? 'van' : 'sedan',
     );
     car.speed = 0;
-    // The flag lives on the car too: collideCars checks the car, not
     car.roadblock = true;
     if (concrete) car.concrete = true;
     police.units.push({ kind: 'car', car, health: 3, ramTimer: 0, roadblock: true, static: true, concrete: !!concrete });
@@ -188,7 +175,6 @@ function spawnRoadblock(police, state, concrete) {
   if (concrete) police.barrierTimer = 22;
   else police.roadblockTimer = 22;
 }
-
 export function stepPolice(police, state, dt, rng, events) {
   const player = state.player;
   const wanted = Math.ceil(state.wanted);
@@ -200,11 +186,9 @@ export function stepPolice(police, state, dt, rng, events) {
   police.spawnTimer -= dt;
   if (police.roadblockTimer > 0) police.roadblockTimer -= dt;
   if (police.barrierTimer > 0) police.barrierTimer -= dt;
-  // The military stands down below 5 stars, like the heli below 3:
   if (wanted < 5) {
     police.units = police.units.filter((u) => !u.military && u.kind !== 'soldier' && !u.concrete);
   }
-
   const heli = police.heli;
   if (wanted >= 4 && !heli.active) {
     heli.active = true;
@@ -223,7 +207,6 @@ export function stepPolice(police, state, dt, rng, events) {
     heli.y = py + Math.sin(heli.orbit) * 190;
     heli.rotor += dt * 42;
   }
-
   if (police.stripTimer > 0) police.stripTimer -= dt;
   for (let i = police.strips.length - 1; i >= 0; i -= 1) {
     police.strips[i].life -= dt;
@@ -242,7 +225,6 @@ export function stepPolice(police, state, dt, rng, events) {
       police.stripTimer = 4;
     }
   }
-
   const hasRoadblock = police.units.some((u) => u.roadblock);
   if (wanted >= 3 && !hasRoadblock && police.roadblockTimer <= 0) {
     spawnRoadblock(police, state);
@@ -254,7 +236,6 @@ export function stepPolice(police, state, dt, rng, events) {
   if (wanted >= 6 && !hasConcrete && police.barrierTimer <= 0) {
     spawnRoadblock(police, state, true);
   }
-
   if (police.units.length < want && police.spawnTimer <= 0) {
     police.spawnTimer = heli.active ? 0.8 : (districtHeat >= 60 ? 0.9 : 1.2);
     const kind = player.inBoat ? 'boat'
@@ -303,7 +284,7 @@ export function stepPolice(police, state, dt, rng, events) {
       }
     } else if (unit.kind === 'car') {
       const car = unit.car;
-      if (unit.static) continue; // Roadblock cars hold their ground.
+      if (unit.static) continue;
       const dx = px - car.x;
       const dy = py - car.y;
       const dist = Math.hypot(dx, dy) || 1;
@@ -384,7 +365,6 @@ export function stepPolice(police, state, dt, rng, events) {
   if (busted) events.busted = true;
   return events;
 }
-
 export function clearPolice(police) {
   police.units.length = 0;
   police.arrestTimer = 0;

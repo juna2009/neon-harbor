@@ -1,4 +1,3 @@
-// Neon Harbor — drawbridge: Harbor canal crossing on road x=2400.
 export const BRIDGE = { x: 2400, y: 1680, top: 1640, bottom: 1720, halfW: 40 };
 export function createBridge() { return { up: false, timer: 0, inGap: false }; }
 export function stepBridge(b, s, dt, fx) {

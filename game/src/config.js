@@ -1,4 +1,3 @@
-// Neon Harbor — tuning — colours — weapons — radio — rewards — jobs.
 export const WORLD_W = 2560;
 export const WORLD_H = 1920;
 export const STEP = 1 / 60;
@@ -8,7 +7,6 @@ export const BEST_KEY = 'neon-harbor-best-cash';
 export const PROGRESS_KEY = 'neon-harbor-mission';
 export const CHECKPOINT_KEY = 'neon-harbor-checkpoint';
 export const SETTINGS_KEY = 'neon-harbor-settings';
-
 export const PLAYER = {
   radius: 14,
   walkSpeed: 175,
@@ -19,7 +17,6 @@ export const PLAYER = {
   bulletSpeed: 760,
   fireInterval: 0.22,
 };
-
 export const WEAPONS = {
   pistol: {
     name: 'Pistol', damage: 1, pellets: 1, spread: 0.03,
@@ -35,7 +32,6 @@ export const WEAPONS = {
   },
 };
 export const WEAPON_ORDER = ['pistol', 'smg', 'shotgun'];
-
 export const CAR = {
   accel: 430,
   brake: 760,
@@ -45,13 +41,11 @@ export const CAR = {
   grip: 3.2,
   health: 100,
 };
-
 export const WANTED = {
   maxStars: 6,
   decayDelay: 12,
   decayPerSecond: 0.5,
 };
-
 export const GARAGE_COST = 150;
 export const GARAGE_REPAIR = 100;
 export const UPGRADES = [
@@ -67,7 +61,6 @@ export const RESPRAY_STARS = 1;
 export const PINK_TAXI_REWARD = 1000;
 export const UFO_HOUR = 3;
 export const UFO_DURATION = 30;
-
 export const TAXI_FARE = 120;
 export const TAXI_TIME_LIMIT = 45;
 export const ARMORED_HAUL = 350;
@@ -77,7 +70,6 @@ export const PIZZA_FARE = 150;
 export const PIZZA_TIME_LIMIT = 60;
 export const NIGHT_RACE_BET = 100;
 export const NIGHT_RACE_PRIZE = 500;
-
 export const COLORS = {
   grass: '#2e6b3a',
   grassDark: '#276031',
@@ -99,14 +91,12 @@ export const COLORS = {
   cash: '#7be382',
   gunman: '#a33327',
 };
-
 export const RADIO_STATIONS = [
   { name: 'Harbor FM', tag: 'synthwave', bpm: 104, root: 45, scale: [0, 3, 5, 7, 10, 12, 15] },
   { name: 'Neon Nights', tag: 'chill', bpm: 82, root: 48, scale: [0, 2, 3, 7, 9, 12, 14] },
   { name: 'Dockside Drive', tag: 'drive', bpm: 122, root: 43, scale: [0, 3, 5, 6, 7, 10, 12] },
   { name: 'Bayview Static', tag: 'lofi', bpm: 96, root: 41, scale: [0, 3, 5, 7, 10, 12] },
 ];
-
 export const MISSION_REWARDS = [250, 400, 350, 900, 1200, 240, 300, 450, 300, 200, 350, 600];
 export const RACE_REWARD = 300;
 export const COLLECTIBLE_COUNT = 12;

@@ -1,18 +1,14 @@
-// Neon Harbor — traffic cars — parked cars — pedestrians — the pink taxi — cruise.
 import { BLOCK, ROAD_W, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, onRoad } from './city.js';
-
 const TRAFFIC_COUNT = 16;
 const PARKED_COUNT = 12;
 const PED_COUNT = 26;
-
 export const CAR_BODIES = {
   sedan: { length: 46, width: 22 },
   hatch: { length: 40, width: 22 },
   van: { length: 54, width: 24 },
   taxi: { length: 46, width: 22 },
 };
-
 export function makeCar(x, y, angle, color, kind, body) {
   const shape = CAR_BODIES[body || 'sedan'];
   return {
@@ -21,7 +17,6 @@ export function makeCar(x, y, angle, color, kind, body) {
     alive: true, health: 2,
   };
 }
-
 export function createTraffic(city, rng) {
   const cars = [];
   for (let i = 0; i < TRAFFIC_COUNT; i += 1) {
@@ -65,7 +60,6 @@ export function createTraffic(city, rng) {
   }
   return { cars, parked };
 }
-
 function nextIntersectionCoord(car, city) {
   const line = car.axis === 'v' ? city.roadsH : city.roadsV;
   const at = car.axis === 'v' ? car.y : car.x;
@@ -76,7 +70,6 @@ function nextIntersectionCoord(car, city) {
   }
   return best;
 }
-
 function blockedAhead(car, others, gap) {
   const fx = Math.cos(car.angle);
   const fy = Math.sin(car.angle);
@@ -91,7 +84,6 @@ function blockedAhead(car, others, gap) {
   }
   return false;
 }
-
 export function stepTraffic(traffic, dt, city, obstacles, bridge) {
   const slowObstacles = (obstacles || []).filter((o) => Math.abs(o.speed || 0) < 150);
   const others = traffic.cars.concat(slowObstacles);
@@ -100,7 +92,6 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
     const next = nextIntersectionCoord(car, city);
     const at = car.axis === 'v' ? car.y : car.x;
     const distToNext = next === null ? Infinity : Math.abs(next - at);
-
     if (distToNext < Math.max(6, car.speed * dt + 2)) {
       if (Math.random() < 0.38) {
         const lane = Math.random() < 0.5 ? 18 : -18;
@@ -120,7 +111,6 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
         }
       }
     }
-
     let desired = car.cruise;
     const d = car.road === 2400 && car.axis === 'v' ? (car.dir < 0 ? car.y - 1840 : 1520 - car.y) : -1;
     if (bridge?.up && d > 0 && d < 80) desired = 0;
@@ -128,7 +118,6 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
     if (distToNext < 90 && blockedAhead({ ...car, x: car.x + Math.cos(car.angle) * 60, y: car.y + Math.sin(car.angle) * 60, angle: car.angle }, others, 60)) desired = 0;
     if (desired === 0) car.speed = Math.max(0, car.speed - 420 * dt);
     else car.speed = Math.min(desired, car.speed + 240 * dt);
-
     const step = car.speed * dt;
     car.x += Math.cos(car.angle) * step;
     car.y += Math.sin(car.angle) * step;
@@ -138,11 +127,9 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
     if (car.y > WORLD_H + 60) car.y = -40;
   }
 }
-
 const PED_SKINS = ['#e8b98a', '#c98d5f', '#8a5a3b', '#f0c8a0'];
 const PED_SHIRTS = ['#e8e4d8', '#f2a65a', '#7fb5d5', '#c39bd3', '#82e0aa', '#f5b7b1', '#e74c3c', '#2ecc71'];
 const PED_PANTS = ['#2c3e50', '#5d4037', '#37474f', '#4a235a', '#1b4f72'];
-
 export function createPedestrians(city, rng) {
   const peds = [];
   for (let i = 0; i < PED_COUNT; i += 1) {
@@ -176,7 +163,6 @@ export function createPedestrians(city, rng) {
       flashTimer: 0,
     });
   }
-  // Round 10: Jax & Mara cross the opening intersection on foot, as themselves.
   peds.push({
     x: 540, y: 480, angle: 0, speed: 40,
     color: '#6b4423', skin: '#d8a077', pants: '#1c1f24', hat: 0, build: 'wide',
@@ -189,7 +175,6 @@ export function createPedestrians(city, rng) {
   });
   return peds;
 }
-
 export function stepPedestrians(peds, dt, city, danger, chase) {
   const flashes = [];
   for (const ped of peds) {
@@ -217,7 +202,7 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
           y: ped.y + Math.sin(ped.angle) * 16,
         });
       }
-      continue; // Filming peds stand still, phone raised.
+      continue;
     }
     let fleeX = 0;
     let fleeY = 0;
@@ -251,10 +236,8 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
   }
   return flashes;
 }
-
 export function randomRoadPoint(city, rng) {
   if (rng.chance(0.5)) return { x: rng.pick(city.roadsV), y: rng.range(120, WORLD_H - 120) };
   return { x: rng.range(120, WATER_X - 120), y: rng.pick(city.roadsH) };
 }
-
 export { BLOCK };

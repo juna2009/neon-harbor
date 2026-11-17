@@ -1,5 +1,3 @@
-// Neon Harbor — procedural music: 4 radio loops + 6 jingles.
-// Standalone: createMusic(ctx, dest); Laras wires it into audio.js.
 const F = (m) => 440 * 2 ** ((m - 69) / 12);
 function note(c, o, f, t, d, w, v, s) {
   try {

@@ -1,9 +1,7 @@
-// Neon Harbor — missions — taxi — race — armored — pizza — tokens.
 import { ARMORED_HAUL, ARMORED_HP, ARMORED_RESPAWN, CHECKPOINT_KEY, COLLECTIBLE_COUNT, COLLECTIBLE_VALUE, GARAGE_COST, GARAGE_REPAIR, MISSION_REWARDS, NIGHT_RACE_BET, NIGHT_RACE_PRIZE, PINK_TAXI_REWARD, PIZZA_FARE, PIZZA_TIME_LIMIT, RACE_REWARD, RESPRAY_COST, RESPRAY_STARS, TAXI_FARE, TAXI_TIME_LIMIT, UPGRADES } from './config.js';
 import { WATER_X } from './city.js';
 import { addWanted, clearPolice, dropWanted, spawnPoliceUnit } from './police.js';
 import { makeCar } from './traffic.js';
-
 export const MISSION_DEFS = [
   {
     title: 'Hot Wheels',
@@ -127,7 +125,6 @@ export const MISSION_DEFS = [
     ],
   },
 ];
-
 export function createMissionState(savedIndex) {
   return {
     index: savedIndex || 0,
@@ -141,7 +138,6 @@ export function createMissionState(savedIndex) {
     checkpoint: null,
   };
 }
-
 function plazaTarget(city) {
   return { x: city.roadsV[2], y: city.roadsH[1], label: 'Package' };
 }
@@ -151,7 +147,6 @@ function docksTarget(city) {
 function marinaTarget(city) {
   return { x: city.marina.x + 84, y: city.marina.y + 80, label: 'Marina' };
 }
-// The marina from the water: the same pier, but on the harbor side, so
 function marinaWaterTarget(city) {
   return { x: WATER_X + 40, y: city.marina.y + 80, label: 'Marina' };
 }
@@ -167,25 +162,23 @@ function lighthouseTarget(city) {
 function raceStartTarget(city) {
   return { x: city.roadsV[4], y: city.roadsH[1], label: 'RACE' };
 }
-
 export function targetForMission(city, index, stage) {
   if (index === 0) return docksTarget(city);
   if (index === 1) return stage === 0 ? plazaTarget(city) : marinaTarget(city);
   if (index === 2) return null;
   if (index === 3) return docksTarget(city);
   if (index === 4) return stage === 0 ? vaultTarget(city) : lighthouseTarget(city);
-  if (index === 5) return null; // Night Taxi: fares come to the cab.
-  if (index === 6) return null; // Vigilante Shift: survive where you are.
+  if (index === 5) return null;
+  if (index === 6) return null;
   if (index === 7) {
     return stage === 0 ? plazaTarget(city) : stage === 1 ? marinaTarget(city) : lighthouseTarget(city);
   }
   if (index === 8) return raceStartTarget(city);
-  if (index === 9) return null; // Token Hunt: the minimap marks the tokens.
-  if (index === 10) return null; // Ghost Town: lose the heat anywhere.
+  if (index === 9) return null;
+  if (index === 10) return null;
   if (index === 11) return marinaWaterTarget(city);
   return null;
 }
-
 export function saveCheckpoint(world, label) {
   const mission = world.mission;
   const p = world.player;
@@ -208,7 +201,6 @@ export function saveCheckpoint(world, label) {
   }
   return cp;
 }
-
 export function loadCheckpoint() {
   try {
     const raw = window.localStorage.getItem(CHECKPOINT_KEY);
@@ -220,14 +212,12 @@ export function loadCheckpoint() {
     return null;
   }
 }
-
 export function clearCheckpoint() {
   try {
     window.localStorage.removeItem(CHECKPOINT_KEY);
   } catch {
   }
 }
-
 export function createRace(city) {
   const points = [
     { x: city.roadsV[4], y: city.roadsH[2], label: '1' },
@@ -247,7 +237,6 @@ export function createRace(city) {
     bet: false,
   };
 }
-
 export function createCollectibles(city, rng) {
   const spots = [];
   for (const park of city.parks) spots.push({ x: park.x + park.w / 2, y: park.y + park.h / 2 });
@@ -261,7 +250,6 @@ export function createCollectibles(city, rng) {
   const picked = rng.shuffle(spots).slice(0, COLLECTIBLE_COUNT);
   return picked.map((s) => ({ x: s.x, y: s.y, taken: false }));
 }
-
 export function createWeaponPickups(city) {
   return [
     { x: city.roadsV[2] + 46, y: city.roadsH[1] + 46, weapon: 'smg', taken: false },
@@ -269,7 +257,6 @@ export function createWeaponPickups(city) {
     { x: city.marina.x + 84, y: city.marina.y + 130, weapon: 'pistol', taken: false },
   ];
 }
-
 export function startMission(world, index) {
   const mission = world.mission;
   const city = world.city;
@@ -319,7 +306,6 @@ export function startMission(world, index) {
   }
   saveCheckpoint(world, `${def.title} — start`);
 }
-
 function completeMission(world) {
   const mission = world.mission;
   const def = MISSION_DEFS[mission.index];
@@ -349,14 +335,12 @@ function completeMission(world) {
   } catch {
   }
 }
-
 function near(world, target, radius) {
   const p = world.player;
   const x = p.inCar ? p.car.x : p.x;
   const y = p.inCar ? p.car.y : p.y;
   return Math.hypot(x - target.x, y - target.y) < radius;
 }
-
 export function updateMission(world, dt) {
   const mission = world.mission;
   if (mission.dialogueTimer > 0) mission.dialogueTimer -= dt;
@@ -452,7 +436,6 @@ export function updateMission(world, dt) {
     if (world.player.inBoat && near(world, marinaWaterTarget(city), 90)) completeMission(world);
   }
 }
-
 export function updateRace(world, dt) {
   const race = world.race;
   const p = world.player;
@@ -463,7 +446,6 @@ export function updateRace(world, dt) {
       race.active = true;
       race.index = 0;
       race.timer = 0;
-      // Night race: started after dark, it is a bet race — $100 in
       race.night = world.daylight < 0.35;
       race.bet = false;
       if (race.night && world.cash >= NIGHT_RACE_BET) {
@@ -489,7 +471,6 @@ export function updateRace(world, dt) {
       if (race.best === 0 || time < race.best) race.best = time;
       const reward = race.bet ? NIGHT_RACE_PRIZE : RACE_REWARD;
       world.cash += reward;
-      // A persistent win count: the per-step events object is wiped at
       world.raceWins = (world.raceWins || 0) + 1;
       world.events.raceWin = { time, reward };
       world.mission.dialogue = [`RACE WON in ${time.toFixed(1)}s — $${reward} earned.`];
@@ -499,11 +480,9 @@ export function updateRace(world, dt) {
     }
   }
 }
-
 export function createTaxi() {
   return { state: 'idle', fare: null, dest: null, timer: 0, reward: TAXI_FARE, cooldown: 0 };
 }
-
 function randomRoadSpot(world, minDist) {
   const p = world.player;
   for (let tries = 0; tries < 12; tries += 1) {
@@ -521,7 +500,6 @@ function randomRoadSpot(world, minDist) {
   }
   return { x: world.city.roadsV[2], y: world.city.roadsH[2] };
 }
-
 export function updateTaxi(world, dt) {
   const taxi = world.taxi;
   if (!taxi) return;
@@ -572,11 +550,9 @@ export function updateTaxi(world, dt) {
     taxi.cooldown = 20;
   }
 }
-
 export function createArmored() {
   return { truck: null, cooldown: 30, ramTimer: 0 };
 }
-
 function spawnArmoredTruck(world) {
   const vertical = world.rng.chance(0.5);
   let x;
@@ -600,7 +576,6 @@ function spawnArmoredTruck(world) {
   truck.dir = angle === 0 || angle === Math.PI / 2 ? 1 : -1;
   return truck;
 }
-
 export function updateArmored(world, dt) {
   const armored = world.armored;
   if (!armored) return;
@@ -649,7 +624,6 @@ export function updateArmored(world, dt) {
     world.mission.dialogueTimer = 5;
   }
 }
-
 export function createPizza(city) {
   return {
     state: 'idle',
@@ -659,7 +633,6 @@ export function createPizza(city) {
     cooldown: 10,
   };
 }
-
 export function updatePizza(world, dt) {
   const pizza = world.pizza;
   if (!pizza) return;
@@ -695,7 +668,6 @@ export function updatePizza(world, dt) {
     pizza.cooldown = 20;
   }
 }
-
 export function repairAtGarage(world) {
   const p = world.player;
   const g = world.city.garage;
@@ -709,11 +681,9 @@ export function repairAtGarage(world) {
   world.events.repair = true;
   return 'ok';
 }
-
 export function maxCarHp(world) {
   return world.upgrades && world.upgrades.armor ? 150 : GARAGE_REPAIR;
 }
-
 export function nearGarage(world) {
   const p = world.player;
   const g = world.city.garage;
@@ -721,14 +691,12 @@ export function nearGarage(world) {
   const y = p.inCar && p.car ? p.car.y : p.y;
   return Math.hypot(x - g.x, y - g.y) <= 80;
 }
-
 export function garageHot(world) {
   if (!world.heat || !world.city) return false;
   const g = world.city.garage;
   const d = world.city.districts.findIndex((dist) => g.x >= dist.x && g.x < dist.x + dist.w);
   return d >= 0 && (world.heat[d] || 0) >= 60;
 }
-
 export function buyUpgrade(world, id) {
   const def = UPGRADES.find((u) => u.id === id);
   if (!def) return 'far';
@@ -744,7 +712,6 @@ export function buyUpgrade(world, id) {
   world.mission.dialogueTimer = 5;
   return 'ok';
 }
-
 export function resprayAtGarage(world) {
   const p = world.player;
   const g = world.city.garage;
@@ -761,7 +728,6 @@ export function resprayAtGarage(world) {
   world.events.repair = true;
   return 'ok';
 }
-
 export function claimPinkTaxi(world) {
   const car = world.player.car;
   if (!car || !car.pink || car.pinkClaimed) return false;
@@ -772,7 +738,6 @@ export function claimPinkTaxi(world) {
   world.mission.dialogueTimer = 5;
   return true;
 }
-
 export function updatePickups(world) {
   const p = world.player;
   const px = p.inCar && p.car ? p.car.x : p.x;
@@ -795,7 +760,6 @@ export function updatePickups(world) {
     }
   }
 }
-
 export function currentObjective(world) {
   const mission = world.mission;
   if (world.taxi && world.taxi.state === 'pickup') {
@@ -834,5 +798,4 @@ export function currentObjective(world) {
   }
   return `${n} ${def.title}: ${def.objective}`;
 }
-
 export { COLLECTIBLE_VALUE, RACE_REWARD };

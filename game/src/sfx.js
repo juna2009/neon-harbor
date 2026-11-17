@@ -1,5 +1,3 @@
-// Neon Harbor — extra SFX: bridge, water, explosions. WebAudio only,
-// lazy context, all calls guarded; safe to import in Node (no window).
 export function createSfx(){
 let c=null,m=false,g=null;
 function ensure(){if(c)return c;try{if(typeof window==='undefined')return null;const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;c=new A();g=c.createGain();g.gain.value=.5;g.connect(c.destination)}catch(e){return null}return c}

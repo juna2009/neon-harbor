@@ -1,54 +1,44 @@
-// Neon Harbor — city — roads — blocks — districts — landmarks.
 import { BLOCK, ROAD_W, WORLD_H, WORLD_W } from './config.js';
-
 export const WATER_X = 2448;
-
 const ROOF_COLORS = [
   ['#b8455a', '#c98a3d', '#a85a32', '#8a4a6b'],
   ['#4a7fb5', '#7a5fb5', '#3f8f9f', '#5a6b8a'],
   ['#3f8f6f', '#e8e4d8', '#4a9db5', '#c98a3d'],
 ];
 const CAR_COLORS = ['#d8d8d8', '#c0392b', '#2e86c1', '#f39c12', '#27ae60', '#8e44ad', '#e67e22'];
-
 export const DISTRICTS = [
   { name: 'Old Town', x: 0, y: 0, w: 1120, h: WORLD_H, ground: '#8a7648', accent: '#ffd23e' },
   { name: 'Downtown', x: 1120, y: 0, w: 640, h: WORLD_H, ground: '#4b5563', accent: '#ff4d9d' },
   { name: 'Harbor', x: 1760, y: 0, w: WATER_X - 1760, h: WORLD_H, ground: '#2f6b5a', accent: '#37e0e6' },
 ];
-
 export function districtAt(city, x, y) {
   for (const d of city.districts) {
     if (x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h) return d;
   }
   return city.districts[city.districts.length - 1];
 }
-
 export function onRoad(city, x, y) {
   for (const rx of city.roadsV) if (Math.abs(x - rx) <= ROAD_W / 2) return true;
   for (const ry of city.roadsH) if (Math.abs(y - ry) <= ROAD_W / 2) return true;
   return false;
 }
-
 export function buildingAt(city, x, y, r) {
   for (const b of city.buildings) {
     if (x > b.x - r && x < b.x + b.w + r && y > b.y - r && y < b.y + b.h + r) return b;
   }
   return null;
 }
-
 export function collides(city, x, y, r) {
   if (x < r || y < r || x > WORLD_W - r || y > WORLD_H - r) return true;
   if (x > WATER_X - r) return true;
   return buildingAt(city, x, y, r) !== null;
 }
-
 export function moveCircle(city, pos, dx, dy, r) {
   const nx = pos.x + dx;
   if (!collides(city, nx, pos.y, r)) pos.x = nx;
   const ny = pos.y + dy;
   if (!collides(city, pos.x, ny, r)) pos.y = ny;
 }
-
 export function nearestIntersection(city, x, y) {
   let best = city.intersections[0];
   let bestD = Infinity;
@@ -58,7 +48,6 @@ export function nearestIntersection(city, x, y) {
   }
   return best;
 }
-
 export function nearestRoadPoint(city, x, y) {
   let bestV = city.roadsV[0];
   let bestD = Infinity;
@@ -75,7 +64,6 @@ export function nearestRoadPoint(city, x, y) {
   if (Math.abs(bestV - x) <= Math.abs(bestH - y)) return { x: bestV, y };
   return { x, y: bestH };
 }
-
 export function pathBlocked(city, x1, y1, x2, y2) {
   for (let t = 0.15; t < 1; t += 0.15) {
     const x = x1 + (x2 - x1) * t;
@@ -84,18 +72,15 @@ export function pathBlocked(city, x1, y1, x2, y2) {
   }
   return false;
 }
-
 export function buildCity(rng) {
   const roadsV = [];
   const roadsH = [];
   for (let x = 160; x <= 2400; x += BLOCK) roadsV.push(x);
   for (let y = 160; y <= 1760; y += BLOCK) roadsH.push(y);
-
   const intersections = [];
   for (const rx of roadsV) {
     for (const ry of roadsH) intersections.push({ x: rx, y: ry });
   }
-
   const buildings = [];
   const parks = [];
   const trees = [];
@@ -134,7 +119,6 @@ export function buildCity(rng) {
       }
     }
   }
-
   let casino = buildings[0];
   let casinoD = Infinity;
   for (const b of buildings) {
@@ -157,7 +141,6 @@ export function buildCity(rng) {
     district: 2, props: 0, landmark: 'lighthouse',
   });
   const lighthouse = buildings[buildings.length - 1];
-
   const gasStation = { x: 850, y: 1490, w: 210, h: 210, label: 'Gas',
     pumps: [900, 960, 1020].map((x) => ({ x, y: 1610, alive: true })) };
   const overlapsLot = (b) => b.x < 1080 && b.x + (b.w || b.r || 0) > 836
@@ -172,7 +155,6 @@ export function buildCity(rng) {
     const x = pt.x + 42, y = pt.y + 42;
     if (!buildingAt({ buildings }, x, y, 5)) hydrants.push({ x, y, burst: false });
   }
-
   return {
     hydrants, gasStation,
     roadsV,

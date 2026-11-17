@@ -1,4 +1,3 @@
-// Neon Harbor — keys, mouse — bindings — settings — mute.
 export const ACTION_CONFIRM = 'confirm';
 export const ACTION_PAUSE = 'pause';
 export const ACTION_INTERACT = 'interact';
@@ -9,7 +8,6 @@ export const ACTION_RADIO = 'radio';
 export const ACTION_SETTINGS = 'settings';
 export const ACTION_REPAIR = 'repair';
 export const ACTION_SHOP = 'shop';
-
 export const DEFAULT_BINDINGS = {
   confirm: ['Enter', 'Space'],
   pause: ['Escape', 'KeyP'],
@@ -22,7 +20,6 @@ export const DEFAULT_BINDINGS = {
   repair: ['KeyG'],
   shop: ['KeyU'],
 };
-
 const ACTION_LABELS = {
   confirm: 'Confirm',
   pause: 'Pause',
@@ -35,31 +32,26 @@ const ACTION_LABELS = {
   repair: 'Repair',
   shop: 'Shop',
 };
-
 export function actionLabel(action) {
   return ACTION_LABELS[action] || action;
 }
-
 export function keyLabel(code) {
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
   return code;
 }
-
 export function createInput(canvas) {
   const keys = new Set();
   const pressed = new Set();
   const mouse = { x: 0, y: 0, down: false, clicked: false };
   let bindings = JSON.parse(JSON.stringify(DEFAULT_BINDINGS));
-  let capture = null; // { action, done } while the settings screen waits for a key.
-
+  let capture = null;
   function actionFor(code) {
     for (const [action, codes] of Object.entries(bindings)) {
       if (codes.includes(code)) return action;
     }
     return null;
   }
-
   function onKeyDown(event) {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
       event.preventDefault();
@@ -95,21 +87,18 @@ export function createInput(canvas) {
   function onMouseUp() {
     mouse.down = false;
   }
-
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
   canvas.addEventListener('mousemove', onMouseMove);
   canvas.addEventListener('mousedown', onMouseDown);
   window.addEventListener('mouseup', onMouseUp);
   window.addEventListener('blur', () => keys.clear());
-
   function axis(negative, positive) {
     let value = 0;
     if (keys.has(negative)) value -= 1;
     if (keys.has(positive)) value += 1;
     return value;
   }
-
   return {
     keys,
     mouse,

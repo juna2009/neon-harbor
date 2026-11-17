@@ -1,8 +1,6 @@
-// Neon Harbor — WebAudio — no files — radio — sfx.
 import { RADIO_STATIONS } from './config.js';
 import { createMusic } from './music.js';
 import { createSfx } from './sfx.js';
-
 export function createAudio() {
   let ctx = null;
   let muted = false;
@@ -13,19 +11,16 @@ export function createAudio() {
   let stationIndex = 0;
   let music = null;
   let sfx = null;
-
   function ensureMusic() {
     const c = ensure();
     if (!c || !master) return null;
     if (!music) music = createMusic(c, master);
     return music;
   }
-
   function ensureSfx() {
     if (!sfx) sfx = createSfx();
     return sfx;
   }
-
   function ensure() {
     if (ctx) return ctx;
     try {
@@ -40,20 +35,17 @@ export function createAudio() {
     }
     return ctx;
   }
-
   function unlock() {
     const c = ensure();
     if (c && c.state === 'suspended') c.resume().catch(() => {});
     const s = ensureSfx();
     if (s) s.unlock();
   }
-
   function setVolume(v) {
     volume = Math.max(0, Math.min(1, v));
     if (master && ctx) master.gain.value = muted ? 0 : volume;
     return volume;
   }
-
   function tone(freq, duration, type, vol, slideTo, when) {
     if (muted) return;
     const c = ensure();
@@ -73,7 +65,6 @@ export function createAudio() {
     } catch {
     }
   }
-
   function noise(duration, vol, lowpass, when) {
     if (muted) return;
     const c = ensure();
@@ -101,27 +92,22 @@ export function createAudio() {
     } catch {
     }
   }
-
   function startRadio(index) {
     if (typeof index === 'number') stationIndex = ((index % RADIO_STATIONS.length) + RADIO_STATIONS.length) % RADIO_STATIONS.length;
     const m = ensureMusic();
     if (m) m.startLoop(stationIndex);
   }
-
   function stopRadio() {
     if (music) music.stopLoop();
   }
-
   function setStation(index) {
     stationIndex = ((index % RADIO_STATIONS.length) + RADIO_STATIONS.length) % RADIO_STATIONS.length;
     const m = ensureMusic();
     return m ? m.setLoop(stationIndex) : RADIO_STATIONS[stationIndex].name;
   }
-
   function nextStation() {
     return setStation(stationIndex + 1);
   }
-
   return {
     unlock,
     setVolume,

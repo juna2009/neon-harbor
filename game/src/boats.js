@@ -1,10 +1,7 @@
-// Neon Harbor — the Living Harbor — speedboats — police boats — wakes — piers.
 import { WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
-
 export const BOAT_MAX_SPEED = 620;
 export const BOAT_ACCEL = 520;
-
 export function createBoats(city, rng) {
   const spots = [
     { x: WATER_X + 40, y: city.marina.y + 80, angle: -Math.PI / 2 },
@@ -17,7 +14,6 @@ export function createBoats(city, rng) {
     stolen: false, wake: [], length: 54, width: 20, alive: true,
   }));
 }
-
 export function nearestBoat(boats, x, y, maxDist) {
   let best = null;
   let bestD = maxDist;
@@ -28,7 +24,6 @@ export function nearestBoat(boats, x, y, maxDist) {
   }
   return best;
 }
-
 export function stepBoats(state, dt) {
   for (const b of state.boats) {
     for (let i = b.wake.length - 1; i >= 0; i -= 1) {
@@ -45,7 +40,6 @@ export function stepBoats(state, dt) {
     }
   }
 }
-
 export function onWater(x, y) {
   return x > WATER_X + 8 && x < WORLD_W - 8 && y > 8 && y < WORLD_H - 8;
 }
