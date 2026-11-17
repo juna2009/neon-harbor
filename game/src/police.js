@@ -6,7 +6,7 @@
 // gunmen (mission 4) are a different faction: red jackets, bandanas, burst
 // fire — never reskinned police.
 import { WANTED, WORLD_H, WORLD_W } from './config.js';
-import { WATER_X, collides, moveCircle, nearestIntersection, pathBlocked } from './city.js';
+import { WATER_X, collides, districtAt, moveCircle, nearestIntersection, pathBlocked } from './city.js';
 import { makeCar } from './traffic.js';
 
 export function createPolice() {
@@ -26,9 +26,17 @@ export function decayWanted(state, dt) {
   if (state.wanted <= 0) return;
   state.wantedTimer += dt;
   if (state.wantedTimer >= WANTED.decayDelay) {
-    state.wanted = Math.max(0, state.wanted - WANTED.decayPerSecond * dt);
+    // Ghost Plates: the heat cools twice as fast.
+    const rate = WANTED.decayPerSecond * (state.upgrades && state.upgrades.ghost ? 2 : 1);
+    state.wanted = Math.max(0, state.wanted - rate * dt);
     if (state.wanted < 0.001) state.wanted = 0;
   }
+}
+
+/** Drop the heat by whole stars at once (garage respray). */
+export function dropWanted(state, stars) {
+  state.wanted = Math.max(0, state.wanted - stars);
+  state.wantedTimer = 0;
 }
 
 function wantedUnitCount(wanted) {
@@ -243,8 +251,11 @@ export function stepPolice(police, state, dt, rng, events) {
   }
 
   if (police.units.length < want && police.spawnTimer <= 0) {
-    // The helicopter's eye makes the response faster.
-    police.spawnTimer = heli.active ? 0.8 : 1.2;
+    // The helicopter's eye makes the response faster — and so does a
+    // hot district: at HEAT 60+ the police are already on edge.
+    const district = districtAt(state.city, player.x, player.y);
+    const heat = state.heat ? state.heat[state.city.districts.indexOf(district)] || 0 : 0;
+    police.spawnTimer = heli.active ? 0.8 : (heat >= 60 ? 0.9 : 1.2);
     const inCar = player.inCar;
     spawnPoliceUnit(police, player, rng, inCar && wanted >= 2 ? 'car' : 'foot', state.city);
   }

@@ -1,21 +1,22 @@
-// Neon Harbor — boot and the one loop: input is read every frame, the
-// world advances in fixed 1/60 s steps, and the renderer paints what is
-// there. Screens: title, play, paused, settings, game over (busted /
-// wasted). The opening drops Jax straight into action: mission 1 starts
-// with him already behind the wheel. Busted/Wasted offers a resume from
-// the last mission checkpoint. C switches the procedural radio station,
-// O opens settings (volume, station, key remap).
+// Neon Harbor — The Mara Job: boot and the one loop: input is read every
+// frame, the world advances in fixed 1/60 s steps, and the renderer paints
+// what is there. Screens: title, play, paused, settings, garage upgrade
+// shop, game over (busted / wasted). The opening drops Jax straight into
+// action: mission 1 starts with him already behind the wheel. Busted/
+// Wasted offers a resume from the last mission checkpoint. C switches the
+// procedural radio station, O opens settings (volume, station, key remap),
+// U opens the garage upgrade shop at the garage bay.
 //
 // ?seed=N fixes the city. ?shot=chase|onfoot|mission|police (with &seed=N)
 // stages that scene instead of running the loop, paints it twice and sets
 // window.__shotReady for a screenshot.
-import { BEST_KEY, PROGRESS_KEY, RADIO_STATIONS, SETTINGS_KEY, STEP } from './config.js';
+import { BEST_KEY, PROGRESS_KEY, RADIO_STATIONS, SETTINGS_KEY, STEP, UPGRADES } from './config.js';
 import { createRandom } from './random.js';
 import { createWorld, EVENT_BUSTED, EVENT_OVER } from './world.js';
-import { ACTION_CONFIRM, ACTION_MUTE, ACTION_PAUSE, ACTION_RADIO, ACTION_SETTINGS, createInput, keyLabel } from './input.js';
+import { ACTION_CONFIRM, ACTION_MUTE, ACTION_PAUSE, ACTION_RADIO, ACTION_SETTINGS, ACTION_SHOP, createInput, keyLabel } from './input.js';
 import { createAudio } from './audio.js';
-import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_SETTINGS, SCREEN_TITLE } from './render.js';
-import { loadCheckpoint } from './missions.js';
+import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_SETTINGS, SCREEN_SHOP, SCREEN_TITLE } from './render.js';
+import { buyUpgrade, loadCheckpoint, nearGarage } from './missions.js';
 import { stageShot } from './shots.js';
 
 /** The longest frame the loop catches up on; a longer stall is dropped. */
@@ -89,6 +90,7 @@ function runGame() {
   let accumulator = 0;
   let last = performance.now();
   let settingsIndex = 0;
+  let shopIndex = 0;
   let capturingRow = -1;
   const prevKeys = { up: false, down: false, left: false, right: false };
 
@@ -162,7 +164,28 @@ function runGame() {
       },
       settingsIndex,
       capturing: capturingRow,
+      shopIndex,
     };
+  }
+
+  function handleShopKeys() {
+    const up = input.keys.has('ArrowUp');
+    const down = input.keys.has('ArrowDown');
+    if (up && !prevKeys.up) shopIndex = (shopIndex + UPGRADES.length - 1) % UPGRADES.length;
+    if (down && !prevKeys.down) shopIndex = (shopIndex + 1) % UPGRADES.length;
+    prevKeys.up = up;
+    prevKeys.down = down;
+    if (input.wasPressed(ACTION_CONFIRM)) {
+      const result = buyUpgrade(world.state, UPGRADES[shopIndex].id);
+      if (result === 'ok') {
+        audio.repair();
+        announce(`${UPGRADES[shopIndex].name} fitted.`);
+      } else if (result === 'broke') announce('Not enough cash for that upgrade.');
+      else if (result === 'owned') announce('Already fitted.');
+    } else if (input.wasPressed(ACTION_PAUSE)) {
+      screen = SCREEN_PLAY;
+      announce('Playing.');
+    }
   }
 
   function handleSettingsKeys() {
@@ -215,6 +238,18 @@ function runGame() {
       saveSettings();
       announce(`Radio: ${name}.`);
     }
+    if (input.wasPressed(ACTION_SHOP) && screen === SCREEN_PLAY) {
+      if (nearGarage(world.state)) {
+        screen = SCREEN_SHOP;
+        announce('Upgrade shop.');
+      } else {
+        announce('The upgrade shop is at the garage — look for the teal bay.');
+      }
+    }
+    if (screen === SCREEN_SHOP) {
+      handleShopKeys();
+      return;
+    }
     if (screen === SCREEN_SETTINGS) {
       handleSettingsKeys();
       return;
@@ -253,6 +288,7 @@ function runGame() {
     if (state.events.enemyShotFired) audio.enemyShot();
     if (state.events.pickup) audio.pickup();
     if (state.events.crash) audio.crash();
+    if (state.events.thunder) audio.thunder();
     if (state.events.tirePop) audio.tirePop();
     if (state.events.repair) audio.repair();
     if (state.events.taxiFare) audio.cash();

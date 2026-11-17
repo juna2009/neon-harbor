@@ -59,6 +59,27 @@ export const WANTED = {
 // Garage: a marked bay on the road where a damaged car is repaired.
 export const GARAGE_COST = 150;
 export const GARAGE_REPAIR = 100;
+// Garage upgrade shop: six Harbor-grade upgrades, bought with cash at
+// the garage (U). Each one changes a real system — speed, handling,
+// armor, wanted decay, district heat, spike strips.
+export const UPGRADES = [
+  { id: 'turbo', name: 'Dockside Turbo', cost: 400, desc: '+15% top speed, +10% acceleration' },
+  { id: 'slicks', name: 'Harbor Slicks', cost: 300, desc: '+25% steering response' },
+  { id: 'armor', name: 'Armored Hull', cost: 500, desc: 'Car takes half damage, +50 max health' },
+  { id: 'ghost', name: 'Ghost Plates', cost: 350, desc: 'Wanted cools twice as fast; stealing stays unseen' },
+  { id: 'cooler', name: 'Cooler Streets', cost: 300, desc: 'District heat builds half as fast, cools twice as fast' },
+  { id: 'runflats', name: 'Run-Flat Tires', cost: 250, desc: 'Spike strips cannot pop your tires' },
+];
+// Respray: the same $150 at the garage buys a fresh paint job and drops
+// the heat by one star — a new colour, a new plate, a cooler trail.
+export const RESPRAY_COST = 150;
+export const RESPRAY_STARS = 1;
+// The bubblegum-pink taxi is the rarest cab in Neon Harbor: steal it
+// and the crew pays $1,000 for the prize.
+export const PINK_TAXI_REWARD = 1000;
+// At 03:00 game time a UFO hovers over the harbor for 30 seconds.
+export const UFO_HOUR = 3;
+export const UFO_DURATION = 30;
 
 // Taxi side job: a fare pays a flat fee for a ride across town.
 export const TAXI_FARE = 120;

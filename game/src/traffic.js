@@ -52,6 +52,13 @@ export function createTraffic(city, rng) {
     car.cruise = car.speed;
     cars.push(car);
   }
+  // The pink taxi: one bubblegum-pink cab with a crown air freshener
+  // cruises the city — the rarest ride in Neon Harbor, worth $1,000
+  // to the crew if Jax steals it (see enterCar in world.js).
+  const cab = cars.find((c) => c.body === 'taxi') || cars[0];
+  cab.body = 'taxi';
+  cab.color = '#ff7fc0';
+  cab.pink = true;
   const parked = [];
   for (let i = 0; i < PARKED_COUNT; i += 1) {
     const vertical = rng.chance(0.5);
@@ -191,15 +198,54 @@ export function createPedestrians(city, rng) {
       flee: 0,
       alive: true,
       walkPhase: rng.range(0, Math.PI * 2),
+      // Photo mode: at 3+ stars a nearby ped stops, raises their phone
+      // and films the chase (see stepPedestrians).
+      photo: 0,
+      flashTimer: 0,
     });
   }
   return peds;
 }
 
-export function stepPedestrians(peds, dt, city, danger) {
+/**
+ * One pedestrian step. `danger` is a gunshot or a speeding car to run
+ * from; `chase` is the player's position while the heat is 3+ stars —
+ * then nearby peds stop, raise their phones and film the chase, their
+ * camera flashes popping along the sidewalk. Returns the flash positions
+ * (world coords) so the caller can spawn flash particles for them.
+ */
+export function stepPedestrians(peds, dt, city, danger, chase) {
+  const flashes = [];
   for (const ped of peds) {
     if (!ped.alive) continue;
     ped.walkPhase += dt * 8;
+    // A chase rolling past at 3+ stars turns bystanders into an
+    // audience: stop, face the action, phone up. Filming beats fleeing
+    // — but only while they are not already running for their life.
+    if (chase && ped.flee <= 0) {
+      const cdx = ped.x - chase.x;
+      const cdy = ped.y - chase.y;
+      const cd = Math.hypot(cdx, cdy);
+      if (cd < 280) {
+        if (ped.photo <= 0) {
+          ped.photo = 2 + Math.random() * 2;
+          ped.flashTimer = 0.2 + Math.random() * 0.6;
+        }
+        ped.angle = Math.atan2(-cdy, -cdx);
+      }
+    }
+    if (ped.photo > 0) {
+      ped.photo -= dt;
+      ped.flashTimer -= dt;
+      if (ped.flashTimer <= 0) {
+        ped.flashTimer = 0.5 + Math.random() * 0.9;
+        flashes.push({
+          x: ped.x + Math.cos(ped.angle) * 16,
+          y: ped.y + Math.sin(ped.angle) * 16,
+        });
+      }
+      continue; // Filming peds stand still, phone raised.
+    }
     let fleeX = 0;
     let fleeY = 0;
     if (danger) {
@@ -230,6 +276,7 @@ export function stepPedestrians(peds, dt, city, danger) {
     ped.x = Math.max(20, Math.min(WATER_X - 20, ped.x));
     ped.y = Math.max(20, Math.min(WORLD_H - 20, ped.y));
   }
+  return flashes;
 }
 
 export function randomRoadPoint(city, rng) {

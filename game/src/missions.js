@@ -15,7 +15,7 @@
 // luck) to protect Jax from a crew that was going to kill him. In the
 // finale she flips: she helps Jax rob the police evidence vault for the
 // ledger that proves her father is corrupt.
-import { CHECKPOINT_KEY, COLLECTIBLE_COUNT, COLLECTIBLE_VALUE, GARAGE_COST, MISSION_REWARDS, PINK_TAXI_REWARD, RACE_REWARD, RESPRAY_COST, RESPRAY_STARS, TAXI_FARE, TAXI_TIME_LIMIT } from './config.js';
+import { CHECKPOINT_KEY, COLLECTIBLE_COUNT, COLLECTIBLE_VALUE, GARAGE_COST, GARAGE_REPAIR, MISSION_REWARDS, PINK_TAXI_REWARD, RACE_REWARD, RESPRAY_COST, RESPRAY_STARS, TAXI_FARE, TAXI_TIME_LIMIT, UPGRADES } from './config.js';
 import { addWanted, clearPolice, dropWanted, spawnPoliceUnit } from './police.js';
 
 export const MISSION_DEFS = [
@@ -435,12 +435,45 @@ export function repairAtGarage(world) {
   const g = world.city.garage;
   if (!p.inCar || !p.car) return 'far';
   if (Math.hypot(p.car.x - g.x, p.car.y - g.y) > 80) return 'far';
-  if (!p.car.tiresPopped && (p.car.hp === undefined || p.car.hp >= GARAGE_REPAIR)) return 'fine';
+  if (!p.car.tiresPopped && (p.car.hp === undefined || p.car.hp >= maxCarHp(world))) return 'fine';
   if (world.cash < GARAGE_COST) return 'broke';
   world.cash -= GARAGE_COST;
-  p.car.hp = GARAGE_REPAIR;
+  p.car.hp = maxCarHp(world);
   p.car.tiresPopped = false;
   world.events.repair = true;
+  return 'ok';
+}
+
+/** Full car health: 100, or 150 with the Armored Hull upgrade. */
+export function maxCarHp(world) {
+  return world.upgrades && world.upgrades.armor ? 150 : GARAGE_REPAIR;
+}
+
+/** True when the player (on foot or in a car) is at the garage bay. */
+export function nearGarage(world) {
+  const p = world.player;
+  const g = world.city.garage;
+  const x = p.inCar && p.car ? p.car.x : p.x;
+  const y = p.inCar && p.car ? p.car.y : p.y;
+  return Math.hypot(x - g.x, y - g.y) <= 80;
+}
+
+/**
+ * Buy a garage upgrade (U at the garage bay): cash for a permanent
+ * system effect. Returns 'ok', 'broke', 'owned' or 'far'.
+ */
+export function buyUpgrade(world, id) {
+  const def = UPGRADES.find((u) => u.id === id);
+  if (!def) return 'far';
+  if (!nearGarage(world)) return 'far';
+  if (world.upgrades && world.upgrades[id]) return 'owned';
+  if (world.cash < def.cost) return 'broke';
+  world.cash -= def.cost;
+  if (!world.upgrades) world.upgrades = {};
+  world.upgrades[id] = true;
+  world.events.upgrade = true;
+  world.mission.dialogue = [`Garage: ${def.name} fitted — $${def.cost}. ${def.desc}.`];
+  world.mission.dialogueTimer = 5;
   return 'ok';
 }
 

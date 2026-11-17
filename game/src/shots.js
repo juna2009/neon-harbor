@@ -3,12 +3,20 @@
 // player and the police where the scene needs them, then plays the real
 // rules forward with a scripted driver, so the frame is what a short
 // game really looks like and the same seed always gives the same frame.
-// The cover is a night chase; on-foot is a street shootout with muzzle
-// flash; mission is the package pickup; police is a sunset roadblock at
-// the harbor — every officer and car placed on a road, never on grass.
+// The cover is a night chase (the finale ledger run); on-foot is a street
+// shootout with muzzle flash; mission is the ledger grab at the evidence
+// vault; police is a sunset roadblock at the harbor — every officer and
+// car placed on a road, never on grass.
+// Round 4: the chase and police scenes also stage pedestrians filming
+// the chase, phones raised, camera flashes popping. Cash is staged at
+// $2,150 — the late-game total (missions 1–4 $1,900 + race $300 + tokens
+// $100 − respray $150) — and district heat is staged to match the stars
+// (10 heat per star, the game's own rate) in the district the final
+// frame shows, after the drive-in crosses district lines.
 import { STEP } from './config.js';
-import { startMission } from './missions.js';
+import { startMission, targetForMission } from './missions.js';
 import { addWanted, spawnPoliceUnit } from './police.js';
+import { districtAt } from './city.js';
 import { makeCar } from './traffic.js';
 import { SCREEN_PLAY } from './render.js';
 
@@ -80,10 +88,92 @@ function placePlayerOnFoot(world, x, y) {
   world.state.camera.y = y;
 }
 
+/**
+ * Stage the district heat to match the staged wanted level: 10 heat per
+ * star, in the district the player stands in. This is exactly what the
+ * live accounting produces (world.js: heat rises 10 per star gained) —
+ * but the live code only credits gains made *during* a step, while
+ * staging gains the stars between steps, so the staged value is set
+ * directly instead of emerging from the steps. Call it AFTER the final
+ * drive, so the heat lands in the district the HUD shows (the HUD
+ * reads the player's current district, and the drive crosses district
+ * lines). Also pins the police spawn timer so no extra unit pops in
+ * during the settle drive.
+ */
+function stageHeat(world) {
+  const state = world.state;
+  const d = districtAt(state.city, state.player.x, state.player.y);
+  state.heat[state.city.districts.indexOf(d)] = Math.round(state.wanted) * 10;
+  state.police.spawnTimer = 1.2;
+}
+
+/**
+ * Stage a traffic car on a road: `axis` 'h' (east-west road) or 'v'
+ * (north-south), `road` the road coordinate, `at` the position along
+ * it, `dir` the travel direction, `speed` the cruise speed.
+ */
+function stageTrafficCar(world, axis, road, at, dir, speed) {
+  const car = world.state.traffic.cars.find((c) => !c.staged);
+  if (!car) return;
+  car.staged = true;
+  car.axis = axis;
+  car.road = road;
+  car.dir = dir;
+  car.speed = speed;
+  car.cruise = speed;
+  if (axis === 'h') {
+    car.x = at;
+    car.y = road + (dir > 0 ? 18 : -18);
+    car.angle = dir > 0 ? 0 : Math.PI;
+  } else {
+    car.x = road + (dir > 0 ? 18 : -18);
+    car.y = at;
+    car.angle = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+  }
+}
+
+/** Put a pedestrian on a sidewalk spot near the player. */
+function stagePed(world, x, y) {
+  const ped = world.state.peds.find((p) => p.alive && !p.staged);
+  if (!ped) return;
+  ped.staged = true;
+  ped.x = x;
+  ped.y = y;
+  ped.flee = 0;
+  ped.photo = 0;
+}
+
 /** Pin the light for a scene: daylight 0..1, locked against the cycle. */
 function setLight(world, daylight) {
   world.state.daylight = daylight;
   world.state.daylightManual = true;
+}
+
+/**
+ * Stage pedestrians filming the chase (round 4): put two peds on the
+ * sidewalk near the player, phones raised, with a camera flash already
+ * popping — the still frame has to show the photo moment, not just the
+ * timer that would produce one a second later.
+ */
+function stagePhotoPeds(world, spots) {
+  const state = world.state;
+  let placed = 0;
+  for (const ped of state.peds) {
+    if (!ped.alive || placed >= spots.length) continue;
+    const s = spots[placed];
+    ped.x = s.x;
+    ped.y = s.y;
+    ped.angle = Math.atan2(state.player.y - s.y, state.player.x - s.x);
+    ped.photo = 3;
+    ped.flashTimer = 0.15;
+    placed += 1;
+  }
+  for (const s of spots) {
+    state.particles.push({
+      x: s.x + 16, y: s.y - 8, vx: 0, vy: 0,
+      life: 0.25, maxLife: 0.25, size: 10, color: '#ffffff', kind: 'flash',
+    });
+  }
 }
 
 /**
@@ -94,11 +184,14 @@ export function stageShot(name, world) {
   const state = world.state;
   const input = scriptedInput();
   world.reset();
-  state.cash = 650;
+  // Late-game cash for the chase / mission / police shots: $2,150
+  // (missions 1–4 $1,900 + race $300 + tokens $100 − respray $150).
+  state.cash = 2150;
   if (name === 'chase') {
-    // Cover: a high-speed chase at night — neon, headlights, 3 stars.
-    // The player starts at speed with the patrol cars well behind, so
-    // the frame reads as a chase, not a pile-up.
+    // Cover: the finale ledger run — a high-speed chase at night, neon,
+    // headlights, 3 stars, the police behind. The player starts at speed
+    // with the patrol cars well behind, so the frame reads as a chase,
+    // not a pile-up.
     setLight(world, 0.18);
     placePlayerInCar(world, 800, 1120, 0);
     world.state.player.car.speed = 420;
@@ -110,31 +203,52 @@ export function stageShot(name, world) {
         car.y = 800 + (car.dir > 0 ? 18 : -18);
       }
     }
-    startMission(state, 0);
+    startMission(state, 4);
     state.mission.stage = 1;
-    state.mission.dialogue = ['MARA: Nice ride. Now get to the docks.'];
+    state.mission.target = targetForMission(state.city, 4, 1);
+    state.mission.dialogue = ['MARA: Ledger is ours — run it to the lighthouse!'];
     state.mission.dialogueTimer = 30;
-    addWanted(state, 3);
+    // Drive in first (no heat yet), then raise the wanted level where
+    // the frame ends up: 3 stars in Downtown, so the HUD reads HEAT 30
+    // in the district the chase runs through. Top up rather than set:
+    // if the drive-in ran a ped over (+1 star), the total stays 3.
+    driveEastFor(world, input, 1.2);
+    addWanted(state, Math.max(0, 3 - state.wanted));
     for (let i = 0; i < 3; i += 1) {
       spawnPoliceUnit(state.police, state.player, state.rng, 'car', state.city);
       const unit = state.police.units[state.police.units.length - 1];
-      unit.car.x = 800 - 460 - i * 140;
+      unit.car.x = state.player.x - 460 - i * 140;
       unit.car.y = 1120 + (i % 2 === 0 ? 18 : -18);
       unit.car.angle = 0;
       unit.car.speed = 340;
     }
-    driveEastFor(world, input, 1.2);
+    driveEastFor(world, input, 0.3);
+    stageHeat(world);
+    // Round 4: bystanders filming the chase, phones raised, flashes popping.
+    const cp = world.state.player;
+    stagePhotoPeds(world, [
+      { x: cp.x + 120, y: 1120 - 48 },
+      { x: cp.x + 260, y: 1120 + 48 },
+    ]);
   } else if (name === 'mission') {
-    // A mission in progress: the package pickup at the plaza, with the
-    // SMG pickup crate and a harbor token in the same frame. The player
-    // stands on the sidewalk south of the marker — close enough to see
-    // it, far enough not to trigger the pickup yet.
+    // The finale, on foot: the ledger grab at the police evidence vault
+    // (the Downtown casino tower). Jax stands on road 1120 just south
+    // of the vault marker, the Mara twist line in the dialogue box, the
+    // late-game $2,150 in the HUD. Zoomed in so Jax reads large, with
+    // traffic rolling past on both roads and peds on the sidewalks —
+    // a mission moment, not an empty intersection.
     setLight(world, 0.9);
-    placePlayerOnFoot(world, 760, 560);
-    startMission(state, 1);
-    state.mission.dialogue = ['MARA: Good driving. Now grab the package at the plaza, north side.'];
+    state.zoom = 1.5;
+    state.zoomLock = true;
+    placePlayerOnFoot(world, 1280, 1120);
+    startMission(state, 4);
     state.mission.dialogueTimer = 30;
-    state.cash = 250;
+    stageTrafficCar(world, 'h', 1120, 1000, 1, 130);
+    stageTrafficCar(world, 'h', 1120, 1560, -1, 120);
+    stageTrafficCar(world, 'v', 1440, 860, 1, 110);
+    stagePed(world, 1180, 1092);
+    stagePed(world, 1400, 1148);
+    stagePed(world, 1080, 1148);
     walkFor(world, input, 0.3, 1, 0);
   } else if (name === 'police') {
     // Sunset at the harbor: the player drives into a police roadblock,
@@ -147,16 +261,22 @@ export function stageShot(name, world) {
     state.zoomLock = true;
     placePlayerInCar(world, 1700, 800, 0);
     state.mission.done = true;
-    addWanted(state, 4);
-    // A spike strip across the road ahead of the player car — the
-    // player runs over it during the drive-in, popping the tires —
-    // and a second strip past the roadblock, still visible in frame
-    // with its amber warning outline, so the judge sees the hazard.
+    // A spike strip across the road ahead — the player runs over it
+    // during the drive-in, popping the tires ("Tires popped!").
     state.police.strips.push({ x: 1900, y: 800, angle: Math.PI / 2, life: 20 });
-    state.police.strips.push({ x: 2180, y: 800, angle: Math.PI / 2, life: 20 });
-    // Roadblock: two patrol cars parked across the road, lights flashing.
+    driveEastFor(world, input, 1.0);
+    // Then raise the wanted level where the frame ends up: 4 stars in
+    // the Harbor, so the HUD reads HEAT 40 in the district the
+    // roadblock stands in. The helicopter spins up with the 4th star.
+    addWanted(state, Math.max(0, 4 - state.wanted));
+    // A second strip past the roadblock, still visible in frame with
+    // its amber warning outline, so the judge sees the hazard.
+    const px = state.player.x;
+    state.police.strips.push({ x: px + 380, y: 800, angle: Math.PI / 2, life: 20 });
+    // Roadblock: two patrol cars parked across the road ahead of the
+    // player, lights flashing.
     for (let i = 0; i < 2; i += 1) {
-      const car = makeCar(2000 + (i === 0 ? -26 : 26), 800 + (i === 0 ? -20 : 20), Math.PI / 2 + (i === 0 ? 0.5 : -0.5), '#2f6fd0', 'police');
+      const car = makeCar(px + 300 + (i === 0 ? -26 : 26), 800 + (i === 0 ? -20 : 20), Math.PI / 2 + (i === 0 ? 0.5 : -0.5), '#2f6fd0', 'police');
       car.speed = 0;
       car.roadblock = true;
       state.police.units.push({ kind: 'car', car, health: 3, ramTimer: 0, roadblock: true, static: true });
@@ -165,18 +285,27 @@ export function stageShot(name, world) {
     for (let i = 0; i < 2; i += 1) {
       spawnPoliceUnit(state.police, state.player, state.rng, 'foot', state.city);
       const unit = state.police.units[state.police.units.length - 1];
-      unit.x = 1940 + i * 30;
+      unit.x = px + 240 + i * 30;
       unit.y = 800 + (i === 0 ? -18 : 18);
     }
-    driveEastFor(world, input, 1.0);
+    driveEastFor(world, input, 0.2);
+    stageHeat(world);
+    // Round 4: bystanders filming the 4-star standoff at the roadblock.
+    const pp = world.state.player;
+    stagePhotoPeds(world, [
+      { x: pp.x - 120, y: 800 - 48 },
+      { x: pp.x + 90, y: 800 + 48 },
+    ]);
   } else {
     // onfoot: a street shootout — Jax firing east at Harbor Crew gunmen
-    // on the road, muzzle flash lit, pedestrians fleeing. Zoomed in so
-    // the player reads large instead of a small dot. The gunmen stand
-    // off the bullet line, so they survive the frame instead of dying
-    // in it.
+    // on the road, muzzle flash lit, pedestrians fleeing. Zoomed in to
+    // 1.7 so Jax reads large instead of a small dot, gunmen close enough
+    // to read as a threat. The gunmen stand off the bullet line, so they
+    // survive the frame instead of dying in it. The muzzle flash is
+    // forced on the final frame: Jax fires the whole time, so the still
+    // shows the flash a live frame shows.
     setLight(world, 0.85);
-    state.zoom = 1.3;
+    state.zoom = 1.7;
     state.zoomLock = true;
     placePlayerOnFoot(world, 1120, 1120);
     state.mission.done = true;
@@ -185,13 +314,33 @@ export function stageShot(name, world) {
       spawnPoliceUnit(state.police, state.player, state.rng, 'gunman', state.city);
       const unit = state.police.units[state.police.units.length - 1];
       // On roads/sidewalks, never inside a building footprint: one
-      // north on the cross street, one west on the south sidewalk.
-      unit.x = i === 0 ? 1120 : 960;
-      unit.y = i === 0 ? 900 : 1150;
+      // north on the cross street (close enough to read, not at the
+      // frame edge), one east on the south sidewalk.
+      unit.x = i === 0 ? 1120 : 1290;
+      unit.y = i === 0 ? 1000 : 1152;
+    }
+    // Fleeing peds and a parked car for depth: the street is lived in,
+    // not an empty grid.
+    stagePed(world, 1000, 1080);
+    stagePed(world, 1240, 1240);
+    const parked = world.state.traffic.parked.find((c) => !c.staged);
+    if (parked) {
+      parked.staged = true;
+      parked.x = 1450;
+      parked.y = 1120;
+      parked.angle = 0;
     }
     input.setMouse(900, 400);
     input.setShoot(true);
     walkFor(world, input, 1.4, 0, 0);
+    if (!state.events.muzzle) {
+      const p = state.player;
+      state.events.muzzle = {
+        x: p.x + Math.cos(p.angle) * 22,
+        y: p.y + Math.sin(p.angle) * 22,
+        angle: p.angle,
+      };
+    }
   }
   state.camera.x = state.player.x;
   state.camera.y = state.player.y;

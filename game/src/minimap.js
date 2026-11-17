@@ -120,6 +120,28 @@ export function drawMinimap(ctx, state, x, y, w, h) {
     ctx.arc(x + state.police.heli.x * sx, y + state.police.heli.y * sy, 6, 0, Math.PI * 2);
     ctx.stroke();
   }
+  // The pink taxi: a bubblegum-pink blip, so the prize is findable.
+  for (const car of state.traffic.cars) {
+    if (car.pink && car.alive) {
+      ctx.fillStyle = '#ff7fc0';
+      ctx.beginPath();
+      ctx.arc(x + car.x * sx, y + car.y * sy, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+  // The 3 AM UFO: a green blip over the harbor.
+  if (state.ufo && state.ufo.active) {
+    ctx.fillStyle = '#78ff8c';
+    ctx.beginPath();
+    ctx.arc(x + state.ufo.x * sx, y + state.ufo.y * sy, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
   // Player: a yellow arrow pointing the way they face.
   const p = state.player;
   ctx.save();

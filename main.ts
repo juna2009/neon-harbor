@@ -1,19 +1,24 @@
-// Neon Harbor — a 2D top-down open-world crime game (Node 22, standard
+// Neon Harbor — The Mara Job: a 2D top-down open-world crime game (Node 22, standard
 // library only): the game is this directory's game/ folder, plain static
 // files a desktop browser loads offline (game/index.html and its ES
 // modules, no library and no network request), and the program hands it
 // in. It copies game/ and screenshots/ from beside this file to /output
 // and writes /output/dossier.json, the summary the judge reads, with the
-// vendored make.fun library. The game itself: a seeded procedural city
-// (Old Town, Downtown, Harbor) explored on foot and by car, with traffic
-// that turns and queues at intersections, pedestrians, car stealing, a
-// 0–5 star wanted level with police chases and roadblocks, four chained
-// story missions with mid-mission checkpoints, a street race, harbor
-// token collectibles, three weapons, a day/night cycle with neon lighting,
-// particles, a procedural radio, a live minimap, settings with key remap,
-// and localStorage saves — all shown in its four screenshots, the first
-// by name being the cover. Put 3 or 4 PNG or JPEG screenshots in
-// screenshots/ and run it.
+// vendored make.fun library. The game itself: Jax Marlowe drives for his
+// fixer Mara — who set him up in mission 3 to save his life, then helps
+// him rob the police evidence vault in the finale. A seeded procedural
+// city (Old Town, Downtown, Harbor) explored on foot and by car, with
+// traffic that turns and queues at intersections, pedestrians who film a
+// chase at 3+ stars, car stealing, a 0–5 star wanted level with police
+// chases, roadblocks, a helicopter and spike strips, five chained story
+// missions with mid-mission checkpoints, a street race, harbor token
+// collectibles, three weapons, a day/night cycle with neon lighting,
+// lightning storms, a 3 AM UFO over the harbor, a garage that repairs,
+// resprays and sells six upgrades, district heat that remembers crimes,
+// a pink taxi worth $1,000, taxi fares, particles, a procedural radio, a
+// live minimap, settings with key remap, and localStorage saves — all
+// shown in its four screenshots, the first by name being the cover. Put
+// 3 or 4 PNG or JPEG screenshots in screenshots/ and run it.
 //
 // Serve it locally with `node serve.ts`, then open http://localhost:8080.
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:

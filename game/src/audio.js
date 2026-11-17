@@ -225,6 +225,12 @@ export function createAudio() {
     crash() {
       noise(0.25, 0.25, 900);
     },
+    thunder() {
+      // A low rumble half a second after the flash: filtered noise
+      // that decays, plus a deep tone sliding down.
+      noise(1.4, 0.35, 160);
+      tone(70, 1.1, 'sine', 0.16, 38);
+    },
     engine(speed01) {
       if (muted) return;
       const c = ensure();

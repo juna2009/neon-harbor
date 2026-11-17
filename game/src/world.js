@@ -2,11 +2,13 @@
 // foot and in a car, entering and stealing cars, collisions, shooting,
 // reloading, the wanted clock, mission updates, particles, skid marks,
 // explosions, the day/night cycle and the speed-based camera zoom all
-// meet here.
-import { CAR, PLAYER, STEP, WANTED, WEAPONS, WORLD_H, WORLD_W } from './config.js';
-import { buildCity, collides, moveCircle } from './city.js';
+// meet here — along with lightning storms, pedestrians who film a chase,
+// the garage respray and six-upgrade shop, district heat that remembers
+// crimes, the pink taxi bounty, the game clock and the 3 AM UFO.
+import { CAR, PLAYER, STEP, UFO_DURATION, UFO_HOUR, WANTED, WEAPONS, WORLD_H, WORLD_W } from './config.js';
+import { WATER_X, buildCity, collides, districtAt, moveCircle } from './city.js';
 import { createBullets, fireWeapon, stepBullets } from './combat.js';
-import { createCollectibles, createMissionState, createRace, createTaxi, createWeaponPickups, loadCheckpoint, repairAtGarage, saveCheckpoint, targetForMission, updateMission, updatePickups, updateRace, updateTaxi } from './missions.js';
+import { claimPinkTaxi, createCollectibles, createMissionState, createRace, createTaxi, createWeaponPickups, loadCheckpoint, maxCarHp, repairAtGarage, resprayAtGarage, saveCheckpoint, targetForMission, updateMission, updatePickups, updateRace, updateTaxi } from './missions.js';
 import { addWanted, clearPolice, createPolice, decayWanted, spawnPoliceUnit, stepPolice } from './police.js';
 import { createPedestrians, createTraffic, stepPedestrians, stepTraffic } from './traffic.js';
 
@@ -29,8 +31,19 @@ export function createWorld(rng, savedMission) {
     pickups: createWeaponPickups(city),
     race: createRace(city),
     taxi: createTaxi(),
-    weather: { rain: false, timer: 55, duration: 0 },
+    weather: { rain: false, timer: 55, duration: 0, storm: false, boltTimer: 0, flash: 0, thunderIn: 0 },
     rainDrops: [],
+    // Game clock: 1 real second is 1 game minute, starting at 21:00 on
+    // day 1. At 03:00 a UFO hovers over the harbor for 30 seconds.
+    clock: { total: 21 * 60 },
+    // District heat: crimes raise the heat of the district they happen
+    // in (0 Old Town, 1 Downtown, 2 Harbor); hot districts (60+) make
+    // the police respond faster. Heat cools slowly on its own.
+    heat: [0, 0, 0],
+    // Garage upgrades bought with cash (U at the garage): permanent
+    // system effects, kept across game-over restarts in this visit.
+    upgrades: {},
+    ufo: { active: false, timer: 0, seen: false, x: WATER_X + 56, y: 620 },
     particles: [],
     skids: [],
     floaters: [],
@@ -104,8 +117,11 @@ export function createWorld(rng, savedMission) {
     state.mission = createMissionState(0);
     state.race = createRace(city);
     state.taxi = createTaxi();
-    state.weather = { rain: false, timer: 55, duration: 0 };
+    state.weather = { rain: false, timer: 55, duration: 0, storm: false, boltTimer: 0, flash: 0, thunderIn: 0 };
     state.rainDrops.length = 0;
+    state.clock = { total: 21 * 60 };
+    state.heat = [0, 0, 0];
+    state.ufo = { active: false, timer: 0, seen: false, x: WATER_X + 56, y: 620 };
     for (const c of state.collectibles) c.taken = false;
     for (const pk of state.pickups) pk.taken = false;
     for (const ped of peds) ped.alive = true;
@@ -170,11 +186,14 @@ export function createWorld(rng, savedMission) {
     p.inCar = true;
     p.car = car;
     car.kind = 'player';
-    if (car.hp === undefined) car.hp = CAR.health;
+    if (car.hp === undefined) car.hp = maxCarHp(state);
     if (car.stolen === undefined) {
       car.stolen = true;
-      if (state.wanted > 0 || nearPolice(p.x, p.y, 300)) addWanted(state, 1);
+      // Ghost Plates: stealing stays unseen — no star for a quiet lift.
+      if (!state.upgrades.ghost && (state.wanted > 0 || nearPolice(p.x, p.y, 300))) addWanted(state, 1);
     }
+    // The pink taxi is a prize, not a ride: stealing it pays $1,000.
+    if (car.pink) claimPinkTaxi(state);
   }
 
   function nearPolice(x, y, radius) {
@@ -264,7 +283,8 @@ export function createWorld(rng, savedMission) {
         state.shake = Math.max(state.shake, 4);
         addSkid(car.x, car.y, car.angle);
         if (car.hp !== undefined && impact > 350) {
-          car.hp -= impact * 0.03;
+          // Armored Hull: the car takes half the damage.
+          car.hp -= impact * 0.03 * (state.upgrades.armor ? 0.5 : 1);
           if (car.hp <= 0) {
             spawnExplosion(car.x, car.y);
             car.alive = false;
@@ -293,15 +313,20 @@ export function createWorld(rng, savedMission) {
     // Popped tires (spike strips): half the top speed, weak acceleration
     // and sloppy steering until the garage fixes it or the car is swapped.
     const tireFactor = car.tiresPopped ? 0.45 : 1;
-    if (throttle > 0) car.speed += CAR.accel * tireFactor * dt;
+    // Garage upgrades: Dockside Turbo (+15% top speed, +10% accel),
+    // Harbor Slicks (+25% steering response).
+    const speedFactor = state.upgrades.turbo ? 1.15 : 1;
+    const accelFactor = state.upgrades.turbo ? 1.1 : 1;
+    const steerFactor = state.upgrades.slicks ? 1.25 : 1;
+    if (throttle > 0) car.speed += CAR.accel * tireFactor * accelFactor * dt;
     else if (throttle < 0) {
       car.speed -= (speedAlong > 10 ? CAR.brake : CAR.accel * 0.6) * dt;
     } else {
       car.speed -= car.speed * 1.4 * dt;
     }
-    car.speed = Math.max(-CAR.maxReverse, Math.min(CAR.maxSpeed * tireFactor, car.speed));
+    car.speed = Math.max(-CAR.maxReverse, Math.min(CAR.maxSpeed * tireFactor * speedFactor, car.speed));
     if (Math.abs(car.speed) > 5) {
-      car.angle += steer * CAR.turnRate * (car.tiresPopped ? 0.55 : 1) * dt * Math.sign(car.speed) * Math.min(1, Math.abs(car.speed) / 120);
+      car.angle += steer * CAR.turnRate * steerFactor * (car.tiresPopped ? 0.55 : 1) * dt * Math.sign(car.speed) * Math.min(1, Math.abs(car.speed) / 120);
     }
     const nx = car.x + Math.cos(car.angle) * car.speed * dt;
     const ny = car.y + Math.sin(car.angle) * car.speed * dt;
@@ -341,8 +366,9 @@ export function createWorld(rng, savedMission) {
         state.events.pedDown = true;
       }
     }
-    // Spike strips: driving over one pops the tires.
-    if (car === state.player.car && !car.tiresPopped) {
+    // Spike strips: driving over one pops the tires — unless the car
+    // runs Run-Flat Tires from the garage upgrade shop.
+    if (car === state.player.car && !car.tiresPopped && !state.upgrades.runflats) {
       for (const strip of state.police.strips) {
         if (Math.hypot(strip.x - car.x, strip.y - car.y) < 34) {
           car.tiresPopped = true;
@@ -417,6 +443,7 @@ export function createWorld(rng, savedMission) {
     state.events = {};
     const p = state.player;
     const events = state.events;
+    const wantedBefore = state.wanted;
 
     // Day/night cycle: a slow drift across ~8 minutes of play, unless a
     // screenshot scene pinned the light by hand.
@@ -463,26 +490,61 @@ export function createWorld(rng, savedMission) {
         state.mission.dialogue = ['Garage: $150 for a full repair — you are short on cash.'];
         state.mission.dialogueTimer = 4;
       } else if (result === 'fine') {
-        state.mission.dialogue = ['Garage: this car is already in fine shape.'];
-        state.mission.dialogueTimer = 3;
+        // The car is undamaged, so G buys a respray instead: fresh
+        // paint, one less star on the tail — if there is heat to lose.
+        const spray = resprayAtGarage(state);
+        if (spray === 'ok') {
+          state.mission.dialogue = ['Resprayed — fresh paint, one less star. $150.'];
+          state.mission.dialogueTimer = 4;
+        } else if (spray === 'broke') {
+          state.mission.dialogue = ['Respray is $150 — you are short on cash.'];
+          state.mission.dialogueTimer = 4;
+        } else {
+          state.mission.dialogue = ['Garage: this car is already in fine shape.'];
+          state.mission.dialogueTimer = 3;
+        }
       }
     }
 
     // Weather: a rain shower rolls in every couple of minutes and lasts
-    // about 25 seconds — streaks, splashes and a darker sky.
+    // about 25 seconds — streaks, splashes and a darker sky. Half the
+    // showers are lightning storms: the front darkens the sky, then a
+    // bolt strobes the whole frame white for 2 frames, and the thunder
+    // rumble follows half a second later.
     const weather = state.weather;
     if (!weather.rain) {
       weather.timer -= dt;
       if (weather.timer <= 0) {
         weather.rain = true;
         weather.duration = 25;
+        weather.storm = state.rng.chance(0.5);
+        weather.boltTimer = state.rng.range(2, 5);
+        weather.flash = 0;
+        weather.thunderIn = 0;
       }
     } else {
       weather.duration -= dt;
       if (weather.duration <= 0) {
         weather.rain = false;
         weather.timer = 95;
+        weather.storm = false;
+        weather.flash = 0;
+        weather.thunderIn = 0;
         state.rainDrops.length = 0;
+      }
+    }
+    if (weather.storm) {
+      if (weather.flash > 0) weather.flash -= 1;
+      weather.boltTimer -= dt;
+      if (weather.boltTimer <= 0) {
+        weather.flash = 2;
+        weather.thunderIn = 0.5;
+        weather.boltTimer = state.rng.range(4, 9);
+        state.shake = Math.max(state.shake, 2);
+      }
+      if (weather.thunderIn > 0) {
+        weather.thunderIn -= dt;
+        if (weather.thunderIn <= 0) events.thunder = true;
       }
     }
     if (weather.rain) {
@@ -501,6 +563,25 @@ export function createWorld(rng, savedMission) {
           drop.x = state.camera.x + state.rng.range(-700, 700);
         }
       }
+    }
+
+    // Game clock: 1 real second is 1 game minute. At 03:00 a UFO
+    // hovers over the harbor for 30 seconds, green beam and all.
+    state.clock.total += dt;
+    const hour = Math.floor(state.clock.total / 60) % 24;
+    const ufo = state.ufo;
+    if (ufo.active) {
+      ufo.timer -= dt;
+      if (ufo.timer <= 0) ufo.active = false;
+    } else if (hour === UFO_HOUR && !ufo.seen) {
+      ufo.active = true;
+      ufo.timer = UFO_DURATION;
+      ufo.seen = true;
+      state.mission.dialogue = ['UFO over the harbor! 03:00 — something is out there.'];
+      state.mission.dialogueTimer = 6;
+      events.ufo = true;
+    } else if (hour !== UFO_HOUR) {
+      ufo.seen = false;
     }
 
     if (p.inCar && p.car) {
@@ -561,7 +642,16 @@ export function createWorld(rng, savedMission) {
     const danger = events.shot
       ? { x: p.x, y: p.y }
       : (p.inCar && p.car && Math.abs(p.car.speed) > 250 ? { x: p.x, y: p.y } : null);
-    stepPedestrians(peds, dt, city, danger);
+    // At 3+ stars the chase itself is the show: nearby peds stop and
+    // film it. Their camera flashes become white starburst particles.
+    const chase = state.wanted >= 3 ? { x: p.x, y: p.y } : null;
+    const flashes = stepPedestrians(peds, dt, city, danger, chase);
+    for (const f of flashes) {
+      state.particles.push({
+        x: f.x, y: f.y, vx: 0, vy: 0,
+        life: 0.25, maxLife: 0.25, size: 10, color: '#ffffff', kind: 'flash',
+      });
+    }
     stepPolice(state.police, state, dt, rng, events);
     // The helicopter's searchlight keeps the heat on: no cooling off
     // while it circles above.
@@ -571,6 +661,21 @@ export function createWorld(rng, savedMission) {
     updateTaxi(state, dt);
     updatePickups(state);
     stepParticles(dt);
+
+    // District heat: crimes committed this step heat up the district
+    // the player is standing in (10 heat per star gained); heat cools
+    // slowly on its own. Cooler Streets halves the gain and doubles
+    // the cooling.
+    const heatGain = state.wanted - wantedBefore;
+    if (heatGain > 0) {
+      const d = districtAt(city, p.x, p.y);
+      const idx = city.districts.indexOf(d);
+      state.heat[idx] = Math.min(100, state.heat[idx] + heatGain * 10 * (state.upgrades.cooler ? 0.5 : 1));
+    }
+    const coolRate = 0.4 * (state.upgrades.cooler ? 2 : 1);
+    for (let i = 0; i < state.heat.length; i += 1) {
+      state.heat[i] = Math.max(0, state.heat[i] - coolRate * dt);
+    }
 
     // Camera follows the player (or their car), clamped to the world.
     // Zoom: close on foot, pulling back as the car goes faster.
