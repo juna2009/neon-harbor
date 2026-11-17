@@ -174,6 +174,17 @@ export function createPedestrians(city, rng) {
       flashTimer: 0,
     });
   }
+  // Round 10: Jax & Mara cross the opening intersection on foot, as themselves.
+  peds.push({
+    x: 540, y: 480, angle: 0, speed: 40,
+    color: '#6b4423', skin: '#d8a077', pants: '#1c1f24', hat: 0, build: 'wide',
+    flee: 0, alive: true, walkPhase: 0, photo: 0, flashTimer: 0, hero: 'jax',
+  });
+  peds.push({
+    x: 420, y: 480, angle: Math.PI, speed: 38,
+    color: '#8a1f28', skin: '#e8b98a', pants: '#2a1214', hat: 0, build: 'slim',
+    flee: 0, alive: true, walkPhase: 1.6, photo: 0, flashTimer: 0, hero: 'mara',
+  });
   return peds;
 }
 

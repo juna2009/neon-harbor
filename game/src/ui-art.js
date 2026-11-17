@@ -11,7 +11,7 @@ function G(c,v,k){B(c);for(let i=0;i<v.length;i+=2)c[i?'lineTo':'moveTo'](v[i],v
 function T(c,z){c.font='bold '+z+'px system-ui';c.textAlign='center';c.textBaseline='middle'}
 function rr(c,x,y,w,h,r){B(c);c.roundRect(x,y,w,h,r)}
 export function drawStar(c,x,y,s,f){Z(c,x,y,s);B(c);for(let i=0;i<10;i++){let a=-1.57+i*.63,r=i%2?.45:1;c[i?'lineTo':'moveTo'](Math.cos(a)*r,Math.sin(a)*r)}c.closePath();if(f){F(c,f>1?'#ff8c1a':C.player);c.fill()}else{L(c,'#eef1f540',.08);c.stroke()}if(f>1){L(c,'#ff3b30',.1);A(c,0,0,1.15)}E(c)}
-export function drawWantedRow(c,x,y,s,n){for(let i=0;i<n;i++)drawStar(c,x+i*s*1.25,y,s,i>4?2:1)}
+export function drawWantedRow(c,x,y,s,n,f,g){for(let i=0;i<n;i++)drawStar(c,x+i*(g||s*1.25),y,s,i<(f===undefined?n:f)?(i>4?2:1):0)}
 export function drawCashIcon(c,x,y,s){Z(c,x,y,s);F(c,C.cash);A(c,0,0,.5,1);F(c,'#eef1f5');T(c,.62);c.fillText('$',0,.04);E(c)}
 export function drawHeart(c,x,y,s,o){Z(c,x,y,s);F(c,o||'#ff4d9d');A(c,-.22,-.08,.28,1);A(c,.22,-.08,.28,1);G(c,[-.5,0,.5,0,0,.55],1);E(c)}
 export function drawAmmoIcon(c,x,y,s,o){Z(c,x,y,s);F(c,o||C.player);R(c,-.22,-.5,.44,.62);G(c,[-.22,-.28,0,-.55,.22,-.28],1);E(c)}

@@ -5,8 +5,8 @@ import { currentObjective, garageHot } from './missions.js';
 import { drawMinimap } from './minimap.js';
 import { createCinematic } from './cinematic.js';
 import { drawBuildingShadow, drawDayTint, drawLightPool, drawLightning, drawWetReflection } from './lighting.js';
-import { drawBuoy, drawCargoShip, drawContainer, drawCrane, drawCrosswalk, drawHydrant, drawLamp, drawPier, drawSign, drawTree } from './props.js';
-import { drawAmmoIcon, drawBanner, drawButton, drawCashIcon, drawDirectionArrow, drawHeart, drawMenuFrame, drawNeonLine, drawObjectiveIcon, drawSpeedIcon, drawStar, drawTargetRing } from './ui-art.js';
+import { drawBuoy, drawBuilding, drawCargoShip, drawContainer, drawCrane, drawCrosswalk, drawHydrant, drawLamp, drawPier, drawSign, drawTree } from './props.js';
+import { drawAmmoIcon, drawBanner, drawButton, drawCashIcon, drawDirectionArrow, drawHeart, drawMenuFrame, drawNeonLine, drawObjectiveIcon, drawSpeedIcon, drawTargetRing, drawWantedRow } from './ui-art.js';
 import { drawBoatWake, drawExplosionSprite, drawHarborSkyline, drawNeonLogo, drawPedPhone, drawPedestrian, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet } from './assets.js';
 import { drawJaxPortrait, drawMaraPortrait, drawPortraitSmall } from './portraits.js';
 
@@ -294,6 +294,8 @@ export function createRenderer(canvas) {
     for (const tree of city.trees) drawTree(g, tree.x, tree.y, tree.r, (tree.x + tree.y) % 2);
     for (const b of city.buildings) {
       drawBuildingShadow(g, b, { dx: 1, dy: 1 });
+      if (b.landmark === 'lighthouse') { drawBuilding(g, b.x, b.y, b.w, b.h, 4); continue; }
+      if (b.landmark === 'casino') { drawBuilding(g, b.x, b.y, b.w, b.h, 3); continue; }
       g.fillStyle = b.color;
       g.fillRect(b.x, b.y, b.w, b.h);
       g.strokeStyle = b.neon;
@@ -708,7 +710,7 @@ export function createRenderer(canvas) {
       if (!ped.alive || !inView(ped.x, ped.y, 30)) continue;
       const pa = ped.angle + Math.PI / 2;
       if (ped.photo > 0) drawPedPhone(ctx, ped.x, ped.y, pa);
-      else drawPedestrian(ctx, ped.x, ped.y, pa, i % 4, ped.walkPhase);
+      else drawPedestrian(ctx, ped.x, ped.y, pa, ped.hero || i % 4, ped.walkPhase);
     }
 
     for (const unit of state.police.units) {
@@ -1118,8 +1120,7 @@ export function createRenderer(canvas) {
   }
 
   function drawStars(ctx2, wanted, x, y) {
-    const full = Math.floor(wanted);
-    for (let i = 0; i < 6; i += 1) drawStar(ctx2, x + i * 26 + 11, y - 8, 11, i < full ? (i === 5 ? 2 : 1) : 0);
+    drawWantedRow(ctx2, x + 11, y - 8, 11, 6, Math.floor(wanted), 26);
   }
 
   function drawHud(state, best, ui) {
