@@ -320,6 +320,7 @@ export function stepPolice(police, state, dt, rng, events) {
       car.angle += Math.max(-3.2 * dt, Math.min(3.2 * dt, diff));
       const topSpeed = unit.military ? 640 : (heli.active ? 620 : 560);
       car.speed = Math.min(topSpeed, car.speed + (unit.military ? 520 : (heli.active ? 460 : 380)) * dt);
+      if (state.bridge.up && Math.abs(car.x - 2400) < 50 && Math.abs(car.y - 1680) < 260 && Math.sin(car.angle) * (1680 - car.y) > 0) car.speed = 0;
       if (unit.ramTimer > 0) unit.ramTimer -= dt;
       const nx = car.x + Math.cos(car.angle) * car.speed * dt;
       const ny = car.y + Math.sin(car.angle) * car.speed * dt;

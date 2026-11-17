@@ -152,7 +152,7 @@ export function buildCity(rng) {
   }
   if (stadium) stadium.stadium = true;
   buildings.push({
-    x: 2380, y: 1500, w: 44, h: 44,
+    x: 2300, y: 1820, w: 44, h: 44,
     color: '#e8e4d8', neon: '#ffd23e', height: 3, roof: 0,
     district: 2, props: 0, landmark: 'lighthouse',
   });

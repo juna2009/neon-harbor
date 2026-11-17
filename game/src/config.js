@@ -1,4 +1,4 @@
-// Neon Harbor — tuning — colours — weapons — radio — rewards — jobs.                                                                                                                                                                                                                                                                                                                           ————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+// Neon Harbor — tuning — colours — weapons — radio — rewards — jobs.
 export const WORLD_W = 2560;
 export const WORLD_H = 1920;
 export const STEP = 1 / 60;

@@ -804,7 +804,7 @@ export function createWorld(rng, savedMission) {
     for (const unit of state.police.units) {
       if (unit.kind === 'car') obstacles.push(unit.car);
     }
-    stepTraffic(traffic, dt, city, obstacles);
+    stepTraffic(traffic, dt, city, obstacles, state.bridge);
     for (const car of traffic.cars) if (car.kind !== 'player') hitScenery(car);
     const danger = events.shot
       ? { x: p.x, y: p.y }

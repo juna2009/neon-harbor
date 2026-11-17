@@ -92,7 +92,7 @@ function blockedAhead(car, others, gap) {
   return false;
 }
 
-export function stepTraffic(traffic, dt, city, obstacles) {
+export function stepTraffic(traffic, dt, city, obstacles, bridge) {
   const slowObstacles = (obstacles || []).filter((o) => Math.abs(o.speed || 0) < 150);
   const others = traffic.cars.concat(slowObstacles);
   for (const car of traffic.cars) {
@@ -122,6 +122,8 @@ export function stepTraffic(traffic, dt, city, obstacles) {
     }
 
     let desired = car.cruise;
+    const d = car.road === 2400 && car.axis === 'v' ? (car.dir < 0 ? car.y - 1840 : 1520 - car.y) : -1;
+    if (bridge?.up && d > 0 && d < 80) desired = 0;
     if (blockedAhead(car, others, 78)) desired = 0;
     if (distToNext < 90 && blockedAhead({ ...car, x: car.x + Math.cos(car.angle) * 60, y: car.y + Math.sin(car.angle) * 60, angle: car.angle }, others, 60)) desired = 0;
     if (desired === 0) car.speed = Math.max(0, car.speed - 420 * dt);
