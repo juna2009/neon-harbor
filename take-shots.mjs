@@ -33,7 +33,8 @@ const shots = [
   ['2-boat.jpg', '?shot=boat&seed=7', `${SHOTS}`],
   ['3-blackout.jpg', '?shot=blackout&seed=7', `${SHOTS}`],
   ['4-police.jpg', '?shot=police&seed=7', `${SHOTS}`],
-  ['neon-harbor-shop5.jpg', '?shot=shop&seed=7', '/tmp'],
+  ['neon-harbor-shop6.jpg', '?shot=shop&seed=7', '/tmp'],
+  ['neon-harbor-shopclosed6.jpg', '?shot=shopclosed&seed=7', '/tmp'],
   ['neon-harbor-onfoot5.jpg', '?shot=onfoot&seed=7', '/tmp'],
   ['neon-harbor-mission5.jpg', '?shot=mission&seed=7', '/tmp'],
 ];

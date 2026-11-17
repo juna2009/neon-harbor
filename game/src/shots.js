@@ -412,17 +412,15 @@ export function stageShot(name, world) {
     // the heat and the helicopter all agree — as the chase scene does.
     state.wanted = 4;
     stageHeat(world);
-  } else if (name === 'shop') {
-    // The garage upgrade shop: Jax at the bay, Dockside Turbo bought
-    // with the real buyUpgrade call ($2,150 → $1,750, OWNED), Armored
-    // Hull selected. The panel is drawn over the live world.
+  } else if (name === 'shop' || name === 'shopclosed') {
     setLight(world, 0.9);
     state.cash = 2150;
+    if (name === 'shopclosed') state.heat[0] = 70;
     const g = state.city.garage;
     placePlayerOnFoot(world, g.x, g.y);
     state.camera.x = g.x;
     state.camera.y = g.y;
-    buyUpgrade(state, 'turbo');
+    if (name === 'shop') buyUpgrade(state, 'turbo');
     state.camera.x = state.player.x;
     state.camera.y = state.player.y;
     return { screen: SCREEN_SHOP, best: state.cash, ui: { shopIndex: 2, stationName: 'Harbor FM' } };
