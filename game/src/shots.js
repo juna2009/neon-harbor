@@ -413,6 +413,9 @@ export function stageShot(name, world) {
     state.wanted = 4;
     stageHeat(world);
   } else if (name === 'shop' || name === 'shopclosed') {
+    // Cash $2,150: missions 1-4 $1,900 + race $300 + tokens $100 - respray
+    // $150. shop buys Dockside Turbo $400 -> $1,750 OWNED; shopclosed buys
+    // nothing (Old Town HEAT 70, garageHot, banner CLOSED), cash stays $2,150.
     setLight(world, 0.9);
     state.cash = 2150;
     if (name === 'shopclosed') state.heat[0] = 70;
