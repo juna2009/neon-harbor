@@ -257,12 +257,10 @@ export function createWorld(rng, savedMission, sp) {
     if (Math.abs(boat.speed) > 5) {
       boat.angle += steer * 2.4 * dt * Math.sign(boat.speed) * Math.min(1, Math.abs(boat.speed) / 150);
     }
-    const nbx = boat.x + Math.cos(boat.angle) * boat.speed * dt;
-    const nby = boat.y + Math.sin(boat.angle) * boat.speed * dt;
+    let nbx = Math.max(WATER_X + 16, Math.min(WORLD_W - 16, boat.x + Math.cos(boat.angle) * boat.speed * dt));
+    let nby = Math.max(16, Math.min(WORLD_H - 16, boat.y + Math.sin(boat.angle) * boat.speed * dt));
     if (!boatHitsObstacle(nbx, nby, 27)) { boat.x = nbx; boat.y = nby; }
     else boat.speed *= -0.25;
-    boat.x = Math.max(WATER_X + 16, Math.min(WORLD_W - 16, boat.x));
-    boat.y = Math.max(16, Math.min(WORLD_H - 16, boat.y));
     if (Math.abs(boat.speed) > 120) {
       boat.wake.push({
         x: boat.x - Math.cos(boat.angle) * 30,

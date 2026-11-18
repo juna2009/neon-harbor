@@ -254,7 +254,7 @@ export function createRenderer(canvas) {
       ctx.fillRect(WATER_X + 12 + drift, y + 30, 60, 4);
       ctx.fillRect(WATER_X + 40 - drift, y + 70, 44, 4);
     }
-    if (inView(WATER_X + 60, 500, 140)) drawCargoShip(ctx, WATER_X + 12, 500, 90, 30, 0);
+    if (inView(WATER_X + 60, 500, 140)) drawCargoShip(ctx, WATER_X + 12, 500, 40, 30, 0);
     for (let i = 0; i < 3; i += 1) {
       const by = 900 + i * 300 + Math.sin(state.elapsed * 1.5 + i) * 4;
       if (inView(WATER_X + 30, by, 20)) drawBuoy(ctx, WATER_X + 30, by, 8);

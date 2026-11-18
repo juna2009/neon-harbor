@@ -252,9 +252,10 @@ void main(){
   c = mix(c, uSky4, smoothstep(0.82, 1.0, y));
   vec2 S = uSunPos;
   float d = length(vec2((vU.x - S.x) * uAsp, vU.y - S.y)); // R26b: jarak koreksi aspek
-  c += uSunGlow * exp(-d * 7.0) * 0.9 * uSunK;
-  c += uSunDisc * smoothstep(mix(0.045, 0.020, uMoon), mix(0.038, 0.014, uMoon), d) * uSunK; // TOD: bulan lebih kecil
-  c += uSunGlow * exp(-abs(vU.y - S.y) * 90.0) * exp(-abs(vU.x - S.x) * 5.0) * 0.4 * uSunK * (1.0 - uMoon); // TOD: bulan tanpa streak
+  float noon = step(1.05, uSunK); // R27a: 1 hanya siang (sunK siang 1.1, lain 1.0)
+  c += uSunGlow * exp(-d * mix(7.0, 18.0, noon)) * mix(0.9, 0.35, noon) * uSunK;
+  c += uSunDisc * smoothstep(mix(mix(0.045, 0.041, noon), 0.020, uMoon), mix(0.038, 0.014, uMoon), d) * uSunK; // TOD: bulan lebih kecil
+  c += uSunGlow * exp(-abs(vU.y - S.y) * 90.0) * exp(-abs(vU.x - S.x) * 5.0) * mix(0.4, 0.15, noon) * uSunK * (1.0 - uMoon); // TOD: bulan tanpa streak
   float smog = exp(-abs(y - 0.47) * 22.0) * uSmog; // TOD: pagi berkabut, siang jernih
   c = mix(c, uSky0, smog);
   float cl1 = smoothstep(0.16, 0.0, distance(vU, vec2(0.22, 0.78)));
