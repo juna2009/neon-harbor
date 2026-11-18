@@ -16,8 +16,14 @@ const hz=d=>cl((d-70)/300,0,.72);
 // orange light bounced off the road. NOT multiplied by shadeK.
 const shW=(c,b,t)=>{const m=c.map(v=>Math.min(255,v*b|0)).map((v,i)=>Math.round(v+(HZ[i]-v)*t));
   return 'rgb('+m.map((v,i)=>Math.round(v*.72+[255,140,80][i]*.28)).join(',')+')';};
+// round 22: the chase camera uses a longer lens + a higher eye than the
+// title frame (narrower FOV = the road fills more of the frame, the
+// flanking walls start further ahead and loom less; the hero stays the
+// same size on screen because the longer lens compensates the pull-back).
+// P() reads these; frame() resets them to the title values every frame.
+let fovF=640, camH=5.6;
 let camZ=0;const ops=[];
-function P(px,py,pz){const dz=pz-camZ;if(dz<2)return 0;return[CX+px*F/dz,HOR-(py-5.6)*F/dz,dz];}
+function P(px,py,pz){const dz=pz-camZ;if(dz<2)return 0;return[CX+px*fovF/dz,HOR-(py-camH)*fovF/dz,dz];}
 function Q(a,b,c,d,col,dep){const p=[P(...a),P(...b),P(...c),P(...d)];if(p.includes(0))return;ops.push({d,f(){x.fillStyle=col;x.beginPath();x.moveTo(p[0][0],p[0][1]);for(let i=1;i<4;i++)x.lineTo(p[i][0],p[i][1]);x.closePath();x.fill();}});}
 function rr(a,b,w,h,r){x.beginPath();x.moveTo(a+r,b);x.arcTo(a+w,b,a+w,b+h,r);x.arcTo(a+w,b+h,a,b+h,r);x.arcTo(a,b+h,a,b,r);x.arcTo(a,b,a+w,b,r);x.closePath();}
 // city: buildings along both sides, right side has a harbor gap z 150..260
@@ -54,6 +60,7 @@ function sign(sd,z0,z1,txt,col){const b=B.find(b=>(b.x>0)===(sd>0)&&b.z>z0&&b.z<
   ops.push({d:p[2],f(){x.save();x.font='bold '+fs+'px sans-serif';x.textAlign='center';x.shadowColor=col;x.shadowBlur=14;x.fillStyle=col;x.fillText(txt,p[0],p[1]);x.restore();}});}
 function frame(t){
   HZ[0]=255;HZ[1]=150;HZ[2]=110;
+  fovF=640;camH=5.6; // title lens (round 22: chase uses its own values)
   camZ=t*26;
   const g=x.createLinearGradient(0,0,0,HOR+60);
   g.addColorStop(0,'#1e0b33');g.addColorStop(.45,'#6b2355');g.addColorStop(.75,'#e0545e');g.addColorStop(1,'#ffb35c');
@@ -213,9 +220,13 @@ function box3(cx, y0, cz, w, h, d, a, col, fogD, depOff) {
   const f4 = [cor(-1, 1, y0), cor(1, 1, y0), cor(1, 1, y1), cor(-1, 1, y1)];
   const f5 = [cor(-1, -1, y0), cor(-1, -1, y1), cor(1, -1, y1), cor(1, -1, y0)];
   QW(f1, sh(c, 1.3 * shadeK, t), dep(f1));
-  QW(f2, sh(c, 0.8 * shadeK, t), dep(f2));
-  QW(f3, sh(c, 0.95 * shadeK, t), dep(f3));
-  QW(f4, sh(c, 1.05 * shadeK, t), dep(f4));
+  // round 22: the sunset bounce floor applies to EVERY vertical face, not
+  // just the west face — round 21 only warmed f5, but the chase camera
+  // looks straight at the long side walls (f2/f3), which stayed pitch
+  // black and read as void. Same floor as f5: +0.22 warm bounce.
+  QW(f2, shadeK < 1 ? shW(c, 0.8 * shadeK + 0.22, t) : sh(c, 0.8 * shadeK, t), dep(f2));
+  QW(f3, shadeK < 1 ? shW(c, 0.95 * shadeK + 0.22, t) : sh(c, 0.95 * shadeK, t), dep(f3));
+  QW(f4, shadeK < 1 ? shW(c, 1.05 * shadeK + 0.22, t) : sh(c, 1.05 * shadeK, t), dep(f4));
   QW(f5, shadeK < 1 ? shW(c, 0.65 * shadeK + 0.22, t) : sh(c, 0.65 * shadeK, t), dep(f5));
 }
 // vertical quad facing along yaw a, centered fOff forward / rOff right of (cx, cz)
@@ -482,6 +493,9 @@ function sunStreaks(sx, sy, len, soft) {
 export function drawChase3D(ctx, state) {
   x = ctx; W = ctx.canvas.width; H = ctx.canvas.height; CX = W / 2; HOR = H * .46;
   camZ = 0;
+  fovF = 860; camH = 4.4; // round 22: telephoto chase lens; low eye keeps
+  // the hero above the dialogue box (a higher eye pushed the car down
+  // behind the HUD in the first round-22 shoot)
   const dl = state.daylight === undefined ? 1 : state.daylight;
   const sky = skyFor(dl);
   HZ[0] = sky.haze[0]; HZ[1] = sky.haze[1]; HZ[2] = sky.haze[2];
@@ -499,7 +513,13 @@ export function drawChase3D(ctx, state) {
   ccLast = now;
   dt = Math.min(Math.max(dt, 0), 0.05);
   const speed = Math.abs(hero.speed || 0);
-  const dist = 9.5 + Math.min(1, speed / 540) * 3;
+  // round 22: pull back (13–16) so the flanking walls start further ahead,
+  // and sit 2 units to the hero's LEFT — the car projects right of centre,
+  // clear of the dialogue box, in 3/4 rear view (roof, side and rear
+  // wheels read instead of one flat slab). The longer lens (fovF 860)
+  // keeps the hero the same size on screen.
+  const dist = 13 + Math.min(1, speed / 540) * 3;
+  const latOff = -2.0;
   const snap = !ccInit || Math.hypot(hx - ccHX, hy - ccHY) > 600;
   // round 20: when the hero has not moved since the last frame (a staged
   // shot paints the same frozen world twice), snap the camera to its
@@ -511,7 +531,7 @@ export function drawChase3D(ctx, state) {
   if (snap) ccYaw = ha;
   else ccYaw += angDiff(ha, ccYaw) * Math.min(1, dt * 4.0);
   const fx = Math.cos(ccYaw), fz = Math.sin(ccYaw);
-  const tx = hx * CS - fx * dist, tz = hy * CS - fz * dist;
+  const tx = hx * CS - fx * dist - fz * latOff, tz = hy * CS - fz * dist + fx * latOff;
   if (snap || still) { ccX = tx; ccZ = tz; ccInit = true; }
   else { ccX += (tx - ccX) * Math.min(1, dt * 8); ccZ += (tz - ccZ) * Math.min(1, dt * 8); }
   ccHX = hx; ccHY = hy;
@@ -661,6 +681,13 @@ export function drawChase3D(ctx, state) {
   // buildings
   for (const b of city.buildings) {
     if (!inRange(b.x + b.w / 2, b.y + b.h / 2, 155, 105)) continue;
+    // round 22: cull the buildings flanking the camera — their side walls
+    // sit 2–3 units away and explode across the whole frame as blank
+    // slabs. The street then opens to the buildings a block ahead, which
+    // read as a city instead of a canyon; the road + sunset dominate.
+    const br = camRel(b.x + b.w / 2, b.y + b.h / 2);
+    const nearFwd = br[0] - Math.max(b.w, b.h) * CS / 2;
+    if (nearFwd < 16 && Math.abs(br[1]) < 16) continue;
     bld3(b, nightF, t);
   }
   // trees
