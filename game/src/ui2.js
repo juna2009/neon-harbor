@@ -326,7 +326,7 @@ export function drawHud2(c, st, best, ui, view) {
   if (st.wanted >= 3) { c.fillStyle = 'rgba(239,68,68,0.07)'; c.fillRect(0, 0, W2, H2); }
 }
 
-// ---- title screen v2: poster layout, measured text (no overflow), portraits framed ----
+// ---- title screen v2: compact card, measured text (no overflow), no faces ----
 function keyChip(c, x, y, key, label) {
   c.font = 'bold 12px ' + FONT;
   const kw = Math.max(48, c.measureText(key).width + 18);
@@ -335,15 +335,69 @@ function keyChip(c, x, y, key, label) {
   T(c, key, x + kw / 2, y + 14, 12, '#ffffff', 'center', 'bold');
   T(c, label, x + kw + 8, y + 14, 13, '#c8cdd6', 'left');
 }
-// ---- title screen v2.1: narrow LEFT poster panel — right ~50% of the frame
-// stays open so the 3D sunset city sells the world (Art Director batch 2:
-// old centered 620px panel + side portraits hid ~60% of the frame).
-// Portraits live INSIDE the panel now, with 3-band shading (portraits.js).
-export function drawTitle2(c, view, best, prog, backdrop, portraits) {
+// ---- title screen v2.2: COMPACT left card (Juna 2026-11-18 19:05 WIB) ----
+// 360x400 at (24,176), under the minimap — 14.1% of the frame. The old
+// 470x688 poster (31.6%) + two framed portraits hid the street and half
+// the hero car; the portraits are deleted outright (asset team owns faces
+// separately). Logo + short tagline + ROAD TO #1 + START only; the 3D
+// sunset street sells the world. (v2.1: narrow LEFT poster panel, portraits
+// inside the panel — superseded.)
+export function drawTitle2(c, view, best, prog, backdrop, live) {
   const W2 = view.w, H2 = view.h;
   if (backdrop) backdrop(c);
   else { c.fillStyle = '#0e1420'; c.fillRect(0, 0, W2, H2); }
-  const tw = 470, tx = 160, ty = 64, th = 688;
+  // TITLE-FIX (Bug 6): the 3D backdrop (city3d frame) paints a HARDCODED
+  // staging HUD — CHAPTER 12/12, $2,150, 4 stars, 142 MPH, GEAR 6 — that
+  // contradicts the real progress. city3d.js is out of scope, so the live
+  // values are painted over it here, from `live` (render.js title branch).
+  if (live) {
+    const CX = W2 / 2;
+    // --- chapter banner (was: CHAPTER 12/12: THE HARBOR KING) ---
+    const chLabel = 'CHAPTER ' + live.chapter + '/' + live.total + ': ' + live.chapterTitle.toUpperCase();
+    const chSub = live.objective.toUpperCase();
+    c.font = 'bold 15px ' + FONT;
+    const bw = Math.min(W2 - 48, Math.max(400, c.measureText(chSub).width + 56));
+    const bx = CX - bw / 2;
+    const ux = Math.min(CX - 200, bx), uw = Math.max(CX + 200, bx + bw) - ux;
+    c.fillStyle = '#0e081e';
+    rr(c, ux, 16, uw, 46, 8); c.fill();
+    c.fillStyle = 'rgba(8,8,24,0.75)';
+    rr(c, bx, 16, bw, 46, 8); c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = '#c9a227'; rr(c, bx, 16, bw, 46, 8); c.stroke();
+    c.fillStyle = '#ffd23e'; c.font = 'bold 11px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+    c.fillText(chLabel, CX, 33);
+    c.fillStyle = '#ffffff'; c.font = 'bold 15px ' + FONT;
+    c.fillText(chSub, CX, 52);
+    // --- top-right status panel (was: 4 stars, $2,150, two bare bars) ---
+    const px = W2 - 216, py = 16, pw = 200, ph = 92;
+    c.fillStyle = '#0e0a1e';
+    rr(c, px, py, pw, ph, 8); c.fill();
+    c.fillStyle = 'rgba(8,8,24,0.75)';
+    rr(c, px, py, pw, ph, 8); c.fill();
+    for (let i = 0; i < 5; i++) drawStar2(c, px + 19 + i * 21, py + 17, 8, i < live.wanted);
+    T(c, '$' + live.cash.toLocaleString('en-US'), px + 12, py + 42, 22, C.cash, 'left', 'bold');
+    drawHeart2(c, px + 18, py + 61, 7);
+    c.fillStyle = '#333';
+    rr(c, px + 28, py + 58, 106, 7, 3); c.fill();
+    c.fillStyle = live.health > 30 ? '#4ade80' : '#ef4444';
+    rr(c, px + 28, py + 58, Math.round(106 * Math.max(0, live.health) / 100), 7, 3); c.fill();
+    T(c, 'HP ' + Math.round(live.health) + '%', px + 140, py + 62, 10, '#eef1f5', 'left', 'bold');
+    T(c, 'JAX MARLOWE', px + 12, py + 82, 10, '#35f0ff', 'left');
+    // --- speed panel: erase with a live copy of the clean road strip left of it ---
+    if (W2 > 640) c.drawImage(c.canvas, W2 - 396, H2 - 88, 180, 72, W2 - 196, H2 - 88, 180, 72);
+    // --- clock line (was: DAY 1 · 21:02 · HARBOR · HEAT 30) ---
+    const clock = 'DAY ' + live.day + ' · ' + live.time + ' · ' + live.district + ' · HEAT ' + live.heat;
+    c.font = 'bold 12px ' + FONT;
+    const cw = c.measureText(clock).width + 24;
+    drawPill(c, 8, H2 - 36, cw, 24, '#0e1420', C.neonCyan);
+    T(c, clock, 20, H2 - 24, 12, '#ffffff', 'left', 'bold');
+  }
+  // TITLE-COMPACT (Juna 2026-11-18 19:05 WIB): no big faces on title —
+  // the portraits are gone (they read as ugly flat masks and the panel
+  // hid half the street + the hero car). One slim card, left edge under
+  // the minimap: 360x400 = 14.1% of a 1280x800 frame. The 3D street,
+  // buildings and cars stay visible; logo + tagline + ROAD TO #1 + START.
+  const tw = 360, tx = 24, ty = 176, th = 400;
   const cx = tx + tw / 2;
   drawPanel(c, tx, ty, tw, th, C.neonCyan);
   let y = ty + 44;
@@ -361,45 +415,28 @@ export function drawTitle2(c, view, best, prog, backdrop, portraits) {
   c.strokeStyle = C.neonCyan; c.lineWidth = 2;
   c.beginPath(); c.moveTo(tx + 32, y); c.lineTo(tx + tw - 32, y); c.stroke();
   y += 22;
-  // tagline, wrapped to fit the narrow panel
-  y += W(c, 'Jax Marlowe came to Neon Harbor to drive. His fixer Mara set him up — to save his life. Now they rob the police evidence vault together.', tx + 32, y, tw - 64, 14, '#eef1f5', 19) * 19 + 6;
+  // tagline, wrapped to fit the narrow card (short: vault line dropped)
+  y += W(c, 'Jax Marlowe came to drive. His fixer Mara set him up — to save his life.', tx + 32, y, tw - 64, 14, '#eef1f5', 19) * 19 + 6;
   y += W(c, 'Steal a car or a speedboat, run the package, lose the heat — thirteen missions across three days.', tx + 32, y, tw - 64, 14, '#c8cdd6', 19) * 19 + 10;
-  // portraits inside the panel (duo cards, centered)
-  if (portraits) {
-    const pw = 150, ph = 160, gap = 12;
-    const totalW = (pw + 12) * 2 + gap;
-    const px0 = cx - totalW / 2 + 6;
-    drawPanel(c, px0 - 6, y - 6, pw + 12, ph + 44, C.neonCyan);
-    portraits.jax(c, px0, y, pw, ph, 'stern');
-    drawPill(c, px0 - 6, y + ph + 8, pw + 12, 26, C.neonCyan);
-    T(c, 'JAX MARLOWE', px0 + pw / 2, y + ph + 22, 12, '#0e1420', 'center', 'bold');
-    const px1 = px0 + pw + 12 + gap;
-    drawPanel(c, px1 - 6, y - 6, pw + 12, ph + 44, C.neonPink);
-    portraits.mara(c, px1, y, pw, ph, 'alert');
-    drawPill(c, px1 - 6, y + ph + 8, pw + 12, 26, C.neonPink);
-    T(c, 'MARA — HARBOR CREW', px1 + pw / 2, y + ph + 22, 12, '#fff', 'center', 'bold');
-    y += ph + 44 + 10;
-  }
+  // (portraits deleted 2026-11-18 19:05 WIB — Juna: faces were ugly and the
+  // duo cards ate the street. No faces on title; asset team owns portraits.)
   // ROAD TO #1 (title version)
   drawRoadTo1(c, tx + 32, y + 8, tw - 64, prog.done, prog.total, prog.next, true);
   y += 80 + 8;
-  // controls grid (key chips, 2 columns, 6 essential keys)
-  const controls = [['WASD', 'move & drive'], ['MOUSE', 'aim'], ['CLICK', 'shoot'], ['E', 'enter car / boat'], ['Q', 'switch weapon'], ['C', 'radio']];
-  controls.forEach(([k, l], i) => {
-    const col = i % 2, row = Math.floor(i / 2);
-    keyChip(c, tx + 32 + col * 210, y + row * 27, k, l);
-  });
-  y += 3 * 27 + 10;
-  // start button with pulse (centered on the panel, not the screen)
+  // (controls grid deleted — title is a storefront now: logo, tagline,
+  // ROAD TO #1, START. keyChip is now unused on title; kept, tiny helper.)
+  // start button with pulse (centered on the card, not the screen)
   const pulse = 1 + 0.06 * Math.sin(Date.now() / 280);
   c.save(); c.translate(cx, y + 19); c.scale(pulse, pulse);
   c.shadowColor = C.neonCyan; c.shadowBlur = 18;
-  c.fillStyle = '#37e0e633'; rr(c, -170, -19, 340, 38, 8); c.fill();
+  c.fillStyle = '#37e0e633'; rr(c, -140, -19, 280, 38, 8); c.fill();
   c.restore();
-  c.lineWidth = 2.5; c.strokeStyle = C.neonCyan; rr(c, cx - 170, y, 340, 38, 8); c.stroke();
+  c.lineWidth = 2.5; c.strokeStyle = C.neonCyan; rr(c, cx - 140, y, 280, 38, 8); c.stroke();
   T(c, 'PRESS ENTER TO START', cx, y + 19, 16, '#ffffff', 'center', 'bold');
-  drawPill(c, cx - 78, H2 - 34, 156, 24, '#0e1420e6', C.cash);
-  T(c, 'BEST CASH $' + best.toLocaleString('en-US'), cx, H2 - 21, 13, C.cash, 'center', 'bold');
+  // BEST CASH stays centered on the SCREEN (card is narrow now; cx would
+  // collide with the clock pill at bottom-left).
+  drawPill(c, W2 / 2 - 78, H2 - 34, 156, 24, '#0e1420e6', C.cash);
+  T(c, 'BEST CASH $' + best.toLocaleString('en-US'), W2 / 2, H2 - 21, 13, C.cash, 'center', 'bold');
 }
 // ---- mission banner v2 ----
 export function drawMissionBanner2(c, view, chapter, total, title) {

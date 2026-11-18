@@ -1093,7 +1093,28 @@ export function createRenderer(canvas) {
     ctx.fillRect(0, 0, view.w, view.h);
     if (screen === SCREEN_TITLE) {
       const t = state.titleT3d ?? ((performance.now() / 1000) % 20);
-      drawTitle2(ctx, view, best, missionProgress(state), (c) => cine.title3D(c, t), { jax: drawJaxPortrait, mara: drawMaraPortrait });
+      const prog = missionProgress(state);
+      // TITLE-FIX (Bug 6): live title values for drawTitle2's correction
+      // layer — chapter + status follow the real progress, never staging.
+      const idx = Math.min(12, Math.max(0, prog.done >= 13 ? 12 : prog.done));
+      const def = MISSION_DEFS[idx] || MISSION_DEFS[MISSION_DEFS.length - 1];
+      const district = districtAt(state.city, state.player.x, state.player.y);
+      const heatIdx = state.city.districts.indexOf(district);
+      const total = state.clock ? state.clock.total : 0;
+      const live = {
+        chapter: prog.done >= 13 ? 13 : prog.done + 1,
+        total: 13,
+        chapterTitle: def.title,
+        objective: prog.done >= 13 ? 'ALL 13 MISSIONS COMPLETE' : def.objective,
+        cash: state.cash || 0,
+        wanted: Math.floor(state.wanted || 0),
+        health: state.player ? state.player.health : 100,
+        day: 1 + Math.floor(total / 1440),
+        time: String(Math.floor(total / 60) % 24).padStart(2, '0') + ':' + String(Math.floor(total) % 60).padStart(2, '0'),
+        district: district.name.toUpperCase(),
+        heat: state.heat ? Math.round(state.heat[heatIdx] || 0) : 0,
+      };
+      drawTitle2(ctx, view, best, prog, (c) => cine.title3D(c, t), live);
       return;
     }
     if (chaseOn(state)) cine.chase3D(ctx, state);
