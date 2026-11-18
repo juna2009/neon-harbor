@@ -61,10 +61,11 @@ function spawnPointNear(player, rng, distance, city) {
 }
 export function spawnPoliceUnit(police, player, rng, kind, city) {
   if (kind === 'boat') {
-    const a = rng.range(0, Math.PI * 2);
     const d = rng.range(420, 560);
-    const bx = Math.max(WATER_X + 30, Math.min(WORLD_W - 30, player.x + Math.cos(a) * d));
-    const by = Math.max(60, Math.min(WORLD_H - 60, player.y + Math.sin(a) * d));
+    const n = player.y - 60, s = WORLD_H - 60 - player.y;
+    const dir = n >= d && s >= d ? (rng.chance(0.5) ? -1 : 1) : n >= s ? -1 : 1;
+    const bx = Math.max(WATER_X + 30, Math.min(WORLD_W - 30, player.x));
+    const by = player.y + dir * Math.min(d, Math.max(n, s));
     police.units.push({
       kind: 'boat', x: bx, y: by, angle: 0, speed: 0, health: 3, ramTimer: 0, wake: [],
     });

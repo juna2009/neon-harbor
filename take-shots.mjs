@@ -2,7 +2,7 @@
 // and captures the four gate screenshots with Playwright against the
 // cached Chromium. Not part of the entry (lives in the repo root, not game/).
 import { createRequire } from 'node:module';
-const require = createRequire('/tmp/shot-tools/node_modules/playwright-core/package.json');
+const require = createRequire('/home/hatch/workspace/makefun/shot-tools/node_modules/playwright-core/package.json');
 const { chromium } = require('playwright-core');
 import { spawn } from 'node:child_process';
 import { statSync } from 'node:fs';
