@@ -134,6 +134,7 @@ export function stageShot(name, world) {
   const state = world.state;
   const input = scriptedInput();
   world.reset();
+  state.view3d = false; // staged shots are 2D top-down unless the scene says otherwise
   state.cash = 2150;
   if (name === 'title3d') {
     state.titleT3d = 6;
@@ -154,9 +155,12 @@ export function stageShot(name, world) {
     state.bullets.push({ x: pump.x - 20, y: pump.y, vx: 760, vy: 0, life: 1, damage: 1, hostile: false });
     walkFor(world, input, 0.55, 0, 0);
     stageHeat(world);
-  } else if (name === 'chase') {
-    setLight(world, 0.18);
-    placePlayerInCar(world, 800, 1120, 0);
+  } else if (name === 'chase' || name === 'chase3d') {
+    setLight(world, name === 'chase3d' ? 0.45 : 0.18);
+    // chase3d: start just west of the 1440 cross street and drive only a
+    // little, so the camera ends up INSIDE the intersection gap — the road
+    // opens to the sun instead of the flanking walls looming over the lens
+    placePlayerInCar(world, name === 'chase3d' ? 1400 : 800, 1120, 0);
     world.state.player.car.speed = 420;
     for (const car of state.traffic.cars) {
       if (car.axis === 'h' && car.road === 1120 && car.x > 700 && car.x < 1750) {
@@ -170,7 +174,7 @@ export function stageShot(name, world) {
     state.blackout.active = false;
     state.mission.dialogue = ['MARA: Ledger is ours — run it to the lighthouse!'];
     state.mission.dialogueTimer = 30;
-    driveEastFor(world, input, 1.2);
+    driveEastFor(world, input, name === 'chase3d' ? 0.35 : 1.2);
     addWanted(state, Math.max(0, 3 - state.wanted));
     for (let i = 0; i < 3; i += 1) {
       spawnPoliceUnit(state.police, state.player, state.rng, 'car', state.city);
@@ -180,13 +184,24 @@ export function stageShot(name, world) {
       unit.car.angle = 0;
       unit.car.speed = 340;
     }
-    driveEastFor(world, input, 0.3);
+    driveEastFor(world, input, name === 'chase3d' ? 0.05 : 0.3);
     stageHeat(world);
+    if (name === 'chase3d') {
+      // chase-cam looks forward: the pursuit must be IN frame — one unit
+      // ahead in the same lane, one oncoming, one traffic car for depth
+      const px = state.player.x;
+      const u1 = state.police.units[state.police.units.length - 2];
+      if (u1) { u1.car.x = px + 300; u1.car.y = 1120 - 18; u1.car.angle = 0; u1.car.speed = 320; }
+      const u2 = state.police.units[state.police.units.length - 1];
+      if (u2) { u2.car.x = px + 460; u2.car.y = 1120 + 18; u2.car.angle = Math.PI; u2.car.speed = 300; }
+      stageTrafficCar(world, 'h', 1120, px + 200, 1, 110);
+    }
     const cp = world.state.player;
     stagePhotoPeds(world, [
       { x: cp.x + 120, y: 1120 - 48 },
       { x: cp.x + 260, y: 1120 + 48 },
     ]);
+    if (name === 'chase3d') state.view3d = true;
   } else if (name === 'mission') {
     setLight(world, 0.9);
     state.zoom = 1.5;
@@ -307,7 +322,7 @@ export function stageShot(name, world) {
     state.mission.dialogueTimer = 30;
     state.camera.x = state.player.x;
     state.camera.y = state.player.y;
-  } else if (name === 'boat') {
+  } else if (name === 'boat' || name === 'boat3d') {
     setLight(world, 0.8);
     state.clock.total = 2 * 1440 + 5 * 60 + 40;
     state.cash = 3470;
@@ -338,6 +353,17 @@ export function stageShot(name, world) {
     state.police.heli.x = state.player.x - 190;
     state.police.heli.y = state.player.y;
     stageHeat(world);
+    if (name === 'boat3d') {
+      // round 20: chase-cam looks forward, so the pursuit must be IN
+      // frame — the police boat staged behind the hero sits behind the
+      // camera, and the heli staged 190 px west is outside the field of
+      // view. Put the police boat ahead in the water strip and the heli
+      // ahead-right in the sky (same trick as the chase3d staging above).
+      state.view3d = true;
+      const px = state.player.x, py = state.player.y;
+      pursuit.x = px + 35; pursuit.y = py - 220; pursuit.angle = -Math.PI / 2; pursuit.speed = 480;
+      state.police.heli.x = px + 60; state.police.heli.y = py - 450;
+    }
   } else if (name === 'blackout') {
     setLight(world, 0.05);
     state.clock.total = 1 * 1440 + 23 * 60 + 40;

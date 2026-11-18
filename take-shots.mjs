@@ -21,22 +21,25 @@ const exe = '/home/hatch/.cache/ms-playwright/chromium-1255/chrome-linux64/chrom
 const browser = await chromium.launch({ executablePath: exe, args: ['--no-sandbox'] });
 const errors = [];
 
-// Round 19 final set: title3d (cover — live 3D-rendered title screen,
-// sunset chase-cam over the harbor), chase (night pursuit, mission 5/12),
-// boat (dawn harbor chase, finale 12/12, the field's only water-action
-// shot), blackout (vault heist in total darkness). The police frame was
-// the weakest of the round 5 set — 6-star military roadblock, but the
-// player car sits stopped at 4 km/h in the middle of a cluttered frame
-// and the action is illegible at thumbnail size; the military response
-// itself stays in the game and in the dossier text. The onfoot, mission
-// and shop scenes are still staged and captured for review, but they
-// live in /tmp — NOT in screenshots/, so the dossier never exceeds
-// its 4-image cap.
+// Round 20 final set: title3d (cover — live 3D-rendered title screen),
+// chase3d (3D chase-cam sunset pursuit, mission 5/12 — replaces the 2D
+// chase: at thumbnail size the 2D chase reads as a busy top-down grid
+// while the 3D frame reads "GTA chase into the sunset" instantly, and it
+// proves the chase-cam is real gameplay, not a mockup), boat3d (3D dawn
+// boat chase, finale 12/12 — replaces the 2D boat: same story beats —
+// police boat, heli, marina, 223 km/h — upgraded to 3D, which is our
+// edge over the 3D rivals that have no water at all), blackout (2D vault
+// heist in total darkness — the honest 2D-gameplay anchor of the set;
+// the dossier text still states the game is 2D top-down with a live 3D
+// chase-cam option). The 2D chase and 2D boat frames stay in git history
+// and in /tmp review copies. The onfoot, mission and shop scenes are
+// still staged and captured for review, but they live in /tmp — NOT in
+// screenshots/, so the dossier never exceeds its 4-image cap.
 const shots = [
   ['neon-harbor-explosion7.jpg', '?shot=explosion&seed=7', '/tmp'],
   ['1-title3d.jpg', '?shot=title3d&seed=7', `${SHOTS}`],
-  ['2-chase.jpg', '?shot=chase&seed=7', `${SHOTS}`],
-  ['3-boat.jpg', '?shot=boat&seed=7', `${SHOTS}`],
+  ['2-chase3d.jpg', '?shot=chase3d&seed=7', `${SHOTS}`],
+  ['3-boat3d.jpg', '?shot=boat3d&seed=7', `${SHOTS}`],
   ['4-blackout.jpg', '?shot=blackout&seed=7', `${SHOTS}`],
   ['neon-harbor-shop6.jpg', '?shot=shop&seed=7', '/tmp'],
   ['neon-harbor-shopclosed6.jpg', '?shot=shopclosed&seed=7', '/tmp'],

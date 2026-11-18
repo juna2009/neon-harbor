@@ -989,7 +989,7 @@ export function createRenderer(canvas) {
       : p.inBoat
         ? 'E step ashore · C radio · M mute'
         : 'E enter car / boat · R reload · Q weapon · C radio · M mute';
-    text(hints, view.w - 16, view.h - 24, 14, '#c8cdd6', 'right');
+    text(hints + ' · V switch view', view.w - 16, view.h - 24, 14, '#c8cdd6', 'right');
     const objective = currentObjective(state);
     ctx.font = `bold 16px ${FONT}`;
     const ow = Math.min(view.w - 32, ctx.measureText(objective).width + 62);
@@ -1055,13 +1055,14 @@ export function createRenderer(canvas) {
     text(prompt, view.w / 2, y + height - 30, 20, COLORS.neonYellow, 'center', 'bold');
   }
   const TITLE_LINES = [
-    'Jax Marlowe came to Neon Harbor to drive. The harbor crew had other plans.',
-    'His fixer Mara set him up — to save his life. Now they rob the police evidence vault together.',
-    'Steal a car or a speedboat, run the package, lose the heat — twelve missions across three days.',
+    'Jax Marlowe came to Neon Harbor to drive — the crew had other plans.',
+    'His fixer Mara set him up to save his life. Now they rob the vault.',
+    'Twelve missions across three days: steal, run, lose the heat.',
     'WASD / arrows — move & drive    Mouse — aim    Click / Space — shoot',
     'E — enter / exit car or boat    R — reload    Q — switch weapon    C — radio',
     'G — garage repair / respray    U — upgrade shop    O — settings',
-    'Street races, taxi fares, harbor tokens and weapon pickups hide all over the city.',
+    'V — switch 2D top-down / 3D chase-cam view',
+    'Street races, taxi fares, harbor tokens and weapon pickups.',
   ];
   function drawSettings(ui) {
     const settings = ui.settings;
@@ -1120,7 +1121,63 @@ export function createRenderer(canvas) {
     });
     text('Up / Down to choose · Enter to buy · Esc to close', view.w / 2, y + height - 24, 16, COLORS.neonYellow, 'center', 'bold');
   }
+  // 3D chase-cam view mode (round 20). Default: 3D chase-cam; V toggles to the
+  // 2D top-down view and back. The mode lives on state.view3d so shots and
+  // probes can read/set it; world.reset() never clears it, so the choice
+  // survives restarts. The listener is registered lazily here (this whole
+  // zone is past the dossier cut) so no pre-cut file grows.
+  let view3dUser = null; // null = no manual choice yet
+  let lastScreen3d = SCREEN_TITLE;
+  let lastState3d = null;
+  let viewInit = false;
+  function chaseOn(state) {
+    if (state.view3d !== undefined) return !!state.view3d;
+    return view3dUser === null ? true : view3dUser;
+  }
+  function drawModeBadge(state) {
+    const on = chaseOn(state);
+    const label = on ? '3D CHASE-CAM  ·  V for 2D top-down' : '2D TOP-DOWN  ·  V for 3D chase-cam';
+    ctx.font = `bold 13px ${FONT}`;
+    const w = ctx.measureText(label).width + 28;
+    ctx.fillStyle = 'rgba(14,20,32,0.82)';
+    ctx.fillRect(12, 184, w, 24);
+    ctx.fillStyle = on ? COLORS.neonPink : COLORS.neonCyan;
+    ctx.fillRect(12, 184, 4, 24);
+    text(label, 28, 201, 13, '#ffffff', 'left', 'bold');
+  }
+  function drawTargetCompass(state) {
+    const tgt = state.mission && state.mission.target;
+    if (!tgt) return;
+    const p = state.player;
+    const dx = tgt.x - p.x, dy = tgt.y - p.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 60) return;
+    const heading = (p.inCar && p.car) ? p.car.angle : (p.inBoat && p.boat) ? p.boat.angle : p.angle;
+    const rel = Math.atan2(dy, dx) - heading;
+    const cxp = view.w / 2, cyp = 104;
+    ctx.save();
+    ctx.translate(cxp, cyp);
+    ctx.rotate(rel);
+    ctx.fillStyle = '#ffd23e';
+    ctx.beginPath();
+    ctx.moveTo(0, -12); ctx.lineTo(9, 8); ctx.lineTo(-9, 8); ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    text(`${tgt.label} — ${Math.round(dist)}m`, cxp, cyp + 30, 13, '#ffd23e', 'center', 'bold');
+  }
   function draw(state, screen, best, ui) {
+    if (!viewInit) {
+      viewInit = true;
+      window.addEventListener('keydown', (e) => {
+        if (e.repeat || e.code !== 'KeyV' || lastScreen3d !== SCREEN_PLAY || !lastState3d) return;
+        const next = !chaseOn(lastState3d);
+        view3dUser = next;
+        lastState3d.view3d = next;
+        cine.chaseReset();
+      });
+    }
+    lastScreen3d = screen;
+    lastState3d = state;
     ctx.clearRect(0, 0, view.w, view.h);
     ctx.fillStyle = '#0e1420';
     ctx.fillRect(0, 0, view.w, view.h);
@@ -1138,14 +1195,19 @@ export function createRenderer(canvas) {
       drawMenuFrame(ctx, tx, ty, tw, th, COLORS.neonCyan);
       drawNeonLogo(ctx, view.w / 2, ty + 66, 1.4);
       drawNeonLine(ctx, tx + 24, ty + 104, tw - 48, COLORS.neonCyan);
-      TITLE_LINES.forEach((line, i) => text(line, view.w / 2, ty + 126 + i * 32, 19, '#c8cdd6', 'center'));
+      TITLE_LINES.forEach((line, i) => text(line, view.w / 2, ty + 126 + i * 32, 16, '#c8cdd6', 'center'));
       drawButton(ctx, view.w / 2 - 170, ty + th - 62, 340, 38, 'PRESS ENTER TO START', 1);
       text(`Best cash $${best}`, view.w / 2, view.h - 40, 16, '#c8cdd6', 'center');
       return;
     }
-    drawWorld(state);
+    if (chaseOn(state)) cine.chase3D(ctx, state);
+    else drawWorld(state);
     cine.drawBars(ctx, view.w, view.h);
     drawHud(state, best, ui);
+    if (screen === SCREEN_PLAY) {
+      drawModeBadge(state);
+      if (chaseOn(state)) drawTargetCompass(state);
+    }
     if (screen === SCREEN_PAUSED) {
       drawPanel('Paused', ['The city waits for no one — except right now.', 'O — settings'], 'Press P or Esc to resume', COLORS.neonCyan);
     } else if (screen === SCREEN_SETTINGS) {
