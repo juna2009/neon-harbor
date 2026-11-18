@@ -474,8 +474,13 @@ function plane3d(wx, wy, angle, plane, o) {
   const jet = !!o.jet;
   // JETFIX: jets were too dark against the sunset buildings (olive #3a4a3a
   // read as a black brick) — brightened ~25% so the silhouette reads.
-  const body = jet ? '#4a5c44' : '#f7fafc';
-  const wingC = jet ? '#39472f' : '#d5dde4';
+  // JETFIX-3 (VB-08): still too dark — the HAF jet read as a black BLOCK
+  // with two floating nav-light squares (its wing is edge-on from behind,
+  // so only the fuselage rear shows, and it was near-black against tan
+  // buildings). Body + wing brightened again; the rear cap below is now
+  // light OLIVE for jets instead of the hero's white-grey.
+  const body = jet ? '#5d7055' : '#f7fafc';
+  const wingC = jet ? '#4a5c44' : '#d5dde4';
   // plane-local (f = forward, r = right) -> world [x, y, z]
   const pt = (f, r, y) => [cx + fx * f + rx * r, y, cz + fz * f + rz * r];
   // contact shadow: fades + grows + drifts with altitude (drawPlane formula)
@@ -495,7 +500,9 @@ function plane3d(wx, wy, angle, plane, o) {
   // slab (v1 wash at 0.35 alpha was too weak to fix it). Same cure as the
   // hero car's rear (round 21) + takeoff3d's 3-band rear: a LIGHT rear
   // cap (0.8 alpha) + dark belly strip + bright top edge.
-  vQuad(cx, cz, angle, -L / 2 - 0.08, 0, 1.5, y0 + 0.1, y0 + 0.92, 'rgba(232,236,242,0.8)');
+  // JETFIX-3 (VB-08): jets get a LIGHT OLIVE cap, not the hero's white —
+  // a white rectangle on an olive jet would read as a painted panel.
+  vQuad(cx, cz, angle, -L / 2 - 0.08, 0, 1.5, y0 + 0.1, y0 + 0.92, jet ? 'rgba(122,138,106,0.85)' : 'rgba(232,236,242,0.8)');
   vQuad(cx, cz, angle, -L / 2 - 0.09, 0, 1.5, y0 + 0.1, y0 + 0.32, 'rgba(20,20,28,0.55)');
   topStrip(cx, cz, angle, -L / 2 - 0.05, 0, 1.4, 0.3, y0 + 0.98, 'rgba(255,210,140,0.95)');
   // canopy: dark glass + sky reflection streak (takeoff3d)
@@ -511,8 +518,19 @@ function plane3d(wx, wy, angle, plane, o) {
     // JETFIX: tail fin SWEPT BACK + shorter — the old vertical fin (1.2
     // tall, straight up) read as a pole from the chase-cam; the swept fin
     // (top edge 0.5 further back, height 0.85) reads as a jet tail.
-    QW([pt(-2.2, s * 0.55, y0 + 0.7), pt(-3.0, s * 0.55, y0 + 0.7), pt(-3.5, s * 0.55, y0 + 1.55), pt(-2.7, s * 0.55, y0 + 1.55)], jet ? '#39472f' : '#05d9e8'); // tail fin (cyan)
-    if (rimOn) QW([pt(-2.7, s * 0.55, y0 + 1.53), pt(-3.5, s * 0.55, y0 + 1.53), pt(-3.5, s * 0.55, y0 + 1.6), pt(-2.7, s * 0.55, y0 + 1.6)], 'rgba(255,210,130,0.8)'); // fin top rim
+    // JETFIX-3 (VB-07): the swept fin STILL read as 2 vertical cyan
+    // PILLARS — from directly behind, the fin's forward sweep collapses
+    // in depth (the camera looks along the fin plane), so only its height
+    // shows. A fin needs width VISIBLE from behind: cant the top OUTWARD
+    // (V-tail) so each fin leans away from the centreline, and sweep the
+    // top further back (0.5 -> 0.9). Two rounds of tuning: a 30 deg cant
+    // read as chopstick antennae against the open sky at alt 340 m, and
+    // even at 19 deg the fin read as a uniform BAR — because the quad is
+    // a parallelogram (top as wide as the base). A real fin TAPERS: wide
+    // base (0.8) -> narrow top (0.3), swept back. The tapered profile
+    // reads as a fin from behind; the bar never did.
+    QW([pt(-2.2, s * 0.55, y0 + 0.7), pt(-3.0, s * 0.55, y0 + 0.7), pt(-3.6, s * 0.85, y0 + 1.55), pt(-3.3, s * 0.85, y0 + 1.55)], jet ? '#4a5c44' : '#05d9e8'); // tail fin (cyan)
+    if (rimOn) QW([pt(-3.3, s * 0.85, y0 + 1.53), pt(-3.6, s * 0.85, y0 + 1.53), pt(-3.6, s * 0.85, y0 + 1.6), pt(-3.3, s * 0.85, y0 + 1.6)], 'rgba(255,210,130,0.8)'); // fin top rim
   }
   // JETFIX: wingtip nav lights (red port / green starboard) + warm rim on
   // the wing trailing edge + dark cheatline on each fuselage side — from
@@ -528,18 +546,26 @@ function plane3d(wx, wy, angle, plane, o) {
   // JETFIX: the old nozzles read as orange WINDOWS on the white rear face
   // (dark ring too thin, orange too big). Ring bigger + darker, orange
   // core smaller, so each nozzle reads as a dark ring with a hot centre.
+  // JETFIX-3 (VB-09): the flat ring STILL read as 2 orange windows —
+  // a painted quad on the rear face can never read as a hole. A nozzle
+  // needs real depth: a short dark TUBE protruding behind the rear face
+  // (box3, 0.55 deep) with the hot core RECESSED at its back end (dep-0.6
+  // so it paints after the tube's rear face). The dark tube + orange
+  // opening reads as a nozzle pipe, not a window.
   for (const s of [-1, 1]) {
-    vQuad(cx, cz, angle, -L / 2 - 0.06, s * 0.5, 0.9, y0 + 0.2, y0 + 0.67, '#23232c');
-    vQuad(cx, cz, angle, -L / 2 - 0.09, s * 0.5, 0.42, y0 + 0.3, y0 + 0.57, '#ff9d4d');
-    vQuad(cx, cz, angle, -L / 2 - 0.12, s * 0.5, 0.22, y0 + 0.37, y0 + 0.51, '#fff0b4');
+    box3(cx + fx * (-L / 2 - 0.18) + rx * s * 0.5, y0 + 0.18, cz + fz * (-L / 2 - 0.18) + rz * s * 0.5, 0.6, 0.5, 0.55, angle, '#17171c', dep);
+    vQuad(cx, cz, angle, -L / 2 - 0.48, s * 0.5, 0.34, y0 + 0.28, y0 + 0.58, '#ff9d4d', dep - 0.6);
+    vQuad(cx, cz, angle, -L / 2 - 0.51, s * 0.5, 0.16, y0 + 0.37, y0 + 0.51, '#fff0b4', dep - 0.6);
   }
   if (thr > 0.25) {
     const fl = 1.8 * thr * flick;
     for (const s of [-1, 1]) {
-      QW([pt(-3.0, s * 0.5 - 0.45, y0 + 0.5), pt(-3.0, s * 0.5 + 0.45, y0 + 0.5), pt(-3.0 - fl, s * 0.5, y0 + 0.5)], 'rgba(255,157,77,' + (0.45 + 0.4 * flick * thr).toFixed(2) + ')');
+      // JETFIX-3: the flame starts at the TUBE exit now (-3.45, not -3.0)
+      // so it looks like it comes out of the nozzle, not the fuselage.
+      QW([pt(-3.45, s * 0.5 - 0.45, y0 + 0.5), pt(-3.45, s * 0.5 + 0.45, y0 + 0.5), pt(-3.45 - fl, s * 0.5, y0 + 0.5)], 'rgba(255,157,77,' + (0.45 + 0.4 * flick * thr).toFixed(2) + ')');
       // JETFIX: vertical afterburner glow — the old flame was a horizontal
       // triangle, edge-on (invisible) from the chase-cam behind.
-      vQuad(cx, cz, angle, -L / 2 - 0.45, s * 0.5, 0.5, y0 + 0.28, y0 + 0.62, 'rgba(255,157,77,0.45)', dep);
+      vQuad(cx, cz, angle, -L / 2 - 0.55, s * 0.5, 0.5, y0 + 0.28, y0 + 0.62, 'rgba(255,157,77,0.45)', dep);
     }
   }
   // landing gear when parked/taxiing (alt < 2): nose + 2 main struts
@@ -565,8 +591,15 @@ function heli3d(hx, hy, px, py, rotor, t) {
   box3(cx, 25.2, cz, 0.35, 0.12, 7, rotor, '#c8cdd6', dep);
   const pcx = px * CS, pcz = py * CS;
   const rx = -Math.sin(ang), rz = Math.cos(ang);
+  // JETFIX-3 (VB-05): the searchlight cone was a 6.4-unit-wide flat quad
+  // (apex at the heli in the sky, base at the player) — in the chase-cam
+  // it read as a GIANT PALE TRIANGLE across the whole sky (ops dump:
+  // bbox [539,80,966,658], inter 87974 — the single biggest op in the
+  // triangle region). A searchlight is a NARROW beam: base half-width
+  // 3.2 -> 1.0, alpha 0.13 -> 0.08. The ground pool below still marks
+  // where the light lands.
   QW([[cx - rx * 0.5, 23.8, cz - rz * 0.5], [cx + rx * 0.5, 23.8, cz + rz * 0.5],
-    [pcx + rx * 3.2, 0.15, pcz + rz * 3.2], [pcx - rx * 3.2, 0.15, pcz - rz * 3.2]], 'rgba(255,240,170,0.13)');
+    [pcx + rx * 1.0, 0.15, pcz + rz * 1.0], [pcx - rx * 1.0, 0.15, pcz - rz * 1.0]], 'rgba(255,240,170,0.08)');
   flatQuad(px - 34, py - 34, px + 34, py + 34, 0.12, 'rgba(255,240,170,0.20)');
 }
 
@@ -1109,7 +1142,13 @@ export function drawChase3D(ctx, state) {
     flatQuad(tgt.x - 26, tgt.y - 26, tgt.x - 22, tgt.y + 26, 0.12, '#ffd23e');
     flatQuad(tgt.x + 22, tgt.y - 26, tgt.x + 26, tgt.y + 26, 0.12, '#ffd23e');
     const lp = cP(txp, 27, tzp);
-    if (lp) {
+    // JETFIX-3 (VB-18): the world-space label was a DUPLICATE of the HUD
+    // compass ("Marina — 1000m" big at top centre + small "Marina" floating
+    // over the sun glow). At 1000 m the beacon projects into the sky, so
+    // the small label reads as ghost text. Only draw it when the target is
+    // near (< 450 px) — then it sits ON the beacon where it belongs; far
+    // away the compass HUD is the only label.
+    if (lp && Math.hypot(tgt.x - p.x, tgt.y - p.y) < 450) {
       x.save(); x.font = 'bold ' + Math.round(cl(900 / lp[2], 11, 22)) + 'px sans-serif'; x.textAlign = 'center';
       x.fillStyle = '#ffd23e'; x.fillText(tgt.label, lp[0], lp[1]); x.restore();
     }

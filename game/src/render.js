@@ -66,11 +66,9 @@ function drawPlayer(ctx, p, state) {
   ctx.fill();
   ctx.fillRect(10, -7, 8, 3);
   ctx.restore();
-  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.arc(p.x, p.y, PLAYER.radius + 3, 0, Math.PI * 2);
-  ctx.stroke();
+  // JETFIX-3 (VB-19): the white player ring used to be drawn here (and a
+  // 2nd copy in the overlay) — inside the heli pool it read as a reticle.
+  // The ring now lives only in the overlay, gated off while the pool is on.
   ctx.strokeStyle = 'rgba(255,210,62,0.8)';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -918,11 +916,18 @@ export function createRenderer(canvas) {
         ctx.textAlign = 'center';
         ctx.fillText(t.label, sx(t.x), sy(t.y) - 34 * zoom);
       }
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(sx(state.player.x), sy(state.player.y), (PLAYER.radius + 3) * zoom, 0, Math.PI * 2);
-      ctx.stroke();
+      // JETFIX-3 (VB-19): the player ring is suppressed while the heli
+      // searchlight pool is on the player — the pool itself marks the
+      // player, and ring + pool + muzzle flash read as a target reticle.
+      // (The duplicate ring that used to live in drawPlayer was deleted;
+      // this is now the only player ring in 2D.)
+      if (!heli2 || !heli2.active) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(sx(state.player.x), sy(state.player.y), (PLAYER.radius + 3) * zoom, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       for (const unit of state.police.units) {
         if (unit.kind !== 'gunman') continue;
         ctx.fillStyle = '#a33327';

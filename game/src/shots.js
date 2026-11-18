@@ -435,9 +435,12 @@ export function stageShot(name, world) {
     // Angle -PI/2 (north, same as the hero): the old PI/2 faced the jets
     // head-on at the camera, so only a small cross read. From behind, the
     // swept fins + nozzle rings + nav lights (the plane3d rear work) read.
+    // JETFIX-3 (VB-08): jet 2 was 80 px west of the hero (~20 units from
+    // the camera) — too far/small, it read as a dark block. Pulled to 55 px
+    // west so both jets are big enough to read as planes.
     state.space.jets.push(
-      { x: pl.x - 30, y: pl.y - 20, angle: -Math.PI / 2, speed: 560, fireTimer: 1 },
-      { x: pl.x - 80, y: pl.y + 10, angle: -Math.PI / 2, speed: 560, fireTimer: 1 },
+      { x: pl.x - 28, y: pl.y - 25, angle: -Math.PI / 2, speed: 560, fireTimer: 1 },
+      { x: pl.x - 55, y: pl.y + 5, angle: -Math.PI / 2, speed: 560, fireTimer: 1 },
     );
   } else if (name === 'blackout') {
     setLight(world, 0.05);
