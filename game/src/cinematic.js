@@ -1,5 +1,3 @@
-// Neon Harbor — cinematic camera + grading: punch, layered shake, slow-mo, letterbox, tint.
-// Standalone: createCinematic(); Laras wires it into main.js/render.js.
 export function createCinematic() {
   let t = 0, ts = 1, bar = 0, barT = 0;
   let pT = 0, pD = 1, pA = 0, sT = 0, sD = 1, sS = 0.35;

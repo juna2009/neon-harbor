@@ -1,4 +1,3 @@
-// Neon Harbor sprites.
 function T(c,x,y,a){c.save();c.translate(x,y);c.rotate(a)}
 function E(c){c.restore()}
 function R(c,x,y,w,h,k){c.fillStyle=k;c.fillRect(x,y,w,h)}
@@ -11,9 +10,6 @@ export function drawPoliceCar(c,x,y,a){T(c,x,y,a);W(c);R(c,-23,-11,46,22,'#111')
 export function drawSpeedboat(c,x,y,a,k){k=k||'#f5f5f5';T(c,x,y,a);R(c,-27,-10,44,20,k);c.fillStyle=k;c.beginPath();c.moveTo(17,-10);c.lineTo(27,0);c.lineTo(17,10);c.closePath();c.fill();R(c,0,-7,10,14,'#9df');R(c,-31,-4,5,8,'#333');E(c)}
 const S='#e74c3c#3498db#f1c40f#9b59b6';
 const PN=['#2c3e50','#333','#555','#222'];
-// Top-down walker, ~30px tall. v: 0-3 as before, 'jax' (brown leather jacket,
-// broad shoulders) or 'mara' (dark red coat, long hair). p=walkPhase: legs
-// alternate with (p||0)%2. Head faces -y; angle a rotates the walker.
 export function drawPedestrian(c,x,y,a,v,p){const f=(p||0)%2,j=v==='jax',m=v==='mara';
  const shirt=j?'#6b4423':m?'#8a1f28':S.substr((v||0)*7,7),pants=j?'#1c1f24':m?'#2a1214':PN[(v||0)%4];
  const hair=j?'#1a120a':m?'#160d0c':v===3?'#d8b25a':'#222',skin=j?'#d8a077':'#e8b98a',bw=j?16:m?11:13;

@@ -1,8 +1,6 @@
-// Neon Harbor — the live minimap.
 import { WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
 import { drawMapBridge, drawMapGas, drawMapHydrant, drawMapMission, drawMapPlayer, drawMapPolice, drawMapWrench } from './ui-art.js';
-
 export function drawMinimap(ctx, state, x, y, w, h) {
   const sx = w / WORLD_W;
   const sy = h / WORLD_H;

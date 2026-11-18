@@ -1,11 +1,9 @@
-// Neon Harbor — screenshot scenes (?shot=chase|onfoot|mission|police|...).
 import { STEP } from './config.js';
 import { buyUpgrade, startMission, targetForMission } from './missions.js';
 import { addWanted, spawnPoliceUnit } from './police.js';
 import { WATER_X, districtAt } from './city.js';
 import { makeCar } from './traffic.js';
 import { SCREEN_PLAY, SCREEN_SHOP } from './render.js';
-
 function scriptedInput() {
   const pressed = new Set();
   const state = { mx: 0, my: 0, shoot: false, mouseX: 640, mouseY: 400 };
@@ -23,7 +21,6 @@ function scriptedInput() {
     clearPresses() { pressed.clear(); },
   };
 }
-
 function driveEastFor(world, input, seconds) {
   const view = { w: 1280, h: 800 };
   for (let i = 0; i < seconds / STEP; i += 1) {
@@ -38,7 +35,6 @@ function driveEastFor(world, input, seconds) {
     input.clearPresses();
   }
 }
-
 function driveBoatNorthFor(world, input, seconds) {
   const view = { w: 1280, h: 800 };
   for (let i = 0; i < seconds / STEP; i += 1) {
@@ -47,7 +43,6 @@ function driveBoatNorthFor(world, input, seconds) {
     input.clearPresses();
   }
 }
-
 function walkFor(world, input, seconds, dx, dy) {
   const view = { w: 1280, h: 800 };
   for (let i = 0; i < seconds / STEP; i += 1) {
@@ -56,7 +51,6 @@ function walkFor(world, input, seconds, dx, dy) {
     input.clearPresses();
   }
 }
-
 function placePlayerInCar(world, x, y, angle) {
   const car = world.state.traffic.parked[0];
   car.x = x;
@@ -68,7 +62,6 @@ function placePlayerInCar(world, x, y, angle) {
   world.state.player.x = x;
   world.state.player.y = y;
 }
-
 function placePlayerOnFoot(world, x, y) {
   const p = world.state.player;
   p.x = x;
@@ -79,14 +72,12 @@ function placePlayerOnFoot(world, x, y) {
   world.state.camera.x = x;
   world.state.camera.y = y;
 }
-
 function stageHeat(world) {
   const state = world.state;
   const d = districtAt(state.city, state.player.x, state.player.y);
   state.heat[state.city.districts.indexOf(d)] = Math.round(state.wanted) * 10;
   state.police.spawnTimer = 1.2;
 }
-
 function stageTrafficCar(world, axis, road, at, dir, speed) {
   const car = world.state.traffic.cars.find((c) => !c.staged);
   if (!car) return;
@@ -106,7 +97,6 @@ function stageTrafficCar(world, axis, road, at, dir, speed) {
     car.angle = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
   }
 }
-
 function stagePed(world, x, y) {
   const ped = world.state.peds.find((p) => p.alive && !p.staged);
   if (!ped) return;
@@ -116,12 +106,10 @@ function stagePed(world, x, y) {
   ped.flee = 0;
   ped.photo = 0;
 }
-
 function setLight(world, daylight) {
   world.state.daylight = daylight;
   world.state.daylightManual = true;
 }
-
 function stagePhotoPeds(world, spots) {
   const state = world.state;
   let placed = 0;
@@ -142,7 +130,6 @@ function stagePhotoPeds(world, spots) {
     });
   }
 }
-
 export function stageShot(name, world) {
   const state = world.state;
   const input = scriptedInput();
@@ -259,7 +246,6 @@ export function stageShot(name, world) {
     state.mission.done = true;
     stageTrafficCar(world, 'h', 1120, 1150, 1, 110);
     driveEastFor(world, input, 0.15);
-    // Stage the storm AFTER the drive: the flash only lasts 2 steps,
     const sp = world.state.player;
     state.weather = { rain: true, timer: 0, duration: 25, storm: true, heavy: true, bolt: null, boltTimer: 5, flash: 2, thunderIn: 0.5 };
     const bx = sp.x + 60;
@@ -320,7 +306,7 @@ export function stageShot(name, world) {
     state.camera.y = state.player.y;
   } else if (name === 'boat') {
     setLight(world, 0.8);
-    state.clock.total = 2 * 1440 + 5 * 60 + 40; // DAY 3 · 05:40
+    state.clock.total = 2 * 1440 + 5 * 60 + 40;
     state.cash = 3470;
     state.zoom = 1.4;
     state.zoomLock = true;
@@ -351,7 +337,7 @@ export function stageShot(name, world) {
     stageHeat(world);
   } else if (name === 'blackout') {
     setLight(world, 0.05);
-    state.clock.total = 1 * 1440 + 23 * 60 + 40; // DAY 2 · 23:40
+    state.clock.total = 1 * 1440 + 23 * 60 + 40;
     state.zoom = 1.5;
     state.zoomLock = true;
     const vault = state.city.casino;

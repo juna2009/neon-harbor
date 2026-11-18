@@ -1,4 +1,3 @@
-// Neon Harbor props: buildings, street, harbor.
 function sh(c,x,y,r){c.fillStyle='#0000004d';c.beginPath();c.arc(x+2,y+3,r,0,6.283);c.fill();}
 export function drawBuilding(c,x,y,w,h,k){
   const P=['#b8455a','#ffd23e','#3f8f6f','#37e0e6','#c98a3d','#ffd23e','#5a6b8a','#e8e4d8','#e8e4d8','#c0392b'];

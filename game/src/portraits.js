@@ -1,4 +1,3 @@
-// Neon Harbor portraits: Jax Marlowe & Mara. Procedural canvas 2D, no images.
 function F(c,k){c.fillStyle=k}function S(c,k){c.strokeStyle=k}
 function E(c,x,y,a,b){c.beginPath();c.ellipse(x,y,a,b,0,0,7);c.fill()}
 function O(c,x,y,r){c.beginPath();c.arc(x,y,r,0,7);c.fill()}

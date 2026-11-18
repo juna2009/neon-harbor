@@ -1,4 +1,3 @@
-// Neon Harbor UI art (canvas 2D).
 import{COLORS as C}from'./config.js';
 function F(c,o){c.fillStyle=o}
 function L(c,o,w){c.strokeStyle=o;c.lineWidth=w}
