@@ -199,7 +199,10 @@ export function stageShot(name, world) {
       // round 21: more traffic ahead for depth + 2 parked cars at the curb
       stageTrafficCar(world, 'h', 1120, px + 520, -1, 110);
       stageTrafficCar(world, 'h', 1120, px + 700, 1, 100);
-      const parkSpots = [[px + 260, 1120 - 44], [px + 430, 1120 + 44]];
+      // JF4: parked at ±36, not ±44 — a 22-wide car centred at ±44 sinks
+      // 5px into the building face (face at ±50, probe: chase3d seed 7).
+      // At ±36 the outer edge stops 3px short of the face.
+      const parkSpots = [[px + 260, 1120 - 36], [px + 430, 1120 + 36]];
       for (const [ppx, ppy] of parkSpots) {
         const parked = state.traffic.parked.find((c) => !c.staged && c !== state.player.car);
         if (!parked) break;

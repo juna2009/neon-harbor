@@ -1249,13 +1249,32 @@ export function drawChase3D(ctx, state) {
   else if (p.inCar && p.car) car3d(p.car.x, p.car.y, p.car.angle, p.car.length, p.car.width, p.car.paint || '#e33e5f', { hero: true, t });
   else if (p.inBoat && p.boat) boat3d(p.boat.x, p.boat.y, p.boat.angle, p.boat.length, p.boat.width, p.boat.color, { hero: true, t });
   else ped3d(p.x, p.y, p.angle, '#ffd23e');
+  // JF4: lamps + palms sit on the SIDEWALK, 43px from the ROAD centreline
+  // (road half-width 36px + 7px = sidewalk centre). They were placed
+  // ±4.6 from the CAMERA line, but the camera sits latOff -2.0 (20px)
+  // north of the road centre, so the north row landed 16px INSIDE the
+  // buildings and the south row 10px ONTO the road (probe: chase3d
+  // seed 7 — north lamps zone BUILDING, south lamps zone ROAD; the north
+  // palm at fwd 30 read as a T-pole standing in the road). roadLat is
+  // the lateral coordinate of the road centreline, measured from the
+  // camera, so it stays correct in any lane and on any road.
+  const roadLat = (() => {
+    if (Math.abs(cfX) >= Math.abs(cfZ)) {
+      const roadY = city.roadsH.reduce((a, b) => Math.abs(b - hy) < Math.abs(a - hy) ? b : a);
+      return (roadY * CS - ccZ) * cfX;
+    }
+    const roadX = city.roadsV.reduce((a, b) => Math.abs(b - hx) < Math.abs(a - hx) ? b : a);
+    return (roadX * CS - ccX) * -cfZ;
+  })();
+  const walkLat = 4.3; // sidewalk centre, in 3D units (43px from road centre)
   // round 21: fill the dark flanks — lamp posts on both sidewalks every
   // ~45 units (pole + lit head + light pool) and palm silhouettes every
   // ~90 units alternating sides (trunk + fronds, dark + warm rim).
   // Positions are camera-relative, so they fill whatever street the chase
   // is on; all variation is h2-gated, no randomness, no wall clock.
+  // Lamp/palm laterals use roadLat ± walkLat (JF4, defined above).
   if (p.inCar) for (let fwd = 26; fwd < 175; fwd += 45) {
-    for (const lat of [-4.6, 4.6]) {
+    for (const lat of [roadLat - walkLat, roadLat + walkLat]) {
       const lx = ccX + cfX * fwd + (-cfZ) * lat, lz = ccZ + cfZ * fwd + cfX * lat;
       const wxp = lx / CS, wzp = lz / CS;
       if (!inRange(wxp, wzp, 175, 135)) continue;
@@ -1266,7 +1285,7 @@ export function drawChase3D(ctx, state) {
     }
   }
   if (p.inCar) for (let pi = 0; pi < 3; pi += 1) {
-    const fwd = 30 + pi * 55, lat = (pi % 2 === 0 ? -1 : 1) * (6.6 + h2(pi, 7) * 1.2);
+    const fwd = 30 + pi * 55, lat = roadLat + (pi % 2 === 0 ? -1 : 1) * (walkLat + h2(pi, 7) * 0.3);
     const pxp = ccX + cfX * fwd + (-cfZ) * lat, pzp = ccZ + cfZ * fwd + cfX * lat;
     const wxp = pxp / CS, wzp = pzp / CS;
     if (!inRange(wxp, wzp, 175, 135)) continue;
