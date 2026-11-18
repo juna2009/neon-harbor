@@ -92,9 +92,28 @@ function frame(t){
   Q([150,-.9,camZ+200],[175,-.9,camZ+200],[175,-.9,camZ+420],[150,-.9,camZ+420],'rgba(255,170,90,.35)',200);
   // pier + boats
   Q([56,.5,camZ+100],[76,.5,camZ+100],[76,.5,camZ+140],[56,.5,camZ+140],sh([40,30,34],1,hz(120)),120);
-  Q([82,-1,camZ+110],[104,-1,camZ+110],[104,1.4,camZ+110],[82,1.4,camZ+110],sh([220,220,230],1,hz(110)),110);
-  Q([85,.9,camZ+105],[101,.9,camZ+105],[101,3,camZ+105],[85,3,camZ+105],sh([30,40,60],1,hz(105)),105);
-  Q([118,-1,camZ+150],[136,-1,camZ+150],[136,1.4,camZ+150],[118,1.4,camZ+150],sh([200,210,220],1,hz(150)),150);
+  // TITLE-SLAB (VB-24): the two moored boats were flat white rectangles —
+  // hull + a cabin at z+105 that projected WIDER than its z+110 hull — so
+  // they stacked into a floating white slab at the frame's right edge
+  // (probe: boat1-hull [1117,392,1245,406], cabin [1158,384,1256,397],
+  // boat2-hull [1143,386,1220,396]). Each boat is now a side view with a
+  // raked bow, a boot-top waterline stripe (run down to the hull bottom so
+  // no white sliver shows below it), and a cabin inside the hull
+  // outline at the same depth, so it reads as a boat, not a slab.
+  // ORDER MATTERS: Q() ignores its dep argument — ops.push({d,...}) stores
+  // the 4th corner point as d, so the sort key is NaN and title quads paint
+  // in INSERTION order. The FAR boat (z+150) must therefore be emitted
+  // FIRST and the NEAR boat (z+110) after it, or the far hull paints over
+  // the near boat's cabin + windshield (seen on screen: cabin/windshield
+  // invisible until this reorder). Do not "fix" by changing Q() — that
+  // would reorder the whole title frame.
+  Q([118,-1,camZ+150],[136,-1,camZ+150],[136,.9,camZ+150],[118,1.8,camZ+150],sh([200,210,220],1,hz(150)),150);
+  Q([118,-1,camZ+150],[136,-1,camZ+150],[136,-.42,camZ+150],[118,-.42,camZ+150],sh([30,40,60],1,hz(150)),150);
+  Q([123,1,camZ+150],[130,1,camZ+150],[130,2.1,camZ+150],[123,2.1,camZ+150],sh([30,40,60],1,hz(150)),150);
+  Q([82,-1,camZ+110],[104,-1,camZ+110],[104,.9,camZ+110],[82,1.9,camZ+110],sh([220,220,230],1,hz(110)),110);
+  Q([82,-1,camZ+110],[104,-1,camZ+110],[104,-.42,camZ+110],[82,-.42,camZ+110],sh([30,40,60],1,hz(110)),110);
+  Q([89,1,camZ+110],[97,1,camZ+110],[97,2.3,camZ+110],[89,2.3,camZ+110],sh([30,40,60],1,hz(110)),110);
+  Q([89,1.5,camZ+110],[92.5,1.5,camZ+110],[92.5,2.3,camZ+110],[89,1.9,camZ+110],sh([140,190,220],1,hz(110)),110);
   // distant skyline silhouettes
   for(let i=0;i<10;i++){const bx=-170+i*38+R()*14,bh=40+R()*60,bw=20+R()*18,bz=camZ+400+R()*30;
     Q([bx,0,bz],[bx+bw,0,bz],[bx+bw,bh,bz],[bx,bh,bz],mix([58,26,58],.7),bz-camZ);}
@@ -181,6 +200,19 @@ function cP(wx, wy, wz) {
   const lx = -dx * cfZ + dz * cfX; // screen-right = (-fz, fx) for the game compass
   const lz = dx * cfX + dz * cfZ;
   return P(lx, wy, lz);
+}
+// VB-22: same projection WITHOUT the near-plane cut — a target behind the
+// camera still yields a (mirrored) screen direction, so the HUD can clamp
+// it to the frame edge instead of dropping it. Returns {x, y, behind};
+// x/y are screen px, behind is true when the point is behind the near
+// plane (depth < 2). Only valid after drawChase3D ran this frame (the
+// camera state is module-level and persists across frames).
+export function projectChase(wx, wy, wz) {
+  const dx = wx - ccX, dz = wz - ccZ;
+  const lx = -dx * cfZ + dz * cfX;
+  const lz = dx * cfX + dz * cfZ;
+  const d = (lz - camZ) || 2;
+  return { x: CX + lx * fovF / d, y: HOR - (wy - camH) * fovF / d, behind: d < 2 };
 }
 function fwdD(wx, wz) { return (wx - ccX) * cfX + (wz - ccZ) * cfZ; }
 function QW(c, col, dep) {

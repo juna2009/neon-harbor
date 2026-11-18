@@ -66,9 +66,7 @@ function drawPlayer(ctx, p, state) {
   ctx.fill();
   ctx.fillRect(10, -7, 8, 3);
   ctx.restore();
-  // JETFIX-3 (VB-19): the white player ring used to be drawn here (and a
-  // 2nd copy in the overlay) — inside the heli pool it read as a reticle.
-  // The ring now lives only in the overlay, gated off while the pool is on.
+  // VB-19: white player ring removed here — ring+pool read as a reticle; ring lives only in overlay, gated off while pool is on.
   ctx.strokeStyle = 'rgba(255,210,62,0.8)';
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -647,11 +645,11 @@ export function createRenderer(canvas) {
       const uy = dy / dist;
       const perpX = -uy;
       const perpY = ux;
-      ctx.fillStyle = 'rgba(255,240,170,0.16)';
+      ctx.fillStyle = 'rgba(255,240,170,0.12)';
       ctx.beginPath();
       ctx.moveTo(heli.x, heli.y);
-      ctx.lineTo(px + perpX * 46, py + perpY * 46);
-      ctx.lineTo(px - perpX * 46, py - perpY * 46);
+      ctx.lineTo(px + perpX * 16, py + perpY * 16);
+      ctx.lineTo(px - perpX * 16, py - perpY * 16);
       ctx.closePath();
       ctx.fill();
       ctx.fillStyle = 'rgba(255,240,170,0.35)';
@@ -660,25 +658,26 @@ export function createRenderer(canvas) {
       ctx.fill();
       ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.beginPath();
-      ctx.ellipse(heli.x + 10, heli.y + 14, 22, 10, 0, 0, Math.PI * 2);
+      ctx.ellipse(heli.x + 12, heli.y + 16, 26, 12, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.save();
       ctx.translate(heli.x, heli.y);
       ctx.rotate(Math.atan2(dy, dx));
       ctx.fillStyle = '#1c2f4a';
-      ctx.fillRect(-14, -3, 28, 6);
+      ctx.fillRect(-20, -6, 40, 12);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(-4, -6, 10, 12);
+      ctx.fillRect(-6, -8, 14, 16);
       ctx.fillStyle = '#ff3b30';
-      ctx.fillRect(-16, -2, 5, 4);
+      ctx.fillRect(-23, -3, 7, 6);
       ctx.strokeStyle = 'rgba(255,255,255,0.7)';
       ctx.lineWidth = 2;
       const rotor = heli.rotor;
+      const cr = Math.cos(rotor), sr = Math.sin(rotor);
       ctx.beginPath();
-      ctx.moveTo(Math.cos(rotor) * -30, Math.sin(rotor) * -30);
-      ctx.lineTo(Math.cos(rotor) * 30, Math.sin(rotor) * 30);
-      ctx.moveTo(Math.cos(rotor + Math.PI / 2) * -30, Math.sin(rotor + Math.PI / 2) * -30);
-      ctx.lineTo(Math.cos(rotor + Math.PI / 2) * 30, Math.sin(rotor + Math.PI / 2) * 30);
+      ctx.moveTo(cr * -38, sr * -38);
+      ctx.lineTo(cr * 38, sr * 38);
+      ctx.moveTo(sr * 38, cr * -38);
+      ctx.lineTo(sr * -38, cr * 38);
       ctx.stroke();
       ctx.restore();
       ctx.fillStyle = '#ffffff';
@@ -869,16 +868,26 @@ export function createRenderer(canvas) {
         const uy = dy / dist;
         const perpX = -uy;
         const perpY = ux;
-        ctx.fillStyle = 'rgba(255,240,170,0.16)';
+        ctx.fillStyle = 'rgba(255,240,170,0.12)';
         ctx.beginPath();
         ctx.moveTo(hx, hy);
-        ctx.lineTo(px + perpX * 46 * zoom, py + perpY * 46 * zoom);
-        ctx.lineTo(px - perpX * 46 * zoom, py - perpY * 46 * zoom);
+        ctx.lineTo(px + perpX * 16 * zoom, py + perpY * 16 * zoom);
+        ctx.lineTo(px - perpX * 16 * zoom, py - perpY * 16 * zoom);
         ctx.closePath();
         ctx.fill();
         ctx.fillStyle = 'rgba(255,240,170,0.35)';
         ctx.beginPath();
         ctx.arc(px, py, 34 * zoom, 0, Math.PI * 2);
+        ctx.fill();
+        // VB-37: pool washes the yellow player out — re-mark on top: dark ring (white re-made the VB-19 reticle) + player-yellow dot.
+        ctx.strokeStyle = 'rgba(8,10,18,0.85)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(px, py, (PLAYER.radius + 4) * zoom, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = COLORS.player;
+        ctx.beginPath();
+        ctx.arc(px, py, 5 * zoom, 0, Math.PI * 2);
         ctx.fill();
       }
       if (state.events.muzzle) {
@@ -916,11 +925,7 @@ export function createRenderer(canvas) {
         ctx.textAlign = 'center';
         ctx.fillText(t.label, sx(t.x), sy(t.y) - 34 * zoom);
       }
-      // JETFIX-3 (VB-19): the player ring is suppressed while the heli
-      // searchlight pool is on the player — the pool itself marks the
-      // player, and ring + pool + muzzle flash read as a target reticle.
-      // (The duplicate ring that used to live in drawPlayer was deleted;
-      // this is now the only player ring in 2D.)
+      // VB-19: player ring suppressed while the heli pool is on — pool marks the player; ring+pool+muzzle read as a reticle (only player ring in 2D).
       if (!heli2 || !heli2.active) {
         ctx.strokeStyle = 'rgba(255,255,255,0.9)';
         ctx.lineWidth = 2.5;
@@ -930,10 +935,9 @@ export function createRenderer(canvas) {
       }
       for (const unit of state.police.units) {
         if (unit.kind !== 'gunman') continue;
-        ctx.fillStyle = '#a33327';
-        ctx.beginPath();
-        ctx.arc(sx(unit.x), sy(unit.y), 9 * zoom, 0, Math.PI * 2);
-        ctx.fill();
+        // VB-44: plain red dot unreadable in the dark — re-draw the
+        // world-pass figure on top of the blackout dark (same drawPerson).
+        drawPerson(ctx, sx(unit.x), sy(unit.y), unit.angle, { ...unit, color: COLORS.gunman, skin: '#c98d5f', pants: '#1c1f24', build: 'wide' }, state.elapsed * 8);
       }
     }
     cine.drawGrade(ctx, view.w, view.h, fx.warm, fx.cool);
@@ -1038,11 +1042,7 @@ export function createRenderer(canvas) {
     const heat = state.heat ? Math.round(state.heat[state.city.districts.indexOf(d)] || 0) : 0;
     drawShop2(ctx, { ...state, garageClosed: garageHot(state), heat }, ui, view);
   }
-  // 3D chase-cam view mode (round 20). Default: 3D chase-cam; V toggles to the
-  // 2D top-down view and back. The mode lives on state.view3d so shots and
-  // probes can read/set it; world.reset() never clears it, so the choice
-  // survives restarts. The listener is registered lazily here (this whole
-  // zone is past the dossier cut) so no pre-cut file grows.
+  // 3D chase-cam (round 20): default 3D, V toggles 2D; mode on state.view3d, survives restarts; listener lazy here (past dossier cut).
   let view3dUser = null; // null = no manual choice yet
   let lastScreen3d = SCREEN_TITLE;
   let lastState3d = null;
@@ -1068,42 +1068,105 @@ export function createRenderer(canvas) {
     ctx.fillRect(x, 196, 4, 24);
     text(label, x + 16, 213, 13, '#ffffff', 'left', 'bold');
   }
+  // VB-22: the old compass pinned its arrow + "Label — 1000m" at fixed
+  // top-centre (view.w/2, 104) whatever the target was doing — at 1000 m
+  // the beacon is a washed-out sliver (or off-frame entirely), so the text
+  // floated in the sky pointing at nothing. Now the compass is a real edge
+  // indicator: the beacon-top point is projected through the live chase
+  // camera, and the marker is clamped to the frame edge in that direction
+  // (slid along the edge clear of the HUD panels), arrow pointing outward,
+  // label on a dark pill beside it. Under 450 px the world label
+  // (city3d.js, JETFIX-3 gate) already marks the beacon, so the HUD
+  // compass hides instead of doubling it.
   function drawTargetCompass(state) {
     const tgt = state.mission && state.mission.target;
     if (!tgt) return;
     const p = state.player;
     const dx = tgt.x - p.x, dy = tgt.y - p.y;
     const dist = Math.hypot(dx, dy);
-    if (dist < 60) return;
-    const heading = (p.inCar && p.car) ? p.car.angle : (p.inBoat && p.boat) ? p.boat.angle : p.angle;
-    const rel = Math.atan2(dy, dx) - heading;
-    // UI-TOP: anchor y 114 (was 104) — the arrow tip used to dip 6 px into
-    // the ROAD TO #1 card (card ends y 98); now it clears it by 4 px in
-    // every rotation, and the label pill below clears it by 30 px.
-    const cxp = view.w / 2, cyp = 114;
+    if (dist < 450) return;
+    const pr = cine.project(tgt.x * 0.1, 27, tgt.y * 0.1);
+    if (!pr) return;
+    // ray from the projection centre (vanishing point) through the target;
+    // behind the camera the projection mirrors horizontally (a target to
+    // the right appears on the left) — un-mirror x only. The beacon top is
+    // above the eye, so a behind target projects BELOW the horizon already:
+    // that downward sense is correct (behind = down on a compass rose) and
+    // must NOT be flipped.
+    let rx = pr.x - view.w / 2, ry = pr.y - view.h * 0.46;
+    if (pr.behind) rx = -rx;
+    if (Math.hypot(rx, ry) < 1) return;
+    // intersect the ray with the frame (margin 26) -> edge point + edge
+    const m = 26, W = view.w, H = view.h;
+    const ox = W / 2, oy = H * 0.46;
+    let edge = '', ax = ox, ay = oy, t = Infinity;
+    const hit = (tt, ex, ey, e) => { if (tt > 0 && tt < t) { t = tt; ax = ex; ay = ey; edge = e; } };
+    if (rx > 0) hit((W - m - ox) / rx, W - m, oy + ry * (W - m - ox) / rx, 'right');
+    if (rx < 0) hit((m - ox) / rx, m, oy + ry * (m - ox) / rx, 'left');
+    if (ry > 0) hit((H - m - oy) / ry, ox + rx * (H - m - oy) / ry, H - m, 'bottom');
+    if (ry < 0) hit((m - oy) / ry, ox + rx * (m - oy) / ry, m, 'top');
+    if (!edge) return;
+    // the top edge is fully occupied (left panel / day pill / minimap —
+    // the gaps between them are narrower than the arrow+pill chip, so a
+    // top marker would cover the day pill). Fall back to the top of the
+    // nearest side edge; the arrow keeps its exact bearing, only the
+    // anchor moves. ay = 0 lets the slide below land on the interval top.
+    if (edge === 'top') {
+      edge = ax <= W / 2 ? 'left' : 'right';
+      ax = edge === 'left' ? m : W - m;
+      ay = 0;
+    }
+    // slide along the edge clear of the HUD panels (fractions of view size,
+    // measured off the 1280x800 shots: left panel, ROAD TO #1, minimap,
+    // dialogue, speedo, mission banner). Without this the marker lands on
+    // the minimap (chase3d) or under ROAD TO #1 (boat3d).
+    // R25l REBASE (Integrator): right edge was [0.26, 0.79] — measured when
+    // the HUD had NO PD panel. R25h added BAY PD RESPONSE under the minimap
+    // (top ~190, bottom ~360; MILITARY pill below it to ~398 at wanted 6),
+    // so a right-edge marker at y~208 painted its pill OVER the panel
+    // header ("BAY PD RESPONSE" / "5 UNITS" covered — seen in the R25l
+    // re-shoot of chase3d + boat3d). Floor moved to 0.52 (y 416) so the
+    // marker + pill clear both the panel and the military pill; the arrow
+    // keeps its exact bearing, only the anchor moves (same rule as the
+    // top-edge fallback above).
+    const free = { top: [0.25, 0.78], right: [0.52, 0.79], bottom: [0.65, 0.81], left: [0.34, 0.65] }[edge];
+    const span = (edge === 'top' || edge === 'bottom') ? W : H;
+    if (edge === 'top' || edge === 'bottom') ax = Math.min(Math.max(ax, free[0] * span), free[1] * span);
+    else ay = Math.min(Math.max(ay, free[0] * span), free[1] * span);
+    // arrow, pointing along the ray (it points up at rotate(0))
+    const rot = Math.atan2(rx, -ry);
     ctx.save();
-    ctx.translate(cxp, cyp);
-    ctx.rotate(rel);
+    ctx.translate(ax, ay);
+    ctx.rotate(rot);
     ctx.fillStyle = '#ffd23e';
     ctx.beginPath();
     ctx.moveTo(0, -12); ctx.lineTo(9, 8); ctx.lineTo(-9, 8); ctx.closePath();
     ctx.fill();
     ctx.restore();
-    // UI-TOP (bible §6.1/§6.4): the label gets its own dark scrim pill so
-    // it stays readable over bright sky, plus a stem tying it to the
-    // arrow above — it never floats unanchored, and (now that the
-    // MILITARY band has moved) nothing ever paints over it.
+    // label: on a dark pill beside the arrow (horizontal, away from the
+    // nearest side edge, so it never covers ROAD TO #1 or the minimap) —
+    // except on the bottom edge, where the mission banner (left) and the
+    // speedo (right) occupy the strip beside the arrow: there the pill sits
+    // ABOVE the arrow, its centre clamped into the free gap between them.
     const label = `${tgt.label} — ${Math.round(dist)}m`;
     ctx.font = `bold 13px ${FONT}`;
     const tw = ctx.measureText(label).width;
-    ctx.strokeStyle = 'rgba(255,210,62,0.55)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(cxp, cyp + 8); ctx.lineTo(cxp, cyp + 14); ctx.stroke();
-    ctx.fillStyle = 'rgba(10,15,28,0.72)';
-    rr(ctx, cxp - tw / 2 - 10, cyp + 14, tw + 20, 22, 11); ctx.fill();
-    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,210,62,0.65)';
-    rr(ctx, cxp - tw / 2 - 10, cyp + 14, tw + 20, 22, 11); ctx.stroke();
-    text(label, cxp, cyp + 30, 13, '#ffd23e', 'center', 'bold');
+    let px = ax;
+    if (edge === 'bottom') {
+      const half = tw / 2 + 10;
+      px = Math.min(Math.max(ax, 810 + half), 1065 - half);
+      ctx.fillStyle = 'rgba(14,20,32,0.82)';
+      rr(ctx, px - half, ay - 40, tw + 20, 24, 7);
+      ctx.fill();
+      text(label, px, ay - 23, 13, '#ffd23e', 'center', 'bold');
+    } else {
+      const side = ax <= W / 2 ? 1 : -1;
+      px = ax + side * (22 + tw / 2);
+      ctx.fillStyle = 'rgba(14,20,32,0.82)';
+      rr(ctx, px - tw / 2 - 10, ay - 12, tw + 20, 24, 7);
+      ctx.fill();
+      text(label, px, ay + 5, 13, '#ffd23e', 'center', 'bold');
+    }
   }
   function draw(state, screen, best, ui) {
     if (!viewInit) {

@@ -389,7 +389,11 @@ export function stageShot(name, world) {
     const pl = state.space.plane;
     const p = state.player;
     p.inPlane = true; p.plane = pl;
-    pl.x = 2260; pl.y = 660; pl.angle = -Math.PI / 2; pl.speed = 120; pl.alt = 15; pl.throttle = 1;
+    pl.x = 2260; pl.y = 660; pl.angle = -Math.PI / 2; pl.speed = 120; pl.alt = 0; pl.throttle = 1;
+    // VB-33 (staging-misc): alt was 15 while the plane sits on the runway
+    // — HUD read "ALT 15 m" for a parked plane. The game's own physics
+    // wants alt 0 at this speed (space.js wantAlt = 0 below 200 km/h), and
+    // the plane visually never left the tarmac, so stage alt 0.
     state.mission.stage = 2;
     state.mission.dialogueTimer = 0; // hide the Mara dialog for this hero shot
     state.wanted = 0;
@@ -479,6 +483,23 @@ export function stageShot(name, world) {
     }
     state.wanted = 4;
     stageHeat(world);
+    // VB-38 (staging-misc): the lower-left quadrant (screen 0-300, 500-750)
+    // reads as empty dark asphalt — the only world in it is one dark
+    // building + a road, and the HUD boxes cover the rest. Two cops
+    // searching the block fill it: a foot cop on the sidewalk north of the
+    // building (screen ~250,508, P badge above) + a gunman south of it
+    // (screen ~220,696, red alert dot). Placed AFTER walkFor + stageHeat
+    // so the sim never moves them and nothing else in the shot shifts.
+    const quadSpots = [
+      ['foot', 920, 1162],
+      ['gunman', 900, 1287],
+    ];
+    for (const [kind, qx, qy] of quadSpots) {
+      spawnPoliceUnit(state.police, state.player, state.rng, kind, state.city);
+      const unit = state.police.units[state.police.units.length - 1];
+      unit.x = qx;
+      unit.y = qy;
+    }
   } else if (name === 'shop' || name === 'shopclosed') {
     setLight(world, 0.9);
     state.cash = 2150;

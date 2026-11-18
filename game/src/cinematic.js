@@ -1,4 +1,4 @@
-import { drawChase3D, drawCity3DFrame, resetChaseCam } from './city3d.js';
+import { drawChase3D, drawCity3DFrame, projectChase, resetChaseCam } from './city3d.js';
 export function createCinematic() {
   let t = 0, ts = 1, bar = 0, barT = 0;
   let pT = 0, pD = 1, pA = 0, sT = 0, sD = 1, sS = 0.35;
@@ -63,5 +63,6 @@ export function createCinematic() {
   function title3D(ctx, t) { drawCity3DFrame(ctx, t); }
   function chase3D(ctx, state) { drawChase3D(ctx, state); }
   function chaseReset() { resetChaseCam(); }
-  return { punch, shake, slowmo, bars, update, drawBars, drawGrade, title3D, chase3D, chaseReset };
+  function project(wx, wy, wz) { return projectChase(wx, wy, wz); }
+  return { punch, shake, slowmo, bars, update, drawBars, drawGrade, title3D, chase3D, chaseReset, project };
 }
