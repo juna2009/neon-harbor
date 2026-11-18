@@ -83,20 +83,24 @@ function norm(v) {
 function cross(a, b) {
   return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
-// Box dengan yaw (sumbu Y) + pitch (sumbu X lokal, untuk kaca miring/kap).
+// Box dengan yaw (sumbu Y) + pitch (sumbu X LOKAL, untuk kaca miring/kap).
+// v16 (R26b GLASS): pitch DULU di frame lokal, baru yaw. Urutan lama
+// (Rx sesudah Ry) memutar rx mengelilingi sumbu-X DUNIA: untuk yaw PI/2
+// itu ROLL 30° mengelilingi sumbu-maju, bukan pitch — kaca belakang jadi
+// slab miring-menyamping, hanya baji segitiga yang menyembul di atas atap.
 function boxR(B, cx, cy, cz, w, h, d, ry, rx, col, m) {
   const hx = w / 2, hy = h / 2, hz = d / 2;
   const cy2 = Math.cos(ry), sy2 = Math.sin(ry), cx2 = Math.cos(rx), sx2 = Math.sin(rx);
   const rot = (x, y, z) => {
-    const x1 = x * cy2 + z * sy2, z1 = -x * sy2 + z * cy2;
-    const y2 = y * cx2 - z1 * sx2, z2 = y * sx2 + z1 * cx2;
-    return [cx + x1, cy + y2, cz + z2];
+    const y1 = y * cx2 - z * sx2, z1 = y * sx2 + z * cx2;
+    const x2 = x * cy2 + z1 * sy2, z2 = -x * sy2 + z1 * cy2;
+    return [cx + x2, cy + y1, cz + z2];
   };
   const nrm = (x, y, z) => {
-    const x1 = x * cy2 + z * sy2, z1 = -x * sy2 + z * cy2;
-    const y2 = y * cx2 - z1 * sx2, z2 = y * sx2 + z1 * cx2;
-    const l = Math.hypot(x1, y2, z2) || 1;
-    return [x1 / l, y2 / l, z2 / l];
+    const y1 = y * cx2 - z * sx2, z1 = y * sx2 + z * cx2;
+    const x2 = x * cy2 + z1 * sy2, z2 = -x * sy2 + z1 * cy2;
+    const l = Math.hypot(x2, y1, z2) || 1;
+    return [x2 / l, y1 / l, z2 / l];
   };
   const F = [
     { n: [0, 0, 1], v: [[-hx, -hy, hz], [hx, -hy, hz], [hx, hy, hz], [-hx, hy, hz]], uv: [[cx - hx, cy - hy], [cx + hx, cy - hy], [cx + hx, cy + hy], [cx - hx, cy + hy]] },
@@ -253,25 +257,23 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     const nrm = dir(0, -face * Math.sin(rx), face * Math.cos(rx));
     quad(B, corners[0], corners[1], corners[2], corners[3], nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], col, 4);
   };
-  // v15c (CARS-FIX): pantulan langit + border kaca — HARUS di bidang muka
-  // kaca boxR. glassPt (v15/v15b) TIDAK cocok untuk pita lebar: bidang
-  // glassPt menyilang muka kaca boxR (hanya garis v=0 yg bersentuhan) —
-  // separuh atas pita langit tersembunyi di balik kaca, segitiga tetap
-  // gelap (bukti: dump mat4 ada di geometri tapi grid bilang kaca yg
-  // terdepan). faceQuad memakai rot boxR yg sama sehingga pita benar-benar
-  // menempel di muka kaca. Segitiga kecil = strip border ATAS (glassPt)
-  // yg menjulur di atas kaca ke area atap -> di v15c strip atas DIHAPUS
-  // (tepi atas kaca sudah tertutup atap; border hanya sisi + bawah).
+  // v15c: pantulan langit + border — HARUS sebidang muka kaca boxR
+  // (faceQuad memakai rot boxR yg sama). v16: diagnosis "menyilang" itu
+  // ternyata urutan rotasi boxR (roll, bukan pitch) — kini diperbaiki.
   // Lapisan (eps dari muka kaca): langit 0.006, border 0.009.
   const faceQuad = (lx, ly, lz, x0, x1, y0, y1, hz, rx, eps, col, m) => {
     const q = at(lx, ly, lz); // pusat kotak (dunia)
     const cy2 = Math.cos(yaw), sy2 = Math.sin(yaw), cx2 = Math.cos(rx), sx2 = Math.sin(rx);
+    // v16 (R26b GLASS): rotasi sama seperti boxR v16 — pitch lokal dulu,
+    // baru yaw. Urutan lama = roll (lihat boxR); quad langit/border harus
+    // sebidang dengan muka kaca boxR yang sudah diperbaiki.
     const rot = (x, y, z) => {
-      const a = x * cy2 + z * sy2, b = -x * sy2 + z * cy2;
-      return [q[0] + a, q[1] + y * cx2 - b * sx2, q[2] + y * sx2 + b * cx2];
+      const y1 = y * cx2 - z * sx2, z1 = y * sx2 + z * cx2;
+      const a = x * cy2 + z1 * sy2, b = -x * sy2 + z1 * cy2;
+      return [q[0] + a, q[1] + y1, q[2] + b];
     };
     // Normal muka belakang (0,0,-1) sesudah rot (arah ke kamera).
-    const nx = -sy2, ny = cy2 * sx2, nz = -cy2 * cx2;
+    const nx = -cx2 * sy2, ny = sx2, nz = -cx2 * cy2;
     const nl = Math.hypot(nx, ny, nz) || 1;
     const n = [nx / nl, ny / nl, nz / nl];
     const pt = (x, y) => {
@@ -288,10 +290,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     faceQuad(lx, ly, lz, -hw, hw, -hh, -hh * 0.35, 0.035, rx, 0.006, [0.20, 0.24, 0.36], 4);
   };
   // Border karet tipis (0.04) — sisi + bawah saja (tanpa strip atas).
-  // v15d: strip sisi DIPENDEK (ujung atas hh*0.7, bukan hh) supaya
-  // tidak menjulur di atas garis atap (dulu top 1.55 vs atap 1.565 —
-  // marginal 0.015; kini top ~1.50, margin 0.065). Segitiga kecil
-  // di atap = ujung strip sisi yang menjulur + terpotong miring atap.
+  // v15d: strip sisi DIPENDEK (ujung atas hh*0.7) supaya tak menjulur di atas atap.
   const glassBorder = (lx, ly, lz, w, h, rx) => {
     const hw = w / 2, hh = h / 2, b = 0.04;
     faceQuad(lx, ly, lz, -hw - b, hw + b, -hh - b, -hh, 0.035, rx, 0.009, DARK, 5); // bawah

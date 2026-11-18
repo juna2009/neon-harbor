@@ -187,8 +187,6 @@ void main(){
     float along = dot(rel, sd);
     float streak = exp(-lat * lat * 0.08) * exp(-max(along - 4.0, 0.0) * 0.008);
     wcol += uSunCol * streak * 0.45;
-    float glit = step(0.985, h21(floor(vW.xz * 2.0) + floor(uCam.x * 0.13)));
-    wcol += vec3(1.0, 0.9, 0.7) * glit * 0.6;
     vec3 Hv = normalize(uSun + V);
     wcol += mix(uSunCol, vec3(1.0), 0.45) * pow(max(dot(N, Hv), 0.0), 80.0) * 0.8;
     float f = 1.0 - exp(-dist * 0.011 * uFogK);
@@ -244,6 +242,7 @@ uniform vec3 uSky0; uniform vec3 uSky1; uniform vec3 uSky2; uniform vec3 uSky3; 
 uniform vec2 uSunPos; uniform vec3 uSunDisc; uniform vec3 uSunGlow; uniform float uMoon;
 uniform float uStars; uniform vec3 uCloud; uniform float uCloudK; uniform float uSmog; uniform float uSkyDim;
 uniform float uSunK; // SIANG v2: intensitas matahari
+uniform float uAsp; // R26b: aspek layar (matahari/bulan bulat)
 float h21(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 void main(){
   float y = vU.y;
@@ -252,10 +251,10 @@ void main(){
   c = mix(c, uSky3, smoothstep(0.68, 0.82, y));
   c = mix(c, uSky4, smoothstep(0.82, 1.0, y));
   vec2 S = uSunPos;
-  float d = distance(vU, S);
+  float d = length(vec2((vU.x - S.x) * uAsp, vU.y - S.y)); // R26b: jarak koreksi aspek
   c += uSunGlow * exp(-d * 7.0) * 0.9 * uSunK;
-  c += uSunDisc * smoothstep(mix(0.045, 0.028, uMoon), mix(0.038, 0.022, uMoon), d) * uSunK; // TOD: bulan lebih kecil
-  c += uSunGlow * exp(-abs(vU.y - S.y) * 90.0) * exp(-abs(vU.x - S.x) * 2.2) * 0.8 * uSunK * (1.0 - uMoon); // TOD: bulan tanpa streak
+  c += uSunDisc * smoothstep(mix(0.045, 0.020, uMoon), mix(0.038, 0.014, uMoon), d) * uSunK; // TOD: bulan lebih kecil
+  c += uSunGlow * exp(-abs(vU.y - S.y) * 90.0) * exp(-abs(vU.x - S.x) * 5.0) * 0.4 * uSunK * (1.0 - uMoon); // TOD: bulan tanpa streak
   float smog = exp(-abs(y - 0.47) * 22.0) * uSmog; // TOD: pagi berkabut, siang jernih
   c = mix(c, uSky0, smog);
   float cl1 = smoothstep(0.16, 0.0, distance(vU, vec2(0.22, 0.78)));
@@ -263,7 +262,7 @@ void main(){
   float cl3 = smoothstep(0.10, 0.0, distance(vU, vec2(0.45, 0.88)));
   c = mix(c, uCloud, (cl1 * 0.22 + cl2 * 0.18 + cl3 * 0.15) * uCloudK / 0.2); // TOD: awan ikut palet
   if (uStars > 0.01) { // TOD: bintang malam (hash grid, hanya langit atas)
-    float st = step(0.994, h21(floor(vU * vec2(160.0, 90.0))));
+    float st = step(0.994, h21(floor(vU * vec2(160.0, 90.0)))) * smoothstep(0.42, 0.18, length(fract(vU * vec2(160.0, 90.0)) - 0.5));
     c += vec3(0.9, 0.95, 1.0) * st * uStars * smoothstep(0.55, 0.85, y);
   }
   c = mix(c * uSkyDim + vec3(0.02, 0.02, 0.08), c, smoothstep(0.15, 0.75, uDay)); // TOD: palet gelap jangan digelapkan 2x
@@ -423,8 +422,11 @@ function car(B, G, cx, cz, yaw, len, wid, paint, police, SHB) { // SIANG v2: SHB
   }
   flat(SHB || G, cx, 0.06, cz, wid + 0.7, len + 0.9, [0, 0, 0], 9); // contact shadow (bucket SH = blending normal; di G aditif hitam = 0 — lihat INTEGRATION.md §6)
 }
-// Perahu: lambung + dek + konsol + kaca + 2 motor tempel. (cx, cz) pusat, yaw sama.
-function boat(B, G, cx, cz, yaw, len, wid, paint) {
+// Perahu (port isyarat Canvas boat3d — BOAT-REBUILD): haluan naik + stem peak,
+// rel gunwale (siluet belakang rail-dip-rail), transom ber-strip, cowl motor
+// warna lambung, driver helm kuning / light bar polisi, V-wake Kelvin.
+// (cx, cz) pusat, yaw sama. opts: {driver} hero/sipil, {pol} polisi.
+function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
   const fwd = [Math.sin(yaw), Math.cos(yaw)];
   const rgt = [Math.cos(yaw), -Math.sin(yaw)];
   const at = (lx, ly, lz) => [cx + rgt[0] * lx + fwd[0] * lz, ly, cz + rgt[1] * lx + fwd[1] * lz];
@@ -432,14 +434,73 @@ function boat(B, G, cx, cz, yaw, len, wid, paint) {
     const q = at(lx, ly, lz);
     boxR(B, q[0], q[1], q[2], w, h, d, yaw, 0, col, m);
   };
+  const pp = (lx, ly, lz, w, h, d, col, m, rx) => {
+    const q = at(lx, ly, lz);
+    boxR(B, q[0], q[1], q[2], w, h, d, yaw, rx, col, m);
+  };
+  const pol = opts && opts.pol;
+  const nb = [-fwd[0], 0, -fwd[1]];
   p(0, 0.45, 0, wid * 0.85, 0.7, len * 0.92, paint, 1); // lambung bawah
   p(0, 0.85, -0.1, wid, 0.35, len, [0.92, 0.92, 0.90], 5); // dek
+  for (const sx of [-1, 1]) { // rel gunwale + strip putih atas
+    p(sx * wid * 0.44, 1.05, 0, 0.14, 0.35, len * 0.82, paint, 1);
+    p(sx * wid * 0.44, 1.24, 0, 0.16, 0.06, len * 0.82, [0.95, 0.95, 0.93], 5);
+  }
+  pp(0, 1.0, len * 0.30, wid * 0.7, 0.22, len * 0.34, paint, 1, -0.38); // haluan miring naik
+  p(0, 1.15, len * 0.47, 0.14, 0.5, 0.14, pol ? [0.93, 0.95, 0.96] : paint, 1); // stem peak
+  p(0, 0.86, -len / 2 - 0.02, wid * 0.9, 0.08, 0.06, [0.95, 0.95, 0.93], 5); // rub rail transom
+  p(0, 0.28, -len / 2 - 0.02, wid * 0.88, 0.1, 0.06, [0.95, 0.95, 0.93], 5); // strip waterline
   p(0, 1.15, -0.6, wid * 0.55, 0.45, len * 0.25, [0.12, 0.13, 0.16], 2); // konsol + kaca
-  p(0, 1.05, len * 0.30, wid * 0.7, 0.25, len * 0.2, paint, 1); // haluan
-  for (const sx of [-0.32, 0.32]) p(sx * wid, 0.55, -len / 2 - 0.15, 0.22, 0.6, 0.3, [0.15, 0.15, 0.17], 5); // motor tempel
-  const nb = [-fwd[0], 0, -fwd[1]];
+  pp(0, 1.35, -0.35, wid * 0.5, 0.5, 0.06, [0.10, 0.16, 0.28], 2, -0.5); // kaca depan miring
+  if (pol) { // light bar polisi di atap konsol (identitas dari belakang)
+    p(0, 1.45, -0.6, 1.1, 0.22, 0.4, [0.08, 0.08, 0.10], 5);
+    const l1 = at(-0.28, 1.45, -0.82), l2 = at(0.28, 1.45, -0.82);
+    billDir(B, l1[0], l1[1], l1[2], 0.4, 0.18, nb, [1.0, 0.12, 0.15], 4);
+    billDir(B, l2[0], l2[1], l2[2], 0.4, 0.18, nb, [0.15, 0.35, 1.0], 4);
+  } else if (opts && opts.driver) { // driver: rompi oranye + helm kuning
+    p(0, 1.15, -1.45, 0.62, 0.42, 0.34, [1.0, 0.35, 0.12], 5);
+    p(0, 1.55, -1.45, 0.38, 0.32, 0.38, [1.0, 0.82, 0.24], 4);
+    const vs = at(0, 1.55, -1.65);
+    billDir(B, vs[0], vs[1], vs[2], 0.3, 0.12, nb, [0.10, 0.10, 0.12], 5); // visor belakang
+  }
+  for (const sx of [-0.32, 0.32]) { // motor tempel: kaki gelap + cowl warna lambung + pita putih
+    p(sx * wid, 0.35, -len / 2 - 0.18, 0.2, 0.7, 0.26, [0.15, 0.15, 0.17], 5);
+    p(sx * wid, 0.85, -len / 2 - 0.15, 0.3, 0.3, 0.3, paint, 1);
+    const bs = at(sx * wid, 0.45, -len / 2 - 0.33);
+    billDir(B, bs[0], bs[1], bs[2], 0.22, 0.1, nb, [0.85, 0.87, 0.9], 5);
+  }
   const ps = at(0, 0.5, -len / 2 - 0.35);
   billDir(G, ps[0], ps[1], ps[2], wid * 1.4, 0.5, nb, [0.9, 0.95, 1.0], 7); // sembur prop wash
+  // V-wake Kelvin (~19.5 deg) + buih + rooster tail (Canvas boat3d)
+  const wc = [0.9, 0.95, 1.0];
+  for (const sg of [-1, 1]) {
+    const a = 19.5 * Math.PI / 180;
+    const dx = -fwd[0] * Math.cos(a) + sg * rgt[0] * Math.sin(a);
+    const dz = -fwd[1] * Math.cos(a) + sg * rgt[1] * Math.sin(a);
+    const S0 = at(sg * wid * 0.32, 0.09, len * 0.30);
+    const L1 = len * 1.1, px = -dz, pz = dx;
+    quad(G, [S0[0] - px * 0.08, 0.09, S0[2] - pz * 0.08], [S0[0] + px * 0.08, 0.09, S0[2] + pz * 0.08],
+      [S0[0] + dx * L1 + px * 0.35, 0.09, S0[2] + dz * L1 + pz * 0.35],
+      [S0[0] + dx * L1 - px * 0.35, 0.09, S0[2] + dz * L1 - pz * 0.35],
+      [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], wc, 8);
+    const sf = at(sg * wid * 0.5, 0.09, -len * 0.42); // spray sudut transom
+    quad(G, [sf[0] - px * 0.05, 0.09, sf[2] - pz * 0.05], [sf[0] + px * 0.05, 0.09, sf[2] + pz * 0.05],
+      [sf[0] + dx * 0.9 + px * 0.3, 0.09, sf[2] + dz * 0.9 + pz * 0.3],
+      [sf[0] + dx * 0.9 - px * 0.3, 0.09, sf[2] + dz * 0.9 - pz * 0.3],
+      [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], wc, 8);
+  }
+  for (let i = 0; i < 3; i += 1) { // buih diamond di belakang transom
+    const fc = -len / 2 - (0.7 + i * 0.8), sd = i % 2 === 0 ? -1 : 1;
+    const rc = sd * (0.18 + i * 0.26), hs = 0.3 + i * 0.05;
+    const d0 = at(rc, 0.09, fc - hs), d1 = at(rc - hs * 0.7, 0.09, fc);
+    const d2 = at(rc, 0.09, fc + hs), d3 = at(rc + hs * 0.7, 0.09, fc);
+    quad(G, [d0[0], 0.09, d0[2]], [d1[0], 0.09, d1[2]], [d2[0], 0.09, d2[2]], [d3[0], 0.09, d3[2]],
+      [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], wc, 8);
+  }
+  const r0 = at(-0.26, 0.5, -len / 2 - 0.25), r1 = at(0.26, 0.5, -len / 2 - 0.25);
+  const r2 = at(0.07, 0.9, -len / 2 - 0.95), r3 = at(-0.07, 0.9, -len / 2 - 0.95);
+  quad(G, [r0[0], 0.5, r0[2]], [r1[0], 0.5, r1[2]], [r2[0], 0.9, r2[2]], [r3[0], 0.9, r3[2]],
+    nb, [[0, 0], [1, 0], [1, 1], [0, 1]], wc, 8); // rooster tail miring
 }
 // Gedung: box + neon sign (di muka ke arah jalan terdekat) + AC rooftop (height 3).
 function bld(B, G, b, idx, facK) { // SIANG v2: facK = pengali kecerahan fasad ikut preset (siang 0.72; lainnya 0.55 = lama)
@@ -491,21 +552,26 @@ function lamp(B, G, x, z, k) { // TOD: k = preset.lamp (0 siang — 1 malam). Ti
 }
 function palm(B, x, z) {
   box(B, x, 2.2, z, 0.28, 4.4, 0.28, [0.12, 0.09, 0.07], 5);
-  box(B, x, 4.35, z, 4.0, 0.12, 0.4, [0.05, 0.12, 0.06], 5);
-  box(B, x, 4.35, z, 0.4, 0.12, 4.0, [0.05, 0.12, 0.06], 5);
+  box(B, x, 4.6, z, 2.2, 1.2, 2.2, [0.12, 0.36, 0.18], 5); // R26b: kanopi kotak (slab lama = T hitam)
 }
 // Helikopter polisi: badan + ekor + rotor (putar, yaw = rotor) + beacon merah.
+// Rotor DULU hitam [0.03] di langit senja = tak terlihat, badan [0.08,0.12,0.35]
+// jadi kotak cokelat. Kini rotor terang ala Canvas heli3d (#c8cdd6), badan
+// lebih terang, kaca kokpit + stabilizer ekor + skid terang.
 function heli(B, G, x, z, rotor, t) {
   const y = 14;
-  box(B, x, y, z, 2.4, 1.7, 4.2, [0.08, 0.12, 0.35], 1);
-  box(B, x, y + 0.4, z - 3.4, 0.5, 0.5, 3.4, [0.08, 0.12, 0.35], 1);
-  box(B, x, y + 0.9, z - 5.0, 0.3, 1.4, 0.9, [0.08, 0.12, 0.35], 1);
-  boxR(B, x, y + 1.05, z, 7.5, 0.1, 0.5, rotor, 0, [0.03, 0.03, 0.03], 5); // rotor utama
-  boxR(B, x, y + 0.9, z - 5.1, 0.1, 1.6, 0.3, 0, 0, [0.03, 0.03, 0.03], 5); // rotor ekor
-  box(B, x, y - 1.1, z + 0.6, 1.8, 0.25, 0.4, DARK, 5);
-  box(B, x, y - 1.1, z - 0.6, 1.8, 0.25, 0.4, DARK, 5);
+  const BODY = [0.14, 0.20, 0.38];
+  box(B, x, y, z, 2.4, 1.7, 4.2, BODY, 1);
+  box(B, x, y + 0.4, z - 3.4, 0.5, 0.5, 3.4, BODY, 1);
+  box(B, x, y + 0.9, z - 5.0, 0.3, 1.4, 0.9, BODY, 1);
+  box(B, x, y + 0.55, z - 4.9, 2.2, 0.08, 0.5, [0.75, 0.78, 0.82], 5); // stabilizer ekor
+  boxR(B, x, y + 1.05, z, 7.5, 0.06, 0.9, rotor, 0, [0.78, 0.80, 0.84], 5); // rotor utama terang
+  boxR(B, x, y + 0.9, z - 5.1, 0.1, 1.6, 0.3, 0, 0, [0.78, 0.80, 0.84], 5); // rotor ekor terang
+  box(B, x, y + 0.15, z + 2.05, 1.5, 0.7, 0.18, [0.45, 0.65, 0.85], 2); // kaca kokpit
+  box(B, x, y - 1.1, z + 0.6, 1.8, 0.25, 0.4, [0.5, 0.52, 0.55], 5); // skid terang
+  box(B, x, y - 1.1, z - 0.6, 1.8, 0.25, 0.4, [0.5, 0.52, 0.55], 5);
   if (Math.sin(t * 6) > 0) billDir(B, x, y + 1.3, z, 0.5, 0.3, [0, 0, -1], [1.0, 0.1, 0.1], 4);
-  // searchlight: quad additif miring ke bawah (ke arah hero — digambar di buildFrame)
+  // searchlight: kerucut digambar di buildFrame (di bawah, butuh posisi hero)
 }
 // Orang jalan kaki: badan + kepala.
 function person(B, x, z, yaw, col) {
@@ -678,8 +744,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     }
   } else if (p.inBoat && p.boat) {
     const b = p.boat;
-    boat(OP, GL, b.x * S, b.y * S, yawOf(b), (b.length || 54) * S, (b.width || 20) * S, hx(b.color || '#e8e4d8'));
-    for (const wk of (b.wake || []).slice(0, 12)) flat(GL, wk.x * S, 0.1, wk.y * S, 2.5, 2.5, [0.9, 0.95, 1.0], 8);
+    boat(OP, GL, b.x * S, b.y * S, yawOf(b), (b.length || 54) * S, (b.width || 20) * S, hx(b.color || '#e8e4d8'), { driver: true });
   } else {
     person(OP, p.x * S, p.y * S, yawOf(p), [0.95, 0.8, 0.2]);
   }
@@ -714,6 +779,9 @@ function buildFrame(state, cam, OP, SH, GL, t) {
         drawCar(u.car, true, u);
       }
       if (u.concrete) box(OP, u.car.x * S, 0.7, u.car.y * S, 3, 1.4, 1.2, [0.55, 0.55, 0.58], 5);
+    } else if (u.kind === 'boat') { // perahu polisi: biru + light bar (Canvas city3d.js:1651)
+      if (!near(u.x, u.y, R)) continue;
+      boat(OP, GL, u.x * S, u.y * S, yawOf(u), 54 * S, 20 * S, [0.18, 0.44, 0.82], { pol: true });
     } else if (u.x !== undefined && near(u.x, u.y, 1200)) {
       person(OP, u.x * S, u.y * S, yawOf(u), [0.15, 0.30, 0.65]);
     }
@@ -728,6 +796,10 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   if (hl && hl.active) {
     heli(OP, GL, hl.x * S, hl.y * S, hl.rotor || 0, t);
     flat(GL, hx0 * S, 0.07, hy0 * S, 12, 12, [1.0, 0.9, 0.6], 7);
+    const rx2 = cam.fwd[1], rz2 = -cam.fwd[0]; // right kamera = lebar beam
+    quad(GL, [hl.x * S - rx2 * 0.5, 13, hl.y * S - rz2 * 0.5], [hl.x * S + rx2 * 0.5, 13, hl.y * S + rz2 * 0.5],
+      [hx0 * S + rx2 * 1.2, 0.1, hy0 * S + rz2 * 1.2], [hx0 * S - rx2 * 1.2, 0.1, hy0 * S - rz2 * 1.2],
+      [cam.fwd[0], 0, cam.fwd[1]], [[0, 0], [1, 0], [1, 1], [0, 1]], [1.0, 0.9, 0.6], 7); // kerucut searchlight
   }
 
   // Perahu (bukan hero) + UFO + pejalan kaki + collectible.
@@ -735,7 +807,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     if (!b || b.alive === false) continue;
     if (p.inBoat && p.boat === b) continue;
     if (!near(b.x, b.y, R)) continue;
-    boat(OP, GL, b.x * S, b.y * S, yawOf(b), (b.length || 54) * S, (b.width || 20) * S, hx(b.color || '#e8e4d8'));
+    boat(OP, GL, b.x * S, b.y * S, yawOf(b), (b.length || 54) * S, (b.width || 20) * S, hx(b.color || '#e8e4d8'), { driver: true });
   }
   if (state.ufo && state.ufo.active) {
     box(OP, state.ufo.x * S, 30, state.ufo.y * S, 6, 1, 6, [0.7, 0.85, 0.9], 5);
@@ -836,7 +908,7 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     moon: gl.getUniformLocation(PS, 'uMoon'), stars: gl.getUniformLocation(PS, 'uStars'),
     cloud: gl.getUniformLocation(PS, 'uCloud'), cloudK: gl.getUniformLocation(PS, 'uCloudK'),
     smog: gl.getUniformLocation(PS, 'uSmog'), skyDim: gl.getUniformLocation(PS, 'uSkyDim'),
-    sunK: gl.getUniformLocation(PS, 'uSunK'),
+    sunK: gl.getUniformLocation(PS, 'uSunK'), asp: gl.getUniformLocation(PS, 'uAsp'),
   };
   const OP = newBucket(), SH = newBucket(), GL = newBucket(), GLSH = newBucket(), GL2 = newBucket();
   const bufOP = makeBufSet(), bufSH = makeBufSet(), bufGL = makeBufSet(), bufGLSH = makeBufSet(), bufGL2 = makeBufSet();
@@ -914,7 +986,7 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     gl.uniform3fv(skyU.sunDisc, new Float32Array(U.sunDisc)); gl.uniform3fv(skyU.sunGlow, new Float32Array(U.sunGlow));
     gl.uniform1f(skyU.moon, U.moon); gl.uniform1f(skyU.stars, U.stars);
     gl.uniform3fv(skyU.cloud, new Float32Array(U.cloud)); gl.uniform1f(skyU.cloudK, U.cloudK);
-    gl.uniform1f(skyU.smog, U.smog); gl.uniform1f(skyU.skyDim, U.skyDim); gl.uniform1f(skyU.sunK, U.sunK);
+    gl.uniform1f(skyU.smog, U.smog); gl.uniform1f(skyU.skyDim, U.skyDim); gl.uniform1f(skyU.sunK, U.sunK); gl.uniform1f(skyU.asp, VW / VH);
     gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf);
     const sa = gl.getAttribLocation(PS, 'aP');
     gl.vertexAttribPointer(sa, 2, gl.FLOAT, false, 0, 0); gl.enableVertexAttribArray(sa);
