@@ -17,9 +17,9 @@ export function districtAt(city, x, y) {
   }
   return city.districts[city.districts.length - 1];
 }
-export function onRoad(city, x, y) {
-  for (const rx of city.roadsV) if (Math.abs(x - rx) <= ROAD_W / 2) return true;
-  for (const ry of city.roadsH) if (Math.abs(y - ry) <= ROAD_W / 2) return true;
+export function onRoad(city, x, y, m = 0) {
+  for (const rx of city.roadsV) if (Math.abs(x - rx) <= ROAD_W / 2 + m) return true;
+  for (const ry of city.roadsH) if (Math.abs(y - ry) <= ROAD_W / 2 + m) return true;
   return false;
 }
 export function buildingAt(city, x, y, r) {
@@ -31,7 +31,12 @@ export function buildingAt(city, x, y, r) {
 export function collides(city, x, y, r) {
   if (x < r || y < r || x > WORLD_W - r || y > WORLD_H - r) return true;
   if (x > WATER_X - r) return true;
-  return buildingAt(city, x, y, r) !== null;
+  if (buildingAt(city, x, y, r) !== null) return true;
+  for (const t of city.trees || []) {
+    const dx = x - t.x, dy = y - t.y;
+    if (dx * dx + dy * dy < (r + t.r) * (r + t.r)) return true;
+  }
+  return false;
 }
 export function moveCircle(city, pos, dx, dy, r) {
   const nx = pos.x + dx;
@@ -69,6 +74,10 @@ export function pathBlocked(city, x1, y1, x2, y2) {
     const x = x1 + (x2 - x1) * t;
     const y = y1 + (y2 - y1) * t;
     if (buildingAt(city, x, y, 18)) return true;
+    for (const tr of city.trees || []) {
+      const dx = x - tr.x, dy = y - tr.y;
+      if (dx * dx + dy * dy < 1600) return true;
+    }
   }
   return false;
 }

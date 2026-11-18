@@ -1,11 +1,11 @@
 import { CAR, PLAYER, STEP, UFO_DURATION, UFO_HOUR, WANTED, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, buildCity, collides, districtAt, moveCircle } from './city.js';
 import { createBullets, fireWeapon, stepBullets } from './combat.js';
-import { BOAT_ACCEL, BOAT_MAX_SPEED, createBoats, nearestBoat, stepBoats } from './boats.js';
+import { BOAT_ACCEL, BOAT_MAX_SPEED, boatHitsObstacle, createBoats, nearestBoat, stepBoats } from './boats.js';
 import { claimPinkTaxi, createArmored, createCollectibles, createMissionState, createPizza, createRace, createTaxi, createWeaponPickups, loadCheckpoint, maxCarHp, repairAtGarage, resprayAtGarage, saveCheckpoint, targetForMission, updateArmored, updateMission, updatePickups, updatePizza, updateRace, updateTaxi } from './missions.js';
 import { addWanted, clearPolice, createPolice, decayWanted, spawnPoliceUnit, stepPolice } from './police.js';
 import { createPedestrians, createTraffic, stepPedestrians, stepTraffic } from './traffic.js';
-import { createBridge, stepBridge } from './drawbridge.js';
+import { createBridge, leafHit, stepBridge } from './drawbridge.js';
 export const EVENT_OVER = 1;
 export const EVENT_BUSTED = 2;
 export function createWorld(rng, savedMission) {
@@ -251,8 +251,10 @@ export function createWorld(rng, savedMission) {
     if (Math.abs(boat.speed) > 5) {
       boat.angle += steer * 2.4 * dt * Math.sign(boat.speed) * Math.min(1, Math.abs(boat.speed) / 150);
     }
-    boat.x += Math.cos(boat.angle) * boat.speed * dt;
-    boat.y += Math.sin(boat.angle) * boat.speed * dt;
+    const nbx = boat.x + Math.cos(boat.angle) * boat.speed * dt;
+    const nby = boat.y + Math.sin(boat.angle) * boat.speed * dt;
+    if (!boatHitsObstacle(nbx, nby, 27)) { boat.x = nbx; boat.y = nby; }
+    else boat.speed *= -0.25;
     boat.x = Math.max(WATER_X + 16, Math.min(WORLD_W - 16, boat.x));
     boat.y = Math.max(16, Math.min(WORLD_H - 16, boat.y));
     if (Math.abs(boat.speed) > 120) {
@@ -459,13 +461,15 @@ export function createWorld(rng, savedMission) {
     car.slide = wet ? (car.slide || 0) * 0.98 + steer * car.speed * dt * 0.7 : (car.slide || 0) * 0.9;
     const nx = car.x + (Math.cos(car.angle) * car.speed - Math.sin(car.angle) * car.slide) * dt;
     const ny = car.y + (Math.sin(car.angle) * car.speed + Math.cos(car.angle) * car.slide) * dt;
-    if (collides(city, nx, car.y, 22)) {
+    const cr = car.body === 'van' ? 30 : 26;
+    const leafBlock = Math.abs(car.speed) < 300;
+    if (collides(city, nx, car.y, cr) || (leafBlock && !leafHit(state.bridge, car.x, car.y, cr) && leafHit(state.bridge, nx, car.y, cr))) {
       car.speed *= -0.25;
       state.events.crash = true;
     } else {
       car.x = nx;
     }
-    if (collides(city, car.x, ny, 22)) {
+    if (collides(city, car.x, ny, cr) || (leafBlock && !leafHit(state.bridge, car.x, car.y, cr) && leafHit(state.bridge, car.x, ny, cr))) {
       car.speed *= -0.25;
       state.events.crash = true;
     } else {

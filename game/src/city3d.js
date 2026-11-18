@@ -32,10 +32,10 @@ for(let z=10;z<900;z+=24+R()*10){
   const mk=sd=>{const w=14+R()*12,d=12+R()*8,h=16+R()*R()*55;B.push({x:sd*(19+w/2+R()*10),z:z+d/2,w,d,h,bi:B.length,c:[[26,28,46],[34,32,58],[22,24,40],[30,26,50]][R()*4|0]});};
   mk(-1);if(z<150||z>260)mk(1);
 }
-function wins(b){const{x,z:zf,w,h,bi}=b,nc=Math.max(2,w/3.4|0),nr=Math.max(3,h/4.4|0),t=hz(zf-camZ);
-  for(let i=0;i<nc;i++)for(let j=0;j<nr;j++){const q=h2(bi*131+i*7,j*3+1);if(q<.45)continue;
-    const wx=x-w/2+1.2+(w-2.4)*(i+.15)/nc,wy=2+(h-3)*(j+.2)/nr,ww=(w-2.4)/nc*.62,wh=(h-3)/nr*.6;
-    const c=q<.78?[255,205,120]:q<.9?[120,215,255]:[255,150,90];
+function wins(b){const{x,z:zf,w,h,bi}=b,nc=Math.max(2,w/2.6|0),nr=Math.max(3,h/3.4|0),t=hz(zf-camZ);
+  for(let i=0;i<nc;i++)for(let j=0;j<nr;j++){const q=h2(bi*131+i*7,j*3+1),q2=h2(bi*17+i*3,j*11+5);
+    const wx=x-w/2+1.2+(w-2.4)*(i+.15)/nc,wy=2+(h-3)*(j+.2)/nr,ww=(w-2.4)/nc*.62*(.75+.5*q2),wh=(h-3)/nr*.6*(.8+.4*q2);
+    const c=q<.3?[255,205,120]:q<.45?[120,215,255]:q<.62?[255,150,90]:q2<.5?[52,66,88]:[34,44,62];
     Q([wx,wy,zf],[wx+ww,wy,zf],[wx+ww,wy+wh,zf],[wx,wy+wh,zf],mix(c,t),zf-camZ);}}
 function bld(b){const{x,z,w,d,h,c}=b,zf=z-d/2,zb=z+d/2,dep=zf-camZ;if(dep<35)return;const sx=x>0?x-w/2:x+w/2;
   Q([x-w/2,0,zf],[x+w/2,0,zf],[x+w/2,h,zf],[x-w/2,h,zf],sh(c,.8,hz(dep)),dep);
@@ -48,11 +48,18 @@ function car(o){const{x,z,w,h,l,c}=o,zb=z-l/2,zf=z+l/2,dep=zb-camZ,t=hz(dep);
   const sx=x>0?x-w/2:x+w/2;
   Q([sx,0,zb],[sx,0,zf],[sx,h*.92,zf],[sx,h,zb],sh(c,.95,t),dep);
   const tl=o.pol?[[255,60,60],[60,120,255]]:[[255,70,90],[255,70,90]];
-  if(o.hero)Q([x-w/2+.2,h-.06,zb-.08],[x+w/2-.2,h-.06,zb-.08],[x+w/2-.2,h+.1,zb-.08],[x-w/2+.2,h+.1,zb-.08],mix([255,90,140],t),dep);
+  if(o.hero){Q([x-w/2+.2,h-.06,zb-.08],[x+w/2-.2,h-.06,zb-.08],[x+w/2-.2,h+.1,zb-.08],[x-w/2+.2,h+.1,zb-.08],mix([255,90,140],t),dep);
+    Q([x-w/2+.3,h*.44,zb-.07],[x+w/2-.3,h*.44,zb-.07],[x+w/2-.3,h*.49,zb-.07],[x-w/2+.3,h*.49,zb-.07],'rgba(0,0,0,.5)',dep);
+    Q([x-w/2+.2,h*.84,zb-.07],[x+w/2-.2,h*.84,zb-.07],[x+w/2-.2,h*.88,zb-.07],[x-w/2+.2,h*.88,zb-.07],'rgba(0,0,0,.4)',dep);
+    Q([x-w/2-.5,h*.8,zb-.3],[x-w/2-.1,h*.8,zb-.3],[x-w/2-.1,h*.95,zb-.3],[x-w/2-.5,h*.95,zb-.3],mix([20,22,30],t),dep);
+    Q([x+w/2+.1,h*.8,zb-.3],[x+w/2+.5,h*.8,zb-.3],[x+w/2+.5,h*.95,zb-.3],[x+w/2+.1,h*.95,zb-.3],mix([20,22,30],t),dep);
+    Q([x-.25,h+.02,zb-.4],[x+.25,h+.02,zb-.4],[x+.25,h+.22,zb-.4],[x-.25,h+.22,zb-.4],mix([20,22,30],t),dep);}
   Q([x-w/2+.3,.55,zb-.06],[x-w/2+1.1,.55,zb-.06],[x-w/2+1.1,.85,zb-.06],[x-w/2+.3,.85,zb-.06],mix(tl[0],t),dep);
   Q([x+w/2-1.1,.55,zb-.06],[x+w/2-.3,.55,zb-.06],[x+w/2-.3,.85,zb-.06],[x+w/2-1.1,.85,zb-.06],mix(tl[1],t),dep);
-  Q([x-w/2+.2,0,zb-.05],[x-w/2+1,0,zb-.05],[x-w/2+1,.6,zb-.05],[x-w/2+.2,.6,zb-.05],'#0a0a0e',dep);
-  Q([x+w/2-1,0,zb-.05],[x+w/2-.2,0,zb-.05],[x+w/2-.2,.6,zb-.05],[x+w/2-1,.6,zb-.05],'#0a0a0e',dep);
+  Q([x-w/2+.1,0,zb-.05],[x-w/2+1.2,0,zb-.05],[x-w/2+1.2,.75,zb-.05],[x-w/2+.1,.75,zb-.05],'#0a0a0e',dep);
+  Q([x+w/2-1.2,0,zb-.05],[x+w/2-.1,0,zb-.05],[x+w/2-.1,.75,zb-.05],[x+w/2-1.2,.75,zb-.05],'#0a0a0e',dep);
+  Q([x-w/2+.35,.15,zb-.08],[x-w/2+.95,.15,zb-.08],[x-w/2+.95,.6,zb-.08],[x-w/2+.35,.6,zb-.08],'#8a8f98',dep);
+  Q([x+w/2-.95,.15,zb-.08],[x+w/2-.35,.15,zb-.08],[x+w/2-.35,.6,zb-.08],[x+w/2-.95,.6,zb-.08],'#8a8f98',dep);
   if(o.pol){Q([x-1,h+.05,zb-.4],[x-.1,h+.05,zb-.4],[x-.1,h+.35,zb-.4],[x-1,h+.35,zb-.4],'#ff4040',dep);
     Q([x+.1,h+.05,zb-.4],[x+1,h+.05,zb-.4],[x+1,h+.35,zb-.4],[x+.1,h+.35,zb-.4],'#4080ff',dep);}}
 function sign(sd,z0,z1,txt,col){const b=B.find(b=>(b.x>0)===(sd>0)&&b.z>z0&&b.z<z1);if(!b)return;
@@ -230,11 +237,11 @@ function box3(cx, y0, cz, w, h, d, a, col, fogD, depOff) {
   QW(f5, shadeK < 1 ? shW(c, 0.65 * shadeK + 0.22, t) : sh(c, 0.65 * shadeK, t), dep(f5));
 }
 // vertical quad facing along yaw a, centered fOff forward / rOff right of (cx, cz)
-function vQuad(cx, cz, a, fOff, rOff, w, y0, y1, col) {
+function vQuad(cx, cz, a, fOff, rOff, w, y0, y1, col, dep) {
   const fx = Math.cos(a), fz = Math.sin(a), rx = -fz, rz = fx;
   const bx = cx + fx * fOff + rx * rOff, bz = cz + fz * fOff + rz * rOff;
   const hw = w / 2;
-  QW([[bx - rx * hw, y0, bz - rz * hw], [bx + rx * hw, y0, bz + rz * hw], [bx + rx * hw, y1, bz + rz * hw], [bx - rx * hw, y1, bz - rz * hw]], col);
+  QW([[bx - rx * hw, y0, bz - rz * hw], [bx + rx * hw, y0, bz + rz * hw], [bx + rx * hw, y1, bz + rz * hw], [bx - rx * hw, y1, bz - rz * hw]], col, dep);
 }
 // flat ground quad, world-px rect (x0,y0)-(x1,y1), at height y (3D units).
 // Depth = farthest corner: ground is always UNDER everything above it, so it
@@ -264,6 +271,10 @@ function car3d(wx, wy, angle, len, wid, color, o) {
   let L = len * CS, Wd = wid * CS;
   const bodyH = o.hero ? 0.72 : 0.8;
   if (o.hero) Wd *= 1.08; // F2: hero car reads wider / lower
+  // T2: vehicle-type recipes (T1 supplies o.type from traffic.js; default sedan).
+  // Only body height changes here — the type features live at the end of car3d.
+  const VT = { bus: 2.1, fire: 1.7, ambulance: 1.55, apc: 1.35, van: 1.7, pickup: 1.15, taxi: 1 }[o.type || 'sedan'] || 1;
+  const BH = bodyH * VT;
   const cx = wx * CS, cz = wy * CS;
   const dep = Math.hypot(cx - ccX, cz - ccZ);
   const fx = Math.cos(angle), fz = Math.sin(angle);
@@ -272,48 +283,132 @@ function car3d(wx, wy, angle, len, wid, color, o) {
   flatQuad(wx - len / 2 - 1, wy - wid / 2 - 1, wx + len / 2 + 1, wy + wid / 2 + 1, 0.025, 'rgba(0,0,0,0.45)');
   if (o.hero) flatQuad(wx - len / 2 - 6, wy - wid / 2 - 6, wx + len / 2 + 6, wy + wid / 2 + 6, 0.03, 'rgba(255,77,157,0.28)');
   // V2 dark outline: a slightly larger dark shell, forced behind the body
-  box3(cx, 0.1, cz, Wd + 0.4, bodyH + 0.12, L + 0.4, angle, '#0a0a0e', dep, 2.5);
-  box3(cx, 0.15, cz, Wd, bodyH, L, angle, color, dep);
+  box3(cx, 0.1, cz, Wd + 0.4, BH + 0.12, L + 0.4, angle, '#0a0a0e', dep, 2.5);
+  box3(cx, 0.15, cz, Wd, BH, L, angle, color, dep);
   const bx = cx - fx * L * 0.06, bz = cz - fz * L * 0.06;
   box3(bx, 0.95, bz, Wd * 0.78, 0.55, L * 0.52, angle, o.glass || '#1a2230', dep);
   // V1 rim light: warm strips on the cabin roof front edge + body top edges
   if (rimOn && o.rim !== false) {
     const rim = mix([255, 179, 92], hz(dep));
     topStrip(cx, cz, angle, L * 0.2, 0, Wd * 0.7, 0.4, 1.53, rim);
-    topStrip(cx, cz, angle, 0, -Wd / 2 + 0.06, L * 0.55, 0.22, 0.15 + bodyH + 0.03, rim);
-    topStrip(cx, cz, angle, 0, Wd / 2 - 0.06, L * 0.55, 0.22, 0.15 + bodyH + 0.03, rim);
+    topStrip(cx, cz, angle, 0, -Wd / 2 + 0.06, L * 0.55, 0.22, 0.15 + BH + 0.03, rim);
+    topStrip(cx, cz, angle, 0, Wd / 2 - 0.06, L * 0.55, 0.22, 0.15 + BH + 0.03, rim);
   }
   vQuad(cx, cz, angle, L * 0.2, 0, Wd * 0.7, 1.0, 1.42, 'rgba(120,180,230,0.5)');
   vQuad(cx, cz, angle, -L * 0.32, 0, Wd * 0.7, 1.0, 1.42, 'rgba(120,180,230,0.4)');
   for (const s of [-1, 1]) {
     vQuad(cx, cz, angle, -L / 2 - 0.06, s * Wd * 0.28, Wd * 0.22, 0.45, 0.72, o.hero ? '#ff5c7a' : '#ff3b30');
+    vQuad(cx, cz, angle, L / 2 + 0.05, s * Wd * 0.28, Wd * 0.3, 0.4, 0.76, '#0c0e14'); // T2: headlight housing
     vQuad(cx, cz, angle, L / 2 + 0.06, s * Wd * 0.28, Wd * 0.22, 0.45, 0.7, '#ffe9a8');
-    const wxp = cx + fx * (L / 2 - 0.7) + (-fz) * s * (Wd / 2 - 0.18), wzp = cz + fz * (L / 2 - 0.7) + fx * s * (Wd / 2 - 0.18);
-    box3(wxp, 0.05, wzp, 0.55, 0.5, 0.9, angle, '#0a0a0e', dep);
-    const wxp2 = cx - fx * (L / 2 - 0.7) + (-fz) * s * (Wd / 2 - 0.18), wzp2 = cz - fz * (L / 2 - 0.7) + fx * s * (Wd / 2 - 0.18);
-    box3(wxp2, 0.05, wzp2, 0.55, 0.5, 0.9, angle, '#0a0a0e', dep);
-    // hub: bright disc on the rear face of the rear wheel (seen from behind)
-    vQuad(cx, cz, angle, -(L / 2 - 0.7), s * (Wd / 2 - 0.18), 0.34, 0.16, 0.42, '#8a8f98');
+    // REWORK: hero wheels BIGGER + protruding past the body sides (they were
+    // flush + dark, invisible from behind at chase-cam distance).
+    const wOut = o.hero ? Wd / 2 - 0.05 : Wd / 2 - 0.16;
+    const wW = o.hero ? 0.8 : 0.62, wH = o.hero ? 0.72 : 0.58, wL = o.hero ? 1.15 : 0.95;
+    const wxp = cx + fx * (L / 2 - 0.7) + (-fz) * s * wOut, wzp = cz + fz * (L / 2 - 0.7) + fx * s * wOut;
+    box3(wxp, 0.05, wzp, wW, wH, wL, angle, '#0a0a0e', dep);
+    const wxp2 = cx - fx * (L / 2 - 0.7) + (-fz) * s * wOut, wzp2 = cz - fz * (L / 2 - 0.7) + fx * s * wOut;
+    box3(wxp2, 0.05, wzp2, wW, wH, wL, angle, '#0a0a0e', dep);
+    // REWORK hub v2: on the REAR face of the rear wheel, explicit dep in
+    // front of the body rear face. v1 put it on the wheel's OUTER face with
+    // a sign error (rOff) so it landed on the FRONT wheel and read as a
+    // 4px sliver at a grazing angle; the rear face is what chase-cam sees.
+    const hubW = o.hero ? 0.55 : 0.4, hubC = o.hero ? '#d8dce2' : '#c8ccd4';
+    const hubDep = dep - L / 2 - 0.5;
+    vQuad(cx, cz, angle, -(L / 2 - 0.7), s * wOut, hubW, 0.12, 0.5, hubC, hubDep);
+    vQuad(cx, cz, angle, -(L / 2 - 0.7), s * wOut, o.hero ? 0.22 : 0.14, 0.22, 0.4, '#20242a', hubDep);
+    // T2: side character line + door seam + handle + mirror (one per side)
+    const lx = (-fz) * s * (Wd / 2 + 0.03), lz = fx * s * (Wd / 2 + 0.03);
+    // REWORK: thin 0.05 lines vanish at chase-cam distance — thicker line
+    // + lower rub strip + a sky streak on the side glass (visible side).
+    const clW = o.hero ? 0.09 : 0.05;
+    box3(cx + lx, 0.48, cz + lz, clW, 0.07, L * 0.62, angle, '#14141a', dep);
+    if (o.hero) box3(cx + lx, 0.3, cz + lz, clW, 0.06, L * 0.5, angle, '#14141a', dep);
+    if (o.hero) vQuad(cx, cz, angle + Math.PI / 2, s * (Wd / 2 + 0.03), -L * 0.08, L * 0.42, 1.06, 1.34, 'rgba(150,195,235,0.55)');
+    box3(cx + fx * (L * 0.08) + lx, 0.35, cz + fz * (L * 0.08) + lz, 0.05, 0.5, 0.08, angle, '#14141a', dep);
+    box3(cx + fx * (L * 0.05) + lx, 0.64, cz + fz * (L * 0.05) + lz, 0.05, 0.05, 0.3, angle, '#0c0e14', dep);
+    box3(cx + fx * (L * 0.22) + lx * 1.6, 1.0, cz + fz * (L * 0.22) + lz * 1.6, 0.24, 0.16, 0.14, angle, '#14141a', dep);
   }
+  // T2: front grill (all cars) — dark band across the nose, below the lights
+  vQuad(cx, cz, angle, L / 2 + 0.07, 0, Wd * 0.7, 0.28, 0.44, '#0c0e14');
   if (o.hero) {
     // round 21 hero rear (all emissive / reflective: raw colours, no shadeK)
-    vQuad(cx, cz, angle, -L / 2 - 0.08, 0, Wd * 0.94, 0.5, 0.8, '#ff2a4a'); // taillight bar, full width
-    vQuad(cx, cz, angle, -L / 2 - 0.1, 0, Wd * 0.94, 0.58, 0.72, '#ff6b85'); // hot core of the bar
-    vQuad(cx, cz, angle, -L * 0.32, 0, Wd * 0.68, 1.02, 1.4, 'rgba(255,176,102,0.55)'); // rear glass: sunset reflection
-    vQuad(cx, cz, angle, -L * 0.32, 0, Wd * 0.68, 1.28, 1.4, 'rgba(255,220,160,0.5)'); // sky streak across the glass
+    vQuad(cx, cz, angle, -L / 2 - 0.08, 0, Wd * 0.96, 0.48, 0.86, '#ff2a4a'); // REWORK: thicker taillight bar, full width
+    vQuad(cx, cz, angle, -L / 2 - 0.1, 0, Wd * 0.96, 0.56, 0.8, '#ff7d95'); // hot core of the bar
+    vQuad(cx, cz, angle, -L / 2 - 0.075, 0, Wd * 0.94, 0.44, 0.48, 'rgba(0,0,0,0.6)'); // dark gap below the bar
+    vQuad(cx, cz, angle, -L * 0.32 - 0.07, 0, Wd * 0.72, 1.0, 1.42, 'rgba(150,195,235,0.78)', dep - L / 2 - 1.0); // REWORK rear glass: pale sky glass + explicit dep (a red rear quad at d=14.00 covered it)
+    vQuad(cx, cz, angle, -L * 0.32 - 0.07, Wd * 0.1, Wd * 0.42, 1.06, 1.4, 'rgba(255,228,175,0.9)', dep - L / 2 - 1.0); // bright sky streak
+    vQuad(cx, cz, angle, -L * 0.32 - 0.07, -Wd * 0.18, Wd * 0.18, 1.3, 1.4, 'rgba(255,200,130,0.55)', dep - L / 2 - 1.0); // second warm streak
     topStrip(cx, cz, angle, -L * 0.32, 0, Wd * 0.68, 0.3, 1.44, 'rgba(255,200,130,0.8)'); // glass top rim
-    box3(cx - fx * (L / 2 - 0.3), 1.02, cz - fz * (L / 2 - 0.3), Wd * 0.92, 0.09, 0.5, angle, '#14141a', dep); // spoiler
+    box3(cx - fx * (L / 2 - 0.3), 1.02, cz - fz * (L / 2 - 0.3), Wd * 0.96, 0.09, 0.5, angle, '#14141a', dep); // spoiler
     topStrip(cx, cz, angle, -(L / 2 - 0.3), 0, Wd * 0.9, 0.5, 1.13, 'rgba(255,179,92,0.9)'); // spoiler rim light
     vQuad(cx, cz, angle, -L / 2 - 0.07, 0, Wd * 0.96, 0.12, 0.38, '#14141a'); // lower bumper
-    vQuad(cx, cz, angle, -L / 2 - 0.09, -Wd * 0.3, 0.2, 0.16, 0.34, '#c8ccd4'); // exhaust L
-    vQuad(cx, cz, angle, -L / 2 - 0.09, Wd * 0.3, 0.2, 0.16, 0.34, '#c8ccd4'); // exhaust R
-    vQuad(cx, cz, angle, -L / 2 - 0.07, 0, 0.55, 0.26, 0.46, '#e8e4d8'); // plate
-    vQuad(cx, cz, angle, -L / 2 - 0.05, 0, Wd * 0.96, 0.2, 0.85, 'rgba(255,150,90,0.16)'); // warm bounce wash
+    vQuad(cx, cz, angle, -L / 2 - 0.26, -Wd * 0.3, 0.2, 0.16, 0.34, '#c8ccd4'); // exhaust L
+    vQuad(cx, cz, angle, -L / 2 - 0.26, Wd * 0.3, 0.2, 0.16, 0.34, '#c8ccd4'); // exhaust R
+    vQuad(cx, cz, angle, -L / 2 - 0.26, 0, 0.55, 0.26, 0.46, '#e8e4d8'); // plate
+    vQuad(cx, cz, angle, -L / 2 - 0.27, 0, Wd * 0.96, 0.38, 0.85, 'rgba(255,150,90,0.16)'); // warm bounce wash
     topStrip(cx, cz, angle, L * 0.2, 0, Wd * 0.7, 0.4, 1.53, 'rgba(255,210,140,0.95)'); // roof Fresnel: sky in the paint
+    // T2: trunk seam + deck edge + bigger bumper + diffuser + shark fin + glass frame
+    vQuad(cx, cz, angle, -L / 2 - 0.07, 0, Wd * 0.9, 0.85, 0.91, 'rgba(0,0,0,0.55)'); // deck edge seam (0.44 seam replaced by trim line)
+    // T2b: two-tone rear — darker lower panel so the rear reads in bands, not one flat slab
+    // REWORK: solid dark valance + bright trim line (the 0.32 wash was invisible).
+    vQuad(cx, cz, angle, -L / 2 - 0.075, 0, Wd * 0.96, 0.08, 0.44, '#171017');
+    vQuad(cx, cz, angle, -L / 2 - 0.08, 0, Wd * 0.96, 0.44, 0.49, 'rgba(255,179,92,0.65)');
+    box3(cx - fx * (L / 2 + 0.05), 0.06, cz - fz * (L / 2 + 0.05), Wd * 0.98, 0.3, 0.4, angle, '#16161c', dep);
+    for (const ds of [-0.28, 0, 0.28]) vQuad(cx, cz, angle, -L / 2 - 0.26, ds * Wd, 0.1, 0.06, 0.3, '#0a0a0e');
+    box3(cx - fx * (L * 0.18), 1.52, cz - fz * (L * 0.18), 0.16, 0.2, 0.4, angle, '#14141a', dep);
+    vQuad(cx, cz, angle, -L * 0.32 - 0.005, 0, Wd * 0.76, 1.40, 1.44, '#0c0e14');
+    vQuad(cx, cz, angle, -L * 0.32 - 0.005, 0, Wd * 0.76, 0.98, 1.02, '#0c0e14');
+    vQuad(cx, cz, angle, -L * 0.32 - 0.005, -Wd * 0.36, 0.04, 0.98, 1.44, '#0c0e14');
+    vQuad(cx, cz, angle, -L * 0.32 - 0.005, Wd * 0.36, 0.04, 0.98, 1.44, '#0c0e14');
     // sunroof + trunk wash as thin slabs with depOff -0.6 so the painter
     // puts them ON the roof/deck (plain topStrips lose the depth sort here)
     box3(cx - fx * 0.05, 1.5, cz - fz * 0.05, Wd * 0.55, 0.04, L * 0.28, angle, '#121620', dep, -1.2);
     box3(cx - fx * (L * 0.35), 0.87, cz - fz * (L * 0.35), Wd * 0.8, 0.04, 0.6, angle, '#ffb35c', dep, -0.6);
+  }
+  // T2: vehicle-type features (T1 supplies o.type via traffic.js — see
+  // VEHICLES-HOOK.md in the track folder; default sedan = no extra quads)
+  if (o.type === 'bus') {
+    for (const s of [-1, 1]) {
+      const lx = (-fz) * s * (Wd / 2 + 0.03), lz = fx * s * (Wd / 2 + 0.03);
+      box3(cx + lx, 0.95, cz + lz, 0.05, 0.55, L * 0.78, angle, '#1a2230', dep);
+    }
+    box3(cx, BH + 0.1, cz, Wd * 0.5, 0.3, L * 0.3, angle, '#c8ccd4', dep);
+    vQuad(cx, cz, angle, L / 2 + 0.08, 0, Wd * 0.5, BH * 0.7, BH * 0.85, '#ffd23e');
+  } else if (o.type === 'fire') {
+    for (const s of [-1, 1]) {
+      const lx = (-fz) * s * (Wd / 2 + 0.03), lz = fx * s * (Wd / 2 + 0.03);
+      box3(cx + lx, 0.62, cz + lz, 0.05, 0.16, L * 0.9, angle, '#e8e4d8', dep);
+    }
+    for (let li = -1; li <= 1; li += 1) box3(cx + (-fz) * li * 0.5, BH + 0.08, cz + fx * li * 0.5, 0.22, 0.14, L * 0.8, angle, '#c8ccd4', dep);
+    vQuad(cx, cz, angle, L * 0.1, -Wd * 0.2, 0.5, BH + 0.1, BH + 0.3, '#ff4040');
+    vQuad(cx, cz, angle, L * 0.1, Wd * 0.2, 0.5, BH + 0.1, BH + 0.3, '#4080ff');
+  } else if (o.type === 'ambulance') {
+    for (const s of [-1, 1]) {
+      const lx = (-fz) * s * (Wd / 2 + 0.03), lz = fx * s * (Wd / 2 + 0.03);
+      box3(cx + lx, 0.62, cz + lz, 0.05, 0.16, L * 0.9, angle, '#c0392b', dep);
+    }
+    vQuad(cx, cz, angle, -L / 2 - 0.08, 0, 0.5, 0.5, 0.95, '#c0392b');
+    vQuad(cx, cz, angle, -L / 2 - 0.08, 0, 0.18, 0.62, 0.83, '#c0392b');
+    vQuad(cx, cz, angle, L * 0.1, -Wd * 0.2, 0.5, BH + 0.1, BH + 0.3, '#ff4040');
+    vQuad(cx, cz, angle, L * 0.1, Wd * 0.2, 0.5, BH + 0.1, BH + 0.3, '#4080ff');
+  } else if (o.type === 'apc') {
+    box3(cx, BH * 0.75, cz, Wd + 0.06, BH * 0.25, L * 0.95, angle, '#3a4a22', dep);
+    box3(cx + fx * (L * 0.1), 0.15 + BH, cz + fz * (L * 0.1), 1.1, 0.5, 1.4, angle, '#4a5a2a', dep);
+    box3(cx + fx * (L * 0.55), 0.15 + BH + 0.1, cz + fz * (L * 0.55), 0.18, 0.18, 1.6, angle, '#2c3418', dep);
+  } else if (o.type === 'van') {
+    for (const s of [-1, 1]) {
+      const lx = (-fz) * s * (Wd / 2 + 0.03), lz = fx * s * (Wd / 2 + 0.03);
+      box3(cx + lx, 0.95, cz + lz, 0.05, 0.5, L * 0.55, angle, '#1a2230', dep);
+      box3(cx + fx * (L * 0.05) + lx, 0.35, cz + fz * (L * 0.05) + lz, 0.05, BH * 0.7, 0.08, angle, '#14141a', dep);
+    }
+  } else if (o.type === 'pickup') {
+    box3(cx - fx * (L * 0.28), 0.15 + BH, cz - fz * (L * 0.28), Wd * 0.88, 0.06, L * 0.36, angle, '#0c0e14', dep);
+  } else if (o.type === 'taxi') {
+    box3(cx + fx * (L * 0.05), 1.52, cz + fz * (L * 0.05), 0.9, 0.28, 0.5, angle, '#ffd23e', dep);
+    for (const s of [-1, 1]) {
+      const lx = (-fz) * s * (Wd / 2 + 0.03), lz = fx * s * (Wd / 2 + 0.03);
+      box3(cx + lx, 0.62, cz + lz, 0.05, 0.12, L * 0.7, angle, '#14141a', dep);
+    }
   }
   if (o.pol) {
     const blink = Math.floor((o.t || 0) * 6) % 2 === 0;
@@ -341,6 +436,82 @@ function boat3d(wx, wy, angle, len, wid, color, o) {
     const blink = Math.floor((o.t || 0) * 6) % 2 === 0;
     vQuad(cx, cz, angle, -L * 0.08, -Wd * 0.2, 0.45, 1.0, 1.25, blink ? '#ff4040' : '#2f6fd0');
     vQuad(cx, cz, angle, -L * 0.08, Wd * 0.2, 0.45, 1.0, 1.25, blink ? '#2f6fd0' : '#ff4040');
+  }
+}
+function plane3d(wx, wy, angle, plane, o) {
+  // R25: rocket plane HA-1 in the chase-cam (mission 13 "Rocket Heist").
+  // Follows the PROVEN 3D shape from takeoff3d.js plane() (rocket v5
+  // shot) + the top-down silhouette from space.js drawPlane (swept wings,
+  // cyan tail fins, orange nose tip, cyan canopy, afterburner).
+  // Altitude scale: 1 unit = ~8.3 m (ALT_U = alt * 0.12): alt 55 m ->
+  // 6.6 units (just below the rooftops, takeoff clears the skyline),
+  // alt 340 m -> 40.8 units (above the skyline). The camera eye rises on
+  // the SAME scale (drawChase3D), so the plane stays framed at any alt.
+  const L = 6.0, Wd = 6.0; // 60 px long, 60 px wingspan (drawPlane top-down)
+  const alt = plane.alt || 0;
+  const altU = alt * 0.12;
+  const y0 = altU + 0.55; // fuselage base (gear height when parked)
+  const cx = wx * CS, cz = wy * CS;
+  const dep = Math.hypot(cx - ccX, cz - ccZ);
+  const fx = Math.cos(angle), fz = Math.sin(angle);
+  const rx = -fz, rz = fx;
+  const t = o.t || 0;
+  const thr = plane.throttle || 0;
+  const flick = 0.75 + 0.25 * Math.sin(t * 31 + wx);
+  const jet = !!o.jet;
+  const body = jet ? '#3a4a3a' : '#f7fafc';
+  const wingC = jet ? '#2c362c' : '#d5dde4';
+  // plane-local (f = forward, r = right) -> world [x, y, z]
+  const pt = (f, r, y) => [cx + fx * f + rx * r, y, cz + fz * f + rz * r];
+  // contact shadow: fades + grows + drifts with altitude (drawPlane formula)
+  const shA = Math.max(0.06, 0.42 - alt / 800);
+  const shS = 1 + alt / 900;
+  const shX = wx + alt * 0.32, shY = wy + alt * 0.32;
+  flatQuad(shX - 34 * shS, shY - 14 * shS, shX + 34 * shS, shY + 14 * shS, 0.02, 'rgba(0,0,0,' + shA.toFixed(2) + ')');
+  // dark outline shell (car3d V2 pattern), forced behind the body
+  box3(cx, y0, cz, 1.9, 1.0, L + 0.4, angle, '#0b0f16', dep, 2.5);
+  // fuselage: white dart; warm rim on the spine (takeoff3d)
+  box3(cx, y0 + 0.05, cz, 1.5, 0.9, L, angle, body, dep);
+  if (!jet) box3(cx + fx * (L * 0.42), y0 + 0.12, cz + fz * (L * 0.42), 0.9, 0.6, L * 0.18, angle, '#ff9d4d', dep); // orange nose tip
+  if (rimOn) topStrip(cx, cz, angle, L * 0.1, 0, 1.0, 0.5, y0 + 0.98, 'rgba(255,200,130,0.9)');
+  // rear face brightening (v3 fix): box3 shades the camera-facing rear
+  // face dark at sunset (0.65*shadeK+0.22) — from directly behind at
+  // altitude, against the bright sunset sky, the fuselage read as a dark
+  // slab (v1 wash at 0.35 alpha was too weak to fix it). Same cure as the
+  // hero car's rear (round 21) + takeoff3d's 3-band rear: a LIGHT rear
+  // cap (0.8 alpha) + dark belly strip + bright top edge.
+  vQuad(cx, cz, angle, -L / 2 - 0.08, 0, 1.5, y0 + 0.1, y0 + 0.92, 'rgba(232,236,242,0.8)');
+  vQuad(cx, cz, angle, -L / 2 - 0.09, 0, 1.5, y0 + 0.1, y0 + 0.32, 'rgba(20,20,28,0.55)');
+  topStrip(cx, cz, angle, -L / 2 - 0.05, 0, 1.4, 0.3, y0 + 0.98, 'rgba(255,210,140,0.95)');
+  // canopy: dark glass + sky reflection streak (takeoff3d)
+  box3(cx + fx * (L * 0.22), y0 + 0.95, cz + fz * (L * 0.22), 0.85, 0.5, L * 0.3, angle, jet ? '#10141a' : '#1c3050', dep);
+  vQuad(cx, cz, angle, L * 0.22, 0, 0.8, y0 + 1.0, y0 + 1.4, 'rgba(150,200,240,0.55)');
+  // swept wings: horizontal quads (drawPlane silhouette); darker top so
+  // they read apart from the fuselage; warm rim on the sun-side edge
+  for (const s of [-1, 1]) {
+    QW([pt(0.6, s * 0.4, y0 + 0.55), pt(-2.0, s * 3.0, y0 + 0.55), pt(-1.4, s * 3.0, y0 + 0.55), pt(-1.0, s * 0.2, y0 + 0.55)], sh(hx3(wingC), 0.92, hz(dep)));
+    QW([pt(-1.0, s * 0.2, y0 + 0.45), pt(-1.4, s * 3.0, y0 + 0.45), pt(-1.4, s * 3.0, y0 + 0.62), pt(-1.0, s * 0.2, y0 + 0.62)], sh(hx3(wingC), 0.55, hz(dep))); // trailing-edge thickness
+    if (rimOn) QW([pt(0.6, s * 0.4, y0 + 0.58), pt(-2.0, s * 3.0, y0 + 0.58), pt(-1.95, s * 3.0, y0 + 0.58), pt(0.55, s * 0.4, y0 + 0.58)], 'rgba(255,200,130,0.5)'); // leading-edge rim
+    QW([pt(-2.2, s * 0.5, y0 + 0.7), pt(-3.0, s * 1.7, y0 + 0.7), pt(-2.8, s * 1.7, y0 + 0.7), pt(-2.2, s * 0.5, y0 + 0.7)], sh(hx3(wingC), 0.95, hz(dep))); // stabilizer
+    QW([pt(-2.2, s * 0.55, y0 + 0.7), pt(-3.0, s * 0.55, y0 + 0.7), pt(-3.0, s * 0.55, y0 + 1.9), pt(-2.2, s * 0.55, y0 + 1.9)], jet ? '#2c362c' : '#05d9e8'); // tail fin (cyan)
+    if (rimOn) QW([pt(-2.2, s * 0.55, y0 + 1.88), pt(-3.0, s * 0.55, y0 + 1.88), pt(-3.0, s * 0.55, y0 + 1.96), pt(-2.2, s * 0.55, y0 + 1.96)], 'rgba(255,210,130,0.8)'); // fin top rim
+  }
+  // twin afterburner nozzles (rear face) + flame when throttled
+  for (const s of [-1, 1]) {
+    vQuad(cx, cz, angle, -L / 2 - 0.06, s * 0.5, 0.7, y0 + 0.25, y0 + 0.75, '#3c3c46');
+    vQuad(cx, cz, angle, -L / 2 - 0.09, s * 0.5, 0.5, y0 + 0.32, y0 + 0.68, '#ff9d4d');
+    vQuad(cx, cz, angle, -L / 2 - 0.12, s * 0.5, 0.28, y0 + 0.4, y0 + 0.6, '#fff0b4');
+  }
+  if (thr > 0.25) {
+    const fl = 1.8 * thr * flick;
+    for (const s of [-1, 1]) {
+      QW([pt(-3.0, s * 0.5 - 0.45, y0 + 0.5), pt(-3.0, s * 0.5 + 0.45, y0 + 0.5), pt(-3.0 - fl, s * 0.5, y0 + 0.5)], 'rgba(255,157,77,' + (0.45 + 0.4 * flick * thr).toFixed(2) + ')');
+    }
+  }
+  // landing gear when parked/taxiing (alt < 2): nose + 2 main struts
+  if (alt < 2) {
+    box3(cx + fx * 1.8, 0, cz + fz * 1.8, 0.25, y0 + 0.05, 0.25, angle, '#0a0a0e', dep);
+    for (const s of [-1, 1]) box3(cx - fx * 1.5 + rx * s * 0.6, 0, cz - fz * 1.5 + rz * s * 0.6, 0.25, y0 + 0.05, 0.25, angle, '#0a0a0e', dep);
   }
 }
 function ped3d(wx, wy, angle, color) {
@@ -390,7 +561,11 @@ function bld3(b, nightF, t) {
   if (b.landmark === 'casino') h3 = 40;
   if (b.landmark === 'lighthouse') h3 = 46;
   const w = b.w * CS, d = b.h * CS;
-  box3(bx, 0, bz, w, h3, d, 0, b.color, dep);
+  // T2: facade tint varies per building (same district palette, never flat)
+  const tv = 0.85 + h2(b.x * 5 + 1, b.y * 3 + 2) * 0.3;
+  const bc = hx3(b.color);
+  const tint = '#' + bc.map(v => Math.min(255, Math.round(v * tv)).toString(16).padStart(2, '0')).join('');
+  box3(bx, 0, bz, w, h3, d, 0, tint, dep);
   if (b.landmark === 'lighthouse') {
     vQuad(bx, bz, 0, d / 2 + 0.1, 0, w * 0.8, h3 * 0.3, h3 * 0.42, '#c0392b');
     vQuad(bx, bz, 0, d / 2 + 0.1, 0, w * 0.8, h3 * 0.62, h3 * 0.74, '#c0392b');
@@ -403,70 +578,110 @@ function bld3(b, nightF, t) {
     return;
   }
   // windows + trim on the faces most toward the camera (always, not just night)
-  if (dep < 95) {
+  // REWORK: gate on the NEAR-face distance, not the centre — a big building
+  // at dep 100 reads 165x266 px on screen; its near face is at ~90 and
+  // must not be windowless. (Probe: (229.9,58.1) dep 100.3, winN 0.)
+  const depNear = dep - Math.max(w, d) / 2;
+  if (depNear < 120) {
     const faces = [
       { a: Math.PI / 2, off: d / 2, span: w, dot: ccZ - bz },
       { a: -Math.PI / 2, off: d / 2, span: w, dot: bz - ccZ },
       { a: 0, off: w / 2, span: d, dot: ccX - bx },
       { a: Math.PI, off: w / 2, span: d, dot: bx - ccX },
     ].sort((p, q) => q.dot - p.dot);
-    const nFaces = nightF > 0.3 ? 2 : 1;
+    const nFaces = nightF > 0.15 ? 3 : 2;
     for (let fi = 0; fi < nFaces && faces[fi].dot > 0; fi += 1) {
       const f = faces[fi];
-      const nc = Math.max(3, Math.min(dep > 70 ? 4 : 5, Math.round(f.span / 4.5)));
-      const nr = Math.max(3, Math.min(dep > 70 ? 4 : 6, Math.round(h3 / 4.5)));
+      // REWORK (probe slab-probe.json): the right wall is the building at
+      // (160,128) dep 24.1 — its north face is seen at a GRAZING angle
+      // (depth range 5..27 across one face). box3 sorts a face by its
+      // NEAREST corner (dep 5), so the face paints AFTER (over) its own
+      // windows (dep 14..25) and the wall reads blank. Fix: facade details
+      // on a grazing face get an explicit dep just in front of the face's
+      // nearest corner (faceMin - 0.5). Non-grazing faces keep computed dep.
+      const fx0 = Math.cos(f.a), fz0 = Math.sin(f.a), rx0 = -fz0, rz0 = fx0;
+      const e1x = bx + fx0 * f.off + rx0 * (-f.span / 2), e1z = bz + fz0 * f.off + rz0 * (-f.span / 2);
+      const e2x = bx + fx0 * f.off + rx0 * (f.span / 2), e2z = bz + fz0 * f.off + rz0 * (f.span / 2);
+      const lz1 = fwdD(e1x, e1z), lz2 = fwdD(e2x, e2z);
+      const faceMin = Math.min(lz1, lz2), faceRange = Math.abs(lz1 - lz2);
+      const fDep = faceRange > 8 ? faceMin - 0.5 : undefined;
+      const nc = Math.max(3, Math.min(dep > 70 ? 5 : dep < 40 ? 9 : 7, Math.round(f.span / 3.0)));
+      const nr = Math.max(3, Math.min(dep > 70 ? 5 : dep < 40 ? 10 : 8, Math.round(h3 / 3.0)));
       for (let i = 0; i < nc; i += 1) for (let j = 0; j < nr; j += 1) {
         const q = h2(b.x * 7 + i * 13 + fi * 31, b.y * 3 + j * 17);
-        const ww = Math.min((f.span / nc) * 0.55, 1.8), wh = Math.min((h3 / nr) * 0.5, 1.5);
+        const q2 = h2(b.x * 11 + i * 5, b.y * 7 + j * 9);
+        // REWORK: smaller windows on near facades (ww was capped 1.8 -> a
+        // 65 px "sticker" square at dep 24); denser grid instead.
+        const ww = Math.min((f.span / nc) * 0.55, 1.3) * (0.75 + 0.5 * q2), wh = Math.min((h3 / nr) * 0.5, 1.1) * (0.8 + 0.4 * q2);
         const rOff = -f.span / 2 + (f.span * (i + 0.5)) / nc;
         const y0 = 2 + (h3 - 3) * (j + 0.25) / nr, y1 = y0 + wh;
-        if (nightF > 0.3) {
-          if (q < (nightF < 0.55 ? 0.18 : 0.3)) continue;
-          const c = q < 0.78 ? [255, 205, 120] : q < 0.9 ? [120, 215, 255] : [255, 150, 90];
-          vQuad(bx, bz, f.a, f.off + 0.12, rOff, ww, y0, y1, mix(c, hz(dep)));
-        } else {
-          if (q < 0.55) continue;
-          vQuad(bx, bz, f.a, f.off + 0.12, rOff, ww, y0, y1, mix([52, 64, 84], hz(dep)));
-        }
+        // T2: every window is DRAWN (dark glass reads, skipped windows read
+        // as holes). Dusk 3-band: warm lit / cool sky / dark glass / deep.
+        let c;
+        if (nightF > 0.3) c = q < 0.4 ? [255, 205, 120] : q < 0.55 ? [120, 215, 255] : q < 0.7 ? [255, 150, 90] : [36, 44, 60];
+        else c = q < 0.28 ? [255, 205, 120] : q < 0.46 ? [150, 195, 235] : q < 0.72 ? [42, 54, 74] : [28, 34, 50];
+        vQuad(bx, bz, f.a, f.off + 0.12, rOff, ww, y0, y1, mix(c, hz(dep)), fDep);
+      }
+      // T2: floor lines — one dark line per ~3 floors stops the slab look
+      vQuad(bx, bz, f.a, f.off + 0.1, 0, f.span * 0.96, h3 * 0.33, h3 * 0.33 + 0.3, 'rgba(0,0,0,0.22)', fDep);
+      vQuad(bx, bz, f.a, f.off + 0.1, 0, f.span * 0.96, h3 * 0.66, h3 * 0.66 + 0.3, 'rgba(0,0,0,0.22)', fDep);
+      // REWORK: accent strip was a giant colour slab (1.1 wide, 82% of the
+      // height — the cyan "sticker" bar). Narrower + shorter + off the ground.
+      if (h2(b.x * 13 + 4, b.y * 5) < 0.45 && fi === 0) {
+        const ac = h2(b.x, b.y * 11) < 0.5 ? 'rgba(255,179,92,0.85)' : 'rgba(5,217,232,0.7)';
+        vQuad(bx, bz, f.a, f.off + 0.13, -f.span / 2 + f.span * (0.25 + 0.5 * h2(b.x + 7, b.y)), 0.55, 2.0, 2.0 + h3 * 0.55, ac, fDep);
       }
       // F3 panel line: one darker horizontal band mid-face (stops the slab look)
-      vQuad(bx, bz, f.a, f.off + 0.1, 0, f.span * 0.96, h3 * 0.45, h3 * 0.45 + 0.35, 'rgba(0,0,0,0.25)');
+      vQuad(bx, bz, f.a, f.off + 0.1, 0, f.span * 0.96, h3 * 0.45, h3 * 0.45 + 0.35, 'rgba(0,0,0,0.25)', fDep);
       // cornice: dark band just under the roofline
-      vQuad(bx, bz, f.a, f.off + 0.11, 0, f.span * 0.98, h3 - 1.7, h3 - 1.15, 'rgba(0,0,0,0.35)');
+      vQuad(bx, bz, f.a, f.off + 0.11, 0, f.span * 0.98, h3 - 1.7, h3 - 1.15, 'rgba(0,0,0,0.35)', fDep);
       if (fi === 0) {
         // base strip grounds the slab; V1 warm rim on the top edge at low sun
-        vQuad(bx, bz, f.a, f.off + 0.12, 0, f.span * 0.96, 0.1, 1.3, 'rgba(0,0,0,0.35)');
-        if (rimOn && nightF < 0.55) vQuad(bx, bz, f.a, f.off + 0.14, 0, f.span * 0.96, h3 - 0.7, h3 - 0.05, mix([255, 179, 92], hz(dep)));
-        else if (nightF > 0.55) vQuad(bx, bz, f.a, f.off + 0.12, 0, f.span * 0.96, h3 - 0.4, h3 - 0.05, b.neon);
+        vQuad(bx, bz, f.a, f.off + 0.12, 0, f.span * 0.96, 0.1, 1.3, 'rgba(0,0,0,0.35)', fDep);
+        if (rimOn && nightF < 0.55) vQuad(bx, bz, f.a, f.off + 0.14, 0, f.span * 0.96, h3 - 0.7, h3 - 0.05, mix([255, 179, 92], hz(dep)), fDep);
+        else if (nightF > 0.55) vQuad(bx, bz, f.a, f.off + 0.12, 0, f.span * 0.96, h3 - 0.4, h3 - 0.05, b.neon, fDep);
         // ground-floor storefronts: lit shop fronts break up blank walls at
         // street level (warm amber / cyan / pink neon) — always on at dusk/night
-        if (nightF > 0.3) {
+        if (nightF > 0.2) {
           for (let s = 0; s < 3; s += 1) {
             const rOff = -f.span / 2 + f.span * (s + 0.5) / 3;
             const sc = s % 3 === 0 ? [255, 179, 92] : s % 3 === 1 ? [5, 217, 232] : [255, 42, 109];
-            vQuad(bx, bz, f.a, f.off + 0.12, rOff, f.span / 3 * 0.62, 0.8, 2.7, mix(sc, hz(dep)));
+            // REWORK: storefront width capped 2.4 (was span/3*0.62 -> a 4.1
+            // unit pink slab on near buildings) + dark frame bar + mullion.
+            const sw = Math.min(f.span / 3 * 0.62, 2.4);
+            vQuad(bx, bz, f.a, f.off + 0.12, rOff, sw, 0.8, 2.7, mix(sc, hz(dep)), fDep);
+            vQuad(bx, bz, f.a, f.off + 0.13, rOff, sw, 2.7, 2.95, 'rgba(10,10,16,0.85)', fDep);
+            vQuad(bx, bz, f.a, f.off + 0.13, rOff, 0.12, 0.8, 2.7, 'rgba(10,10,16,0.7)', fDep);
           }
-          // vertical neon sign on ~1 in 3 buildings (deterministic gate)
-          if (h2(b.x * 3 + 5, b.y * 7) < 0.34 && dep < 90) {
+          // vertical neon sign on ~40% of buildings (deterministic gate)
+          if (h2(b.x * 3 + 5, b.y * 7) < 0.4 && dep < 100) {
             const nc = ['#ff2a6d', '#05d9e8', '#ffd23e'][Math.floor(h2(b.x, b.y * 3) * 3)];
             const nOff = -f.span / 2 + f.span * (0.2 + 0.6 * h2(b.x + 9, b.y));
-            vQuad(bx, bz, f.a, f.off + 0.16, nOff, 0.9, 3.2, Math.max(6, h3 * 0.68), nc);
-            vQuad(bx, bz, f.a, f.off + 0.14, nOff, 1.7, 3.2, Math.max(6, h3 * 0.68), nc + '33');
+            vQuad(bx, bz, f.a, f.off + 0.16, nOff, 0.55, 3.2, Math.max(6, h3 * 0.68), nc, fDep);
+            vQuad(bx, bz, f.a, f.off + 0.14, nOff, 1.1, 3.2, Math.max(6, h3 * 0.68), nc + '33', fDep);
           }
         }
       }
     }
   }
   if (dep < 90) {
-    if (h2(b.x, b.y) > 0.6) {
+    if (h2(b.x, b.y) > 0.45) {
       box3(bx + (h2(b.x + 1, b.y) - 0.5) * w * 0.4, h3, bz + (h2(b.x, b.y + 1) - 0.5) * d * 0.4, 2.2, 1.2, 2.2, 0, '#6b7280', dep);
     }
-    if (h2(b.x + 2, b.y) > 0.45) { // 2nd rooftop AC unit
+    if (h2(b.x + 2, b.y) > 0.35) { // 2nd rooftop AC unit
       box3(bx - (h2(b.x + 3, b.y) - 0.5) * w * 0.4, h3, bz - (h2(b.x, b.y + 3) - 0.5) * d * 0.4, 1.6, 0.9, 1.6, 0, '#7d838c', dep);
     }
-    if (h2(b.x, b.y + 2) > 0.5) { // antenna mast + tip light
+    if (h2(b.x, b.y + 2) > 0.35) { // antenna mast + tip light
       box3(bx + (h2(b.x + 4, b.y) - 0.5) * w * 0.5, h3, bz + (h2(b.x, b.y + 4) - 0.5) * d * 0.5, 0.18, 3.2, 0.18, 0, '#3a3f47', dep);
       vQuad(bx + (h2(b.x + 4, b.y) - 0.5) * w * 0.5, bz + (h2(b.x, b.y + 4) - 0.5) * d * 0.5, 0, 0, 0, 0.3, h3 + 3.1, h3 + 3.4, '#ff4040');
+    }
+    if (h2(b.x + 6, b.y + 6) > 0.72) { // T2: water tank on legs (old-town silhouette)
+      const txp = bx - (h2(b.x + 8, b.y) - 0.5) * w * 0.4, tzp = bz - (h2(b.x, b.y + 8) - 0.5) * d * 0.4;
+      box3(txp, h3 + 1.0, tzp, 1.9, 2.3, 1.9, 0, '#8a6f4d', dep);
+      box3(txp, h3 + 3.2, tzp, 2.1, 0.25, 2.1, 0, '#6b5638', dep);
+    }
+    if (h2(b.x + 9, b.y + 9) > 0.78) { // T2: satellite dish, tilted to the sky
+      box3(bx + (h2(b.x + 10, b.y) - 0.5) * w * 0.4, h3 + 0.6, bz + (h2(b.x, b.y + 10) - 0.5) * d * 0.4, 1.4, 0.2, 1.4, 0.6, '#c8ccd4', dep);
     }
   }
 }
@@ -506,7 +721,7 @@ export function drawChase3D(ctx, state) {
   const t = state.elapsed || 0;
   const city = state.city;
   const p = state.player;
-  const hero = p.inCar && p.car ? p.car : p.inBoat && p.boat ? p.boat : p;
+  const hero = p.inPlane && p.plane ? p.plane : p.inCar && p.car ? p.car : p.inBoat && p.boat ? p.boat : p;
   const hx = hero.x, hy = hero.y, ha = hero.angle || 0;
   const now = performance.now();
   let dt = ccLast ? (now - ccLast) / 1000 : 0.016;
@@ -535,6 +750,41 @@ export function drawChase3D(ctx, state) {
   if (snap || still) { ccX = tx; ccZ = tz; ccInit = true; }
   else { ccX += (tx - ccX) * Math.min(1, dt * 8); ccZ += (tz - ccZ) * Math.min(1, dt * 8); }
   ccHX = hx; ccHY = hy;
+  // T2 (clip #6, TERBUKTI 4x): clamp the chase camera OUT of buildings and
+  // keep it over water when the hero is in a boat. Without this the camera
+  // sits inside a wall and the R22 cull hides that building (visible pop).
+  // Push-out along the smallest penetration axis; iterate so a push out of
+  // one building never leaves the camera inside a neighbour.
+  {
+    let camWX = ccX / CS, camWY = ccZ / CS;
+    const inBoat = !!(p.inBoat && p.boat);
+    const M = 26; // px: camera near-plane (2 units) + wall clearance
+    if (inBoat) camWX = Math.max(camWX, WATER_X + 24);
+    for (let iter = 0; iter < 4; iter += 1) {
+      let hit = null;
+      for (const b of city.buildings) {
+        if (camWX > b.x - M && camWX < b.x + b.w + M && camWY > b.y - M && camWY < b.y + b.h + M) { hit = b; break; }
+      }
+      if (!hit) break;
+      const l = camWX - (hit.x - M), r = (hit.x + hit.w + M) - camWX;
+      const tp = camWY - (hit.y - M), bt = (hit.y + hit.h + M) - camWY;
+      const mn = Math.min(l, r, tp, bt);
+      if (mn === l) camWX = hit.x - M;
+      else if (mn === r) camWX = hit.x + hit.w + M;
+      else if (mn === tp) camWY = hit.y - M;
+      else camWY = hit.y + hit.h + M;
+      if (inBoat) camWX = Math.max(camWX, WATER_X + 24);
+    }
+    ccX = camWX * CS; ccZ = camWY * CS;
+    // boat hugging the shore: the water clamp can pull the camera almost
+    // onto the boat — raise the eye so the view goes over it, not through it
+    if (inBoat && Math.hypot(ccX - hx * CS, ccZ - hy * CS) < 6) camH = 9;
+  }
+  // R25: the hero plane climbs — raise the eye on the SAME altitude scale
+  // as plane3d (1 unit = ~8.3 m, altU = alt * 0.12) so the plane stays
+  // framed at any altitude. The 0.9 factor lets the plane drift up in the
+  // frame as it climbs (takeoff feel) instead of being pinned to one spot.
+  if (p.inPlane && p.plane) camH = 4.4 + (p.plane.alt || 0) * 0.12 * 0.9;
   cfX = fx; cfZ = fz;
   // sky
   const g = x.createLinearGradient(0, 0, 0, HOR + 60);
@@ -597,6 +847,34 @@ export function drawChase3D(ctx, state) {
         }
         flatQuad(gx, gy, gx + 320, gy + 320, 0, sh(hx3(ground), shadeK, hz(td)));
       }
+    }
+  }
+  // R25: Harbor Aerospace spaceport ground (mission 13). The 2D game
+  // clears buildings/parks/trees from this footprint (clearSpaceport),
+  // so the 3D view paints the apron + runway + hangar + tower here.
+  // Gate matches PATCH-SPEC T3 §6.3 (centre 2240,640, 175x135). The
+  // hangar door + tower windows face SOUTH (the staged takeoff shot
+  // looks north up the runway, so the south faces are the visible ones).
+  if (inRange(2240, 640, 175, 135)) {
+    const sd = Math.hypot(2240 * CS - ccX, 640 * CS - ccZ);
+    const sdt = hz(sd);
+    flatQuad(2080, 480, 2400, 800, 0.02, sh(hx3('#6b7280'), shadeK, sdt)); // apron
+    flatQuad(2220, 520, 2300, 780, 0.04, sh(hx3('#2a2d33'), shadeK, sdt)); // runway
+    for (let d0 = 540; d0 < 780; d0 += 40) flatQuad(2258, d0, 2262, d0 + 20, 0.09, '#e8d44d'); // centreline
+    flatQuad(2224, 524, 2296, 532, 0.09, '#e8e4d8'); // threshold N
+    flatQuad(2224, 768, 2296, 776, 0.09, '#e8e4d8'); // threshold S
+    flatQuad(2336, 532, 2368, 564, 0.05, sh(hx3('#7d838c'), shadeK, sdt)); // rocket pad
+    flatQuad(2344, 540, 2360, 556, 0.07, '#c98a3d');
+    const hdep = Math.hypot(2166 * CS - ccX, 680 * CS - ccZ);
+    box3(2166 * CS, 0.02, 680 * CS, 10, 6, 8, 0, '#7d838c', hdep); // hangar
+    vQuad(2166 * CS, 680 * CS, Math.PI / 2, 4.1, 0, 6, 0.8, 2.4, '#05d9e8'); // hangar door glow (south face)
+    box3(2138 * CS, 0.02, 518 * CS, 3.6, 14, 3.6, 0, '#8a8f98', hdep); // tower
+    vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.9, 0, 2.4, 9, 11.5, 'rgba(255,205,120,0.95)'); // tower windows (south face)
+    box3(2138 * CS, 14, 518 * CS, 0.18, 3.2, 0.18, 0, '#3a3f47', hdep); // antenna
+    vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.9, 0, 0.3, 17.1, 17.4, '#ff4040'); // tip light
+    for (const tk of [[2352, 700], [2352, 744]]) {
+      box3(tk[0] * CS, 0.02, tk[1] * CS, 3.2, 2.6, 3.2, 0, '#c8ccd4', hdep); // fuel tank
+      box3(tk[0] * CS, 2.6, tk[1] * CS, 3.4, 0.2, 3.4, 0, '#9aa0a8', hdep);
     }
   }
   // water glitter on the water ahead of the camera (near the harbor)
@@ -690,13 +968,15 @@ export function drawChase3D(ctx, state) {
     if (nearFwd < 16 && Math.abs(br[1]) < 16) continue;
     bld3(b, nightF, t);
   }
-  // trees
+  // trees (T2: 3 variants by hash — tall, wide, palm-ish; never identical)
   for (const tree of city.trees) {
     if (!inRange(tree.x, tree.y, 85, 85)) continue;
     const cxp = tree.x * CS, czp = tree.y * CS;
     const dep = Math.hypot(cxp - ccX, czp - ccZ);
-    box3(cxp, 0, czp, 0.5, 1.2, 0.5, 0, '#5a4632', dep);
-    box3(cxp, 1.1, czp, 2.2, 1.8, 2.2, 0, '#1f5c2e', dep);
+    const tv = h2(tree.x, tree.y);
+    const th = 1.0 + tv * 0.8, cw = 1.8 + h2(tree.x + 3, tree.y) * 1.2;
+    box3(cxp, 0, czp, 0.5, th, 0.5, 0, '#5a4632', dep);
+    box3(cxp, th - 0.1, czp, cw, 1.6 + tv, cw, 0, ['#1f5c2e', '#276031', '#2a6b35'][Math.floor(tv * 3)], dep);
   }
   // docks / marina piers + containers + crane
   const docks = city.docks, marina = city.marina;
@@ -767,11 +1047,11 @@ export function drawChase3D(ctx, state) {
   // parked + moving traffic
   for (const car of state.traffic.parked) {
     if (!car.alive || !inRange(car.x, car.y, 150, 100)) continue;
-    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t });
+    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: car.type });
   }
   for (const car of state.traffic.cars) {
     if (!car.alive || !inRange(car.x, car.y, 150, 100)) continue;
-    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t });
+    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: car.type });
   }
   if (state.armored && state.armored.truck && state.armored.truck.alive && inRange(state.armored.truck.x, state.armored.truck.y, 150, 100)) {
     const tr = state.armored.truck;
@@ -786,7 +1066,7 @@ export function drawChase3D(ctx, state) {
       if (unit.car.concrete) {
         box3(unit.car.x * CS, 0.15, unit.car.y * CS, unit.car.width * CS, 2.2, unit.car.length * CS, unit.car.angle, '#6b6f75', Math.hypot(unit.car.x * CS - ccX, unit.car.y * CS - ccZ));
       } else {
-        car3d(unit.car.x, unit.car.y, unit.car.angle, unit.car.length, unit.car.width, unit.car.color || '#2f6fd0', { pol: true, t });
+        car3d(unit.car.x, unit.car.y, unit.car.angle, unit.car.length, unit.car.width, unit.car.color || '#2f6fd0', { pol: true, t, type: unit.car.type });
       }
     } else if (unit.kind === 'boat') {
       if (!inRange(unit.x, unit.y, 150, 100)) continue;
@@ -805,6 +1085,15 @@ export function drawChase3D(ctx, state) {
   const heli = state.police.heli;
   if (heli && heli.active && inRange(heli.x, heli.y, 170, 130)) {
     heli3d(heli.x, heli.y, p.x, p.y, heli.rotor || 0, t);
+  }
+  // R25: HAF military jets (6 stars, airborne in the plane) — without
+  // this they shoot an invisible enemy in the default 3D view. Jets have
+  // no alt field; they chase the hero plane, so they fly at its altitude.
+  if (state.space && state.space.jets && state.space.jets.length && p.inPlane && p.plane) {
+    for (const j of state.space.jets) {
+      if (!inRange(j.x, j.y, 170, 130)) continue;
+      plane3d(j.x, j.y, j.angle, { alt: p.plane.alt || 0, throttle: 1 }, { jet: true, t });
+    }
   }
   // pedestrians
   const PEDC = ['#e8e4d8', '#c0392b', '#2e86c1', '#f39c12'];
@@ -846,8 +1135,9 @@ export function drawChase3D(ctx, state) {
     vQuad(b.x * CS, b.y * CS, ccYaw, 0, 0, 0.5, 0.6, 1.1, '#ffe9a8');
     drawn += 1;
   }
-  // hero last (nearest): car / boat / on foot
-  if (p.inCar && p.car) car3d(p.car.x, p.car.y, p.car.angle, p.car.length, p.car.width, p.car.paint || '#e33e5f', { hero: true, t });
+  // hero last (nearest): plane / car / boat / on foot (R25: plane first)
+  if (p.inPlane && p.plane) plane3d(p.plane.x, p.plane.y, p.plane.angle, p.plane, { hero: true, t });
+  else if (p.inCar && p.car) car3d(p.car.x, p.car.y, p.car.angle, p.car.length, p.car.width, p.car.paint || '#e33e5f', { hero: true, t });
   else if (p.inBoat && p.boat) boat3d(p.boat.x, p.boat.y, p.boat.angle, p.boat.length, p.boat.width, p.boat.color, { hero: true, t });
   else ped3d(p.x, p.y, p.angle, '#ffd23e');
   // round 21: fill the dark flanks — lamp posts on both sidewalks every

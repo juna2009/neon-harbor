@@ -1,6 +1,7 @@
 import { WANTED, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, collides, districtAt, moveCircle, nearestIntersection, pathBlocked } from './city.js';
 import { makeCar } from './traffic.js';
+import { boatHitsObstacle } from './boats.js';
 export function createPolice() {
   return {
     units: [], spawnTimer: 0, arrestTimer: 0, roadblockTimer: 8, barrierTimer: 8,
@@ -273,8 +274,9 @@ export function stepPolice(police, state, dt, rng, events) {
       while (diff < -Math.PI) diff += Math.PI * 2;
       unit.angle += Math.max(-3.4 * dt, Math.min(3.4 * dt, diff));
       unit.speed = Math.min(600, unit.speed + 480 * dt);
-      unit.x += Math.cos(unit.angle) * unit.speed * dt;
-      unit.y += Math.sin(unit.angle) * unit.speed * dt;
+      const nbx = unit.x + Math.cos(unit.angle) * unit.speed * dt;
+      const nby = unit.y + Math.sin(unit.angle) * unit.speed * dt;
+      if (!boatHitsObstacle(nbx, nby, 27)) { unit.x = nbx; unit.y = nby; }
       unit.x = Math.max(WATER_X + 16, Math.min(WORLD_W - 16, unit.x));
       unit.y = Math.max(16, Math.min(WORLD_H - 16, unit.y));
       if (Math.abs(unit.speed) > 120) {
@@ -324,9 +326,10 @@ export function stepPolice(police, state, dt, rng, events) {
       if (unit.ramTimer > 0) unit.ramTimer -= dt;
       const nx = car.x + Math.cos(car.angle) * car.speed * dt;
       const ny = car.y + Math.sin(car.angle) * car.speed * dt;
-      if (!collides(state.city, nx, car.y, 22)) car.x = nx;
+      const cr = car.body === 'van' ? 30 : 26;
+      if (!collides(state.city, nx, car.y, cr)) car.x = nx;
       else car.speed *= 0.7;
-      if (!collides(state.city, car.x, ny, 22)) car.y = ny;
+      if (!collides(state.city, car.x, ny, cr)) car.y = ny;
       else car.speed *= 0.7;
       if (dist < 46 && unit.ramTimer <= 0) {
         unit.ramTimer = 0.6;

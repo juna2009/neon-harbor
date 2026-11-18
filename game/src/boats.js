@@ -43,3 +43,16 @@ export function stepBoats(state, dt) {
 export function onWater(x, y) {
   return x > WATER_X + 8 && x < WORLD_W - 8 && y > 8 && y < WORLD_H - 8;
 }
+export const SHIP_RECT = { x: WATER_X + 12, y: 500 - 15, w: 90, h: 30 };
+export const BUOYS = [900, 1200, 1500].map((y) => ({ x: WATER_X + 30, y, r: 8 }));
+export function boatHitsObstacle(x, y, r) {
+  const qx = Math.max(SHIP_RECT.x, Math.min(x, SHIP_RECT.x + SHIP_RECT.w));
+  const qy = Math.max(SHIP_RECT.y, Math.min(y, SHIP_RECT.y + SHIP_RECT.h));
+  const dx = x - qx, dy = y - qy;
+  if (dx * dx + dy * dy < r * r) return true;
+  for (const b of BUOYS) {
+    const bx = x - b.x, by = y - b.y;
+    if (bx * bx + by * by < (r + b.r) * (r + b.r)) return true;
+  }
+  return false;
+}

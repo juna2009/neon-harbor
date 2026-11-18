@@ -1,5 +1,5 @@
 import { ROAD_W, WORLD_H, WORLD_W } from './config.js';
-import { WATER_X, onRoad } from './city.js';
+import { WATER_X, buildingAt, onRoad } from './city.js';
 const TRAFFIC_COUNT = 16;
 const PARKED_COUNT = 12;
 const PED_COUNT = 26;
@@ -94,7 +94,8 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
     const at = car.axis === 'v' ? car.y : car.x;
     const distToNext = next === null ? Infinity : Math.abs(next - at);
     if (distToNext < Math.max(6, car.speed * dt + 2)) {
-      if (Math.random() < 0.38) {
+      const noTurn = bridge?.up && car.axis === 'h' && next === 2400 && car.road === 1760;
+      if (!noTurn && Math.random() < 0.38) {
         const lane = Math.random() < 0.5 ? 18 : -18;
         const newDir = Math.random() < 0.5 ? 1 : -1;
         if (car.axis === 'v') {
@@ -113,8 +114,8 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
       }
     }
     let desired = car.cruise;
-    const d = car.road === 2400 && car.axis === 'v' ? (car.dir < 0 ? car.y - 1840 : 1520 - car.y) : -1;
-    if (bridge?.up && d > 0 && d < 80) desired = 0;
+    const d = car.road === 2400 && car.axis === 'v' ? (car.dir < 0 ? car.y - 1720 : 1640 - car.y) : -1;
+    if (bridge?.up && d > 0 && d < 200) desired = 0;
     if (blockedAhead(car, others, 78)) desired = 0;
     if (distToNext < 90 && blockedAhead({ ...car, x: car.x + Math.cos(car.angle) * 60, y: car.y + Math.sin(car.angle) * 60, angle: car.angle }, others, 60)) desired = 0;
     if (desired === 0) car.speed = Math.max(0, car.speed - 420 * dt);
@@ -140,13 +141,13 @@ export function createPedestrians(city, rng) {
     let angle;
     if (vertical) {
       const rx = rng.pick(city.roadsV);
-      x = rx + (rng.chance(0.5) ? ROAD_W / 2 + 12 : -ROAD_W / 2 - 12);
+      x = rx + (rng.chance(0.5) ? ROAD_W / 2 + 4 : -ROAD_W / 2 - 4);
       y = rng.range(60, WORLD_H - 60);
       angle = rng.chance(0.5) ? Math.PI / 2 : -Math.PI / 2;
     } else {
       const ry = rng.pick(city.roadsH);
       x = rng.range(60, WATER_X - 60);
-      y = ry + (rng.chance(0.5) ? ROAD_W / 2 + 12 : -ROAD_W / 2 - 12);
+      y = ry + (rng.chance(0.5) ? ROAD_W / 2 + 4 : -ROAD_W / 2 - 4);
       angle = rng.chance(0.5) ? 0 : Math.PI;
     }
     peds.push({
@@ -226,11 +227,23 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
     } else {
       ped.x += Math.cos(ped.angle) * ped.speed * dt;
       ped.y += Math.sin(ped.angle) * ped.speed * dt;
-      if (ped.x < 40 || ped.x > WATER_X - 40 || ped.y < 40 || ped.y > WORLD_H - 40 || !onRoad(city, ped.x, ped.y)) {
+      if (ped.x < 40 || ped.x > WATER_X - 40 || ped.y < 40 || ped.y > WORLD_H - 40 || !onRoad(city, ped.x, ped.y, 14)) {
         ped.angle += Math.PI;
         ped.x += Math.cos(ped.angle) * 4;
         ped.y += Math.sin(ped.angle) * 4;
       }
+    }
+    const pr = ped.build === 'wide' ? 11 : 9;
+    const pb = buildingAt(city, ped.x, ped.y, pr);
+    if (pb) {
+      const l = ped.x - (pb.x - pr), r = pb.x + pb.w + pr - ped.x;
+      const t = ped.y - (pb.y - pr), b = pb.y + pb.h + pr - ped.y;
+      const m = Math.min(l, r, t, b);
+      if (m === l) ped.x = pb.x - pr;
+      else if (m === r) ped.x = pb.x + pb.w + pr;
+      else if (m === t) ped.y = pb.y - pr;
+      else ped.y = pb.y + pb.h + pr;
+      ped.angle += Math.PI;
     }
     ped.x = Math.max(20, Math.min(WATER_X - 20, ped.x));
     ped.y = Math.max(20, Math.min(WORLD_H - 20, ped.y));

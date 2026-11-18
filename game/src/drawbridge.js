@@ -1,4 +1,15 @@
 export const BRIDGE = { x: 2400, y: 1680, top: 1640, bottom: 1720, halfW: 40 };
+function circleRect(cx, cy, r, rx, ry, rw, rh) {
+  const qx = Math.max(rx, Math.min(cx, rx + rw));
+  const qy = Math.max(ry, Math.min(cy, ry + rh));
+  const dx = cx - qx, dy = cy - qy;
+  return dx * dx + dy * dy < r * r;
+}
+export function leafHit(b, x, y, r) {
+  if (!b || !b.up) return false;
+  return circleRect(x, y, r, BRIDGE.x - 30, BRIDGE.top - 34, 60, 30)
+    || circleRect(x, y, r, BRIDGE.x - 30, BRIDGE.bottom + 4, 60, 30);
+}
 export function createBridge() { return { up: false, timer: 0, inGap: false }; }
 export function stepBridge(b, s, dt, fx) {
   const p = s.player;
