@@ -285,7 +285,7 @@ export function drawHud2(c, st, best, ui, view) {
   T(c, 'BEST $' + best.toLocaleString('en-US'), 284, 30, 12, '#c8cdd6', 'right');
   drawHeart2(c, 32, 66, 9);
   segBar(c, 48, 58, 190, 16, Math.max(0, p.health / 100), p.health > 30 ? '#4ade80' : '#ef4444', 10);
-  T(c, Math.round(p.health) + '%', 284, 66, 13, '#eef1f5', 'right', 'bold');
+  T(c, Math.round(p.health) + ' HP', 284, 66, 13, '#eef1f5', 'right', 'bold');
   T(c, 'WANTED', 24, 96, 11, '#c8cdd6', 'left', 'bold');
   drawWantedRow2(c, 96, 96, 12, 6, Math.floor(st.wanted));
   const wp = WEAPONS[p.weapon];
@@ -334,20 +334,34 @@ export function drawHud2(c, st, best, ui, view) {
   }
   // minimap (top-right)
   drawMinimap2(c, st, W2 - 228, 16, 200, 150);
-  // speed cluster (bottom-right)
+  // speed cluster (bottom-right) — plain big tabular number, no heavy box
+  // (reference "111 MPH" + "MERIDIAN · 82%"; bible §6.2: real-time numbers
+  // tabular so the counter never wobbles; §6.1: outline + drop shadow carry
+  // the contrast, so no panel is needed). Right-anchored at W2-24: the
+  // number grows leftward as digits change, the right edge never moves.
+  // On foot the whole block stays hidden (no empty box left behind).
   if ((p.inCar && p.car) || (p.inBoat && p.boat)) {
     const veh = p.inCar ? p.car : p.boat;
     const spd = Math.round(Math.abs(veh.speed) * 0.36);
-    drawPanel(c, W2 - 212, H2 - 116, 200, 104, C.neonCyan);
-    c.lineWidth = 6; c.strokeStyle = '#2a3242';
-    c.beginPath(); c.arc(W2 - 176, H2 - 64, 26, 2.36, 5.5); c.stroke();
-    c.lineWidth = 6; c.strokeStyle = C.neonCyan;
-    c.beginPath(); c.arc(W2 - 176, H2 - 64, 26, 2.36, 2.36 + Math.min(1, Math.abs(veh.speed) / 540) * 3.14); c.stroke();
-    T(c, String(spd), W2 - 132, H2 - 78, 34, '#ffffff', 'left', 'bold');
-    T(c, 'km/h', W2 - 132, H2 - 48, 13, '#c8cdd6', 'left');
     const hp = Math.max(0, Math.round(veh.hp || 0));
-    T(c, (p.inCar ? 'CAR' : 'BOAT') + ' ' + hp + '%', W2 - 196, H2 - 52, 12, '#c8cdd6', 'left', 'bold');
-    segBar(c, W2 - 196, H2 - 36, 110, 8, hp / 100, hp > 30 ? '#4ade80' : '#ef4444', 8);
+    const rx = W2 - 24;
+    c.save();
+    c.font = 'bold 64px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+    c.textAlign = 'right'; c.textBaseline = 'alphabetic';
+    c.lineWidth = 5; c.strokeStyle = 'rgba(8,12,24,0.6)';
+    c.strokeText(String(spd), rx, H2 - 68);
+    c.shadowColor = 'rgba(5,8,16,0.75)'; c.shadowBlur = 8; c.shadowOffsetY = 2;
+    c.fillStyle = '#ffffff';
+    c.fillText(String(spd), rx, H2 - 68);
+    c.restore();
+    // unit (+ gear in a car — display-only derivation, 6 gears over 0-540)
+    // then vehicle + condition, both right-aligned, soft shadowed
+    const gear = p.inCar ? Math.min(6, 1 + Math.floor(Math.abs(veh.speed) / 90)) : 0;
+    c.save();
+    c.shadowColor = 'rgba(5,8,16,0.7)'; c.shadowBlur = 6; c.shadowOffsetY = 1;
+    T(c, 'KM/H' + (p.inCar ? ' · GEAR ' + gear : ''), rx, H2 - 48, 14, '#ffd23e', 'right', 'bold');
+    T(c, (p.inCar ? 'CAR' : 'BOAT') + ' · ' + hp + '%', rx, H2 - 28, 12, '#c8cdd6', 'right', 'bold');
+    c.restore();
     if (p.car && p.car.tiresPopped) {
       drawPill(c, W2 - 300, H2 - 150, 288, 26, '#ff3b30', '#fff');
       T(c, 'TIRES POPPED — GARAGE $150 (G)', W2 - 156, H2 - 136, 13, '#fff', 'center', 'bold');
