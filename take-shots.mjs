@@ -21,19 +21,23 @@ const exe = '/home/hatch/.cache/ms-playwright/chromium-1255/chrome-linux64/chrom
 const browser = await chromium.launch({ executablePath: exe, args: ['--no-sandbox'] });
 const errors = [];
 
-// Round 5 final set: chase (cover), boat (dawn harbor chase), blackout
-// (finale in total darkness), police (sunset roadblock). The onfoot,
-// mission and shop scenes are still staged and captured for review, but
-// they live in /tmp — NOT in screenshots/, so the dossier never exceeds
-// its 4-image cap. The shop frame is a menu frame; the mission frame is
-// the same vault moment the blackout frame shows, only less dramatic;
-// onfoot's shootout is covered by the blackout frame's muzzle flash.
+// Round 19 final set: title3d (cover — live 3D-rendered title screen,
+// sunset chase-cam over the harbor), chase (night pursuit, mission 5/12),
+// boat (dawn harbor chase, finale 12/12, the field's only water-action
+// shot), blackout (vault heist in total darkness). The police frame was
+// the weakest of the round 5 set — 6-star military roadblock, but the
+// player car sits stopped at 4 km/h in the middle of a cluttered frame
+// and the action is illegible at thumbnail size; the military response
+// itself stays in the game and in the dossier text. The onfoot, mission
+// and shop scenes are still staged and captured for review, but they
+// live in /tmp — NOT in screenshots/, so the dossier never exceeds
+// its 4-image cap.
 const shots = [
   ['neon-harbor-explosion7.jpg', '?shot=explosion&seed=7', '/tmp'],
-  ['1-chase.jpg', '?shot=chase&seed=7', `${SHOTS}`],
-  ['2-boat.jpg', '?shot=boat&seed=7', `${SHOTS}`],
-  ['3-blackout.jpg', '?shot=blackout&seed=7', `${SHOTS}`],
-  ['4-police.jpg', '?shot=police&seed=7', `${SHOTS}`],
+  ['1-title3d.jpg', '?shot=title3d&seed=7', `${SHOTS}`],
+  ['2-chase.jpg', '?shot=chase&seed=7', `${SHOTS}`],
+  ['3-boat.jpg', '?shot=boat&seed=7', `${SHOTS}`],
+  ['4-blackout.jpg', '?shot=blackout&seed=7', `${SHOTS}`],
   ['neon-harbor-shop6.jpg', '?shot=shop&seed=7', '/tmp'],
   ['neon-harbor-shopclosed6.jpg', '?shot=shopclosed&seed=7', '/tmp'],
   ['neon-harbor-onfoot5.jpg', '?shot=onfoot&seed=7', '/tmp'],

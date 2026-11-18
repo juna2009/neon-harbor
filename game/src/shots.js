@@ -3,7 +3,7 @@ import { buyUpgrade, startMission, targetForMission } from './missions.js';
 import { addWanted, spawnPoliceUnit } from './police.js';
 import { WATER_X, districtAt } from './city.js';
 import { makeCar } from './traffic.js';
-import { SCREEN_PLAY, SCREEN_SHOP } from './render.js';
+import { SCREEN_PLAY, SCREEN_SHOP, SCREEN_TITLE } from './render.js';
 function scriptedInput() {
   const pressed = new Set();
   const state = { mx: 0, my: 0, shoot: false, mouseX: 640, mouseY: 400 };
@@ -135,7 +135,10 @@ export function stageShot(name, world) {
   const input = scriptedInput();
   world.reset();
   state.cash = 2150;
-  if (name === 'explosion') {
+  if (name === 'title3d') {
+    state.titleT3d = 6;
+    return { screen: SCREEN_TITLE, best: state.cash };
+  } else if (name === 'explosion') {
     setLight(world, 0.9);
     state.zoom = 1.25; state.zoomLock = true;
     placePlayerOnFoot(world, 820, 1520);

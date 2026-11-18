@@ -1125,13 +1125,8 @@ export function createRenderer(canvas) {
     ctx.fillStyle = '#0e1420';
     ctx.fillRect(0, 0, view.w, view.h);
     if (screen === SCREEN_TITLE) {
-      const saved = { ...state.camera };
-      state.camera.x = 1120 + Math.sin(state.elapsed * 0.1) * 200;
-      state.camera.y = 960;
-      drawWorld(state);
-      state.camera.x = saved.x;
-      state.camera.y = saved.y;
-      drawHarborSkyline(ctx, 0, view.h - 120, view.w, 120);
+      const t = state.titleT3d ?? ((performance.now() / 1000) % 20);
+      cine.title3D(ctx, t);
       if (view.w >= 1160) {
         drawJaxPortrait(ctx, 56, 250, 200, 260, 'stern');
         drawMaraPortrait(ctx, view.w - 256, 250, 200, 260, 'alert');

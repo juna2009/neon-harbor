@@ -1,3 +1,4 @@
+import { drawCity3DFrame } from './city3d.js';
 export function createCinematic() {
   let t = 0, ts = 1, bar = 0, barT = 0;
   let pT = 0, pD = 1, pA = 0, sT = 0, sD = 1, sS = 0.35;
@@ -59,5 +60,6 @@ export function createCinematic() {
     if (warm > 0.01) { ctx.fillStyle = `rgba(255,140,60,${(warm * 0.07).toFixed(3)})`; ctx.fillRect(0, 0, w, h); }
     if (cool > 0.01) { ctx.fillStyle = `rgba(70,120,255,${(cool * 0.07).toFixed(3)})`; ctx.fillRect(0, 0, w, h); }
   }
-  return { punch, shake, slowmo, bars, update, drawBars, drawGrade };
+  function title3D(ctx, t) { drawCity3DFrame(ctx, t); }
+  return { punch, shake, slowmo, bars, update, drawBars, drawGrade, title3D };
 }
