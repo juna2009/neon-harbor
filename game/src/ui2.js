@@ -2,6 +2,8 @@
 // Pure Canvas 2D, same neon palette as config.js. Drop-in as game/src/ui2.js.
 // Post-cut module: integration wiring is only a few calls in render.js.
 // All content is our own (Neon Harbor / Jax / Mara) — no rival text or art.
+// UI-TOP (batch a, base cb4130f): Bug 7 numbering fix + MILITARY banner slot +
+// stats-panel tidy + ROAD TO #1 1px border. See PATCH-SPEC-UI-TOP.md.
 import { COLORS as C, UPGRADES, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
 
@@ -189,6 +191,9 @@ export function drawMinimap2(c, st, x, y, w, h) {
   T(c, 'N ↑', x + w - 4, y + h + 13, 11, '#eef1f5', 'right', 'bold');
 }
 // ---- ROAD TO #1: progress meter toward rank 1 (13 missions = 100%) ----
+// UI-TOP: the meter counts missions DONE (0-based completed count). The
+// count is labelled DONE so it can never be read as the current mission
+// number; the bottom objective bar carries the current mission instead.
 export function drawRoadTo1(c, x, y, w, done, total, next, big) {
   const pct = total ? Math.round((done / total) * 100) : 0;
   const complete = done >= total;
@@ -196,8 +201,11 @@ export function drawRoadTo1(c, x, y, w, done, total, next, big) {
   // backing card so the meter stays readable over busy backdrops
   c.fillStyle = 'rgba(10,15,28,0.72)';
   rr(c, x - 8, y - 8, w + 16, big ? 80 : 54, 10); c.fill();
+  // UI-TOP (bible §6.5): 1px accent border, radius 10 like drawPanel.
+  c.lineWidth = 1.5; c.strokeStyle = complete ? '#ffd23e' : 'rgba(55,224,230,0.65)';
+  rr(c, x - 8, y - 8, w + 16, big ? 80 : 54, 10); c.stroke();
   T(c, 'ROAD TO #1', x, y, big ? 16 : 13, complete ? '#ffd23e' : C.neonCyan, 'left', 'bold');
-  T(c, done + '/' + total + '  ·  ' + pct + '%', x + w, y, big ? 16 : 13, complete ? '#ffd23e' : '#eef1f5', 'right', 'bold');
+  T(c, done + '/' + total + ' DONE  ·  ' + pct + '%', x + w, y, big ? 16 : 13, complete ? '#ffd23e' : '#eef1f5', 'right', 'bold');
   const by = y + (big ? 16 : 12);
   c.fillStyle = '#0a0f1c'; rr(c, x, by, w, h, h / 2); c.fill();
   const segW = (w - (total - 1) * 3) / total;
@@ -233,20 +241,25 @@ export function drawHud2(c, st, best, ui, view) {
   drawPanel(c, 12, 12, 284, 176, C.neonCyan);
   drawCashIcon2(c, 32, 36, 13);
   T(c, '$' + st.cash.toLocaleString('en-US'), 50, 36, 28, C.cash, 'left', 'bold');
-  T(c, 'BEST $' + best.toLocaleString('en-US'), 282, 30, 12, '#c8cdd6', 'right');
+  // UI-TOP: right-edge numbers share one inner margin (x 284 = panel edge
+  // 296 minus 12) and are right-aligned, so they never creep toward the
+  // panel edge or jitter when a digit is added/removed (bible §6.2).
+  T(c, 'BEST $' + best.toLocaleString('en-US'), 284, 30, 12, '#c8cdd6', 'right');
   drawHeart2(c, 32, 66, 9);
   segBar(c, 48, 58, 190, 16, Math.max(0, p.health / 100), p.health > 30 ? '#4ade80' : '#ef4444', 10);
-  T(c, Math.round(p.health) + '%', 248, 66, 13, '#eef1f5', 'left', 'bold');
+  T(c, Math.round(p.health) + '%', 284, 66, 13, '#eef1f5', 'right', 'bold');
   T(c, 'WANTED', 24, 96, 11, '#c8cdd6', 'left', 'bold');
   drawWantedRow2(c, 96, 96, 12, 6, Math.floor(st.wanted));
   const wp = WEAPONS[p.weapon];
   T(c, wp.name.toUpperCase(), 24, 122, 13, '#eef1f5', 'left', 'bold');
-  const pips = 12, filled = Math.ceil((p.ammo / wp.mag) * pips);
+  // UI-TOP: 10 ammo pips (was 12) to match the 10-segment HP bar above;
+  // same info, one rhythm. Count is compact ("24/120") + right-aligned.
+  const pips = 10, filled = Math.ceil((p.ammo / wp.mag) * pips);
   for (let i = 0; i < pips; i++) {
     c.fillStyle = i < filled ? '#ffd23e' : '#2a3242';
-    rr(c, 96 + i * 11, 115, 8, 14, 2); c.fill();
+    rr(c, 96 + i * 13, 115, 8, 14, 2); c.fill();
   }
-  T(c, p.ammo + ' / ' + p.reserve, 232, 122, 13, '#eef1f5', 'left', 'bold');
+  T(c, p.ammo + '/' + p.reserve, 284, 122, 13, '#eef1f5', 'right', 'bold');
   T(c, '◆ ' + collected + '/' + st.collectibles.length + ' HARBOR TOKENS', 24, 148, 13, C.neonYellow, 'left', 'bold');
   if (ui && ui.stationName) {
     drawPill(c, 12, 196, 132, 24, '#0e1420e6', C.neonPink);
@@ -267,12 +280,13 @@ export function drawHud2(c, st, best, ui, view) {
   T(c, readout, W2 / 2, 28, 15, hot ? '#ff8a7a' : '#ffffff', 'center', 'bold');
   drawRoadTo1(c, (W2 - 360) / 2, 52, 360, st.missionDone || 0, st.missionTotal || 12, st.nextMission || '');
   if (st.wanted >= 6) {
-    const g = c.createLinearGradient(0, 0, W2, 0);
-    g.addColorStop(0, '#ff3b3000'); g.addColorStop(0.5, '#ff3b30'); g.addColorStop(1, '#ff3b3000');
-    // JETFIX: banner sat 10 px under the ROAD TO #1 card — cramped stack,
-    // read as one block. +10 px breathing room (ROAD TO #1 ends y 98).
-    c.fillStyle = g; c.fillRect(0, 118, W2, 30);
-    T(c, '⚠  MILITARY RESPONSE  ⚠', W2 / 2, 134, 16, '#fff', 'center', 'bold');
+    // UI-TOP: FIXED slot under the minimap (right rail, aligned with its
+    // panel: x W2-234, y 198). The old full-width band at y 118..148 sat
+    // ON the stats panel (red wash over WANTED/PISTOL rows) and ON the
+    // compass label ("Lighthouse — 1021m" at y ~134). This pill never
+    // moves and never overlaps the meter, the compass or the stats.
+    drawPill(c, W2 - 234, 198, 212, 30, '#ff3b30', '#ffffff');
+    T(c, '⚠  MILITARY RESPONSE  ⚠', W2 - 128, 213, 13, '#ffffff', 'center', 'bold');
   }
   // minimap (top-right)
   drawMinimap2(c, st, W2 - 228, 16, 200, 150);
@@ -310,8 +324,12 @@ export function drawHud2(c, st, best, ui, view) {
   // JETFIX: the space-HUD hint pill (space.js, y H2-34..H2-10) overlapped
   // this bar's bottom edge (panel ended H2-28). Bar moved up 12 px.
   drawPanel(c, 16, H2 - 76, ow, 36, C.neonCyan);
+  // UI-TOP (Bug 7): the pill is the CURRENT mission number (done + 1),
+  // matching the "n/13 Title: ..." prefix of the objective text beside
+  // it. The ROAD TO #1 meter above is the one that counts missions DONE.
+  const curMission = Math.min((st.missionDone || 0) + 1, st.missionTotal || 13);
   drawPill(c, 24, H2 - 68, 52, 20, C.neonCyan);
-  T(c, (st.missionDone || 0) + '/' + (st.missionTotal || 12), 50, H2 - 57, 12, '#0e1420', 'center', 'bold');
+  T(c, curMission + '/' + (st.missionTotal || 13), 50, H2 - 57, 12, '#0e1420', 'center', 'bold');
   T(c, obj, 86, H2 - 57, 16, '#ffffff', 'left', 'bold');
   // dialogue card
   if (st.dialogue) {
@@ -421,7 +439,11 @@ export function drawTitle2(c, view, best, prog, backdrop, live) {
   // (portraits deleted 2026-11-18 19:05 WIB — Juna: faces were ugly and the
   // duo cards ate the street. No faces on title; asset team owns portraits.)
   // ROAD TO #1 (title version)
-  drawRoadTo1(c, tx + 32, y + 8, tw - 64, prog.done, prog.total, prog.next, true);
+  // R25g fix (HUD-TOP §5.1 trade-off): on title, NEXT is the mission you are
+  // about to play — the current chapter — not missionProgress's next (the
+  // mission AFTER the current one, right for the in-game HUD but reads
+  // "NEXT: The Package" on a fresh game while the banner says HOT WHEELS).
+  drawRoadTo1(c, tx + 32, y + 8, tw - 64, prog.done, prog.total, (live && live.chapterTitle) || prog.next, true);
   y += 80 + 8;
   // (controls grid deleted — title is a storefront now: logo, tagline,
   // ROAD TO #1, START. keyChip is now unused on title; kept, tiny helper.)

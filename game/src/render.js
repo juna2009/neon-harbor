@@ -960,9 +960,16 @@ export function createRenderer(canvas) {
   }
   // Mission progress for the ROAD TO #1 meter (HUD + title): done = missions
   // finished (index advances on completion; mission.done flags the finale).
+  // UI-TOP (Bug 7): NEXT is the mission AFTER the current one. The old code
+  // returned MISSION_DEFS[index] — the CURRENT mission — so NEXT repeated
+  // the objective bar ("NEXT: The Harbor King" while playing The Harbor
+  // King). Index 12 (Rocket Heist, the finale) has no next mission, so the
+  // guard returns '' instead of crashing on MISSION_DEFS[13].
   function missionProgress(state) {
     const done = state.mission.done ? 13 : state.mission.index;
-    return { done, total: 13, next: state.mission.done ? '' : MISSION_DEFS[state.mission.index].title };
+    const nextIdx = state.mission.index + 1;
+    const next = state.mission.done || nextIdx >= MISSION_DEFS.length ? '' : MISSION_DEFS[nextIdx].title;
+    return { done, total: 13, next };
   }
   function drawHud(state, best, ui) {
     const p = state.player;
@@ -1064,7 +1071,10 @@ export function createRenderer(canvas) {
     if (dist < 60) return;
     const heading = (p.inCar && p.car) ? p.car.angle : (p.inBoat && p.boat) ? p.boat.angle : p.angle;
     const rel = Math.atan2(dy, dx) - heading;
-    const cxp = view.w / 2, cyp = 104;
+    // UI-TOP: anchor y 114 (was 104) — the arrow tip used to dip 6 px into
+    // the ROAD TO #1 card (card ends y 98); now it clears it by 4 px in
+    // every rotation, and the label pill below clears it by 30 px.
+    const cxp = view.w / 2, cyp = 114;
     ctx.save();
     ctx.translate(cxp, cyp);
     ctx.rotate(rel);
@@ -1073,7 +1083,21 @@ export function createRenderer(canvas) {
     ctx.moveTo(0, -12); ctx.lineTo(9, 8); ctx.lineTo(-9, 8); ctx.closePath();
     ctx.fill();
     ctx.restore();
-    text(`${tgt.label} — ${Math.round(dist)}m`, cxp, cyp + 30, 13, '#ffd23e', 'center', 'bold');
+    // UI-TOP (bible §6.1/§6.4): the label gets its own dark scrim pill so
+    // it stays readable over bright sky, plus a stem tying it to the
+    // arrow above — it never floats unanchored, and (now that the
+    // MILITARY band has moved) nothing ever paints over it.
+    const label = `${tgt.label} — ${Math.round(dist)}m`;
+    ctx.font = `bold 13px ${FONT}`;
+    const tw = ctx.measureText(label).width;
+    ctx.strokeStyle = 'rgba(255,210,62,0.55)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cxp, cyp + 8); ctx.lineTo(cxp, cyp + 14); ctx.stroke();
+    ctx.fillStyle = 'rgba(10,15,28,0.72)';
+    rr(ctx, cxp - tw / 2 - 10, cyp + 14, tw + 20, 22, 11); ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,210,62,0.65)';
+    rr(ctx, cxp - tw / 2 - 10, cyp + 14, tw + 20, 22, 11); ctx.stroke();
+    text(label, cxp, cyp + 30, 13, '#ffd23e', 'center', 'bold');
   }
   function draw(state, screen, best, ui) {
     if (!viewInit) {
