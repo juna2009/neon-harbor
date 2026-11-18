@@ -331,55 +331,71 @@ function keyChip(c, x, y, key, label) {
   T(c, key, x + kw / 2, y + 14, 12, '#ffffff', 'center', 'bold');
   T(c, label, x + kw + 8, y + 14, 13, '#c8cdd6', 'left');
 }
+// ---- title screen v2.1: narrow LEFT poster panel — right ~50% of the frame
+// stays open so the 3D sunset city sells the world (Art Director batch 2:
+// old centered 620px panel + side portraits hid ~60% of the frame).
+// Portraits live INSIDE the panel now, with 3-band shading (portraits.js).
 export function drawTitle2(c, view, best, prog, backdrop, portraits) {
   const W2 = view.w, H2 = view.h;
   if (backdrop) backdrop(c);
   else { c.fillStyle = '#0e1420'; c.fillRect(0, 0, W2, H2); }
-  const px = 56, pw = 190, ph = 250, py = 250;
-  if (portraits) {
-    drawPanel(c, px - 8, py - 8, pw + 16, ph + 44, C.neonCyan);
-    portraits.jax(c, px, py, pw, ph, 'stern');
-    drawPill(c, px - 8, py + ph + 8, pw + 16, 26, C.neonCyan);
-    T(c, 'JAX MARLOWE', px + pw / 2, py + ph + 22, 13, '#0e1420', 'center', 'bold');
-    drawPanel(c, W2 - px - pw - 8, py - 8, pw + 16, ph + 44, C.neonPink);
-    portraits.mara(c, W2 - px - pw, py, pw, ph, 'alert');
-    drawPill(c, W2 - px - pw - 8, py + ph + 8, pw + 16, 26, C.neonPink);
-    T(c, 'MARA — HARBOR CREW', W2 - px - pw / 2, py + ph + 22, 13, '#fff', 'center', 'bold');
-  }
-  const tw = 620, tx = (W2 - tw) / 2, ty = 80, th = 640;
+  const tw = 470, tx = 160, ty = 64, th = 688;
+  const cx = tx + tw / 2;
   drawPanel(c, tx, ty, tw, th, C.neonCyan);
+  let y = ty + 44;
   // logo with glow
   c.save();
-  c.shadowColor = C.neonCyan; c.shadowBlur = 24;
-  T(c, 'NEON HARBOR', W2 / 2, ty + 62, 52, '#eafcff', 'center', 'bold');
+  c.shadowColor = C.neonCyan; c.shadowBlur = 22;
+  T(c, 'NEON HARBOR', cx, y, 40, '#eafcff', 'center', 'bold');
   c.restore();
+  y += 36;
   c.save();
-  c.shadowColor = C.neonPink; c.shadowBlur = 14;
-  T(c, 'THE MARA JOB', W2 / 2, ty + 108, 22, C.neonPink, 'center', 'bold');
+  c.shadowColor = C.neonPink; c.shadowBlur = 12;
+  T(c, 'THE MARA JOB', cx, y, 18, C.neonPink, 'center', 'bold');
   c.restore();
+  y += 20;
   c.strokeStyle = C.neonCyan; c.lineWidth = 2;
-  c.beginPath(); c.moveTo(tx + 40, ty + 134); c.lineTo(tx + tw - 40, ty + 134); c.stroke();
-  // tagline, wrapped to fit
-  W(c, 'Jax Marlowe came to Neon Harbor to drive. His fixer Mara set him up — to save his life. Now they rob the police evidence vault together.', tx + 36, ty + 162, tw - 72, 16, '#eef1f5', 23);
-  W(c, 'Steal a car or a speedboat, run the package, lose the heat — twelve missions across three days.', tx + 36, ty + 232, tw - 72, 16, '#c8cdd6', 23);
+  c.beginPath(); c.moveTo(tx + 32, y); c.lineTo(tx + tw - 32, y); c.stroke();
+  y += 22;
+  // tagline, wrapped to fit the narrow panel
+  y += W(c, 'Jax Marlowe came to Neon Harbor to drive. His fixer Mara set him up — to save his life. Now they rob the police evidence vault together.', tx + 32, y, tw - 64, 14, '#eef1f5', 19) * 19 + 6;
+  y += W(c, 'Steal a car or a speedboat, run the package, lose the heat — twelve missions across three days.', tx + 32, y, tw - 64, 14, '#c8cdd6', 19) * 19 + 10;
+  // portraits inside the panel (duo cards, centered)
+  if (portraits) {
+    const pw = 150, ph = 160, gap = 12;
+    const totalW = (pw + 12) * 2 + gap;
+    const px0 = cx - totalW / 2 + 6;
+    drawPanel(c, px0 - 6, y - 6, pw + 12, ph + 44, C.neonCyan);
+    portraits.jax(c, px0, y, pw, ph, 'stern');
+    drawPill(c, px0 - 6, y + ph + 8, pw + 12, 26, C.neonCyan);
+    T(c, 'JAX MARLOWE', px0 + pw / 2, y + ph + 22, 12, '#0e1420', 'center', 'bold');
+    const px1 = px0 + pw + 12 + gap;
+    drawPanel(c, px1 - 6, y - 6, pw + 12, ph + 44, C.neonPink);
+    portraits.mara(c, px1, y, pw, ph, 'alert');
+    drawPill(c, px1 - 6, y + ph + 8, pw + 12, 26, C.neonPink);
+    T(c, 'MARA — HARBOR CREW', px1 + pw / 2, y + ph + 22, 12, '#fff', 'center', 'bold');
+    y += ph + 44 + 10;
+  }
   // ROAD TO #1 (title version)
-  drawRoadTo1(c, tx + 40, ty + 296, tw - 80, prog.done, prog.total, prog.next, true);
-  // controls grid (key chips, 2 columns)
-  const controls = [['WASD', 'move & drive'], ['MOUSE', 'aim'], ['CLICK', 'shoot'], ['E', 'enter car / boat'], ['R', 'reload'], ['Q', 'switch weapon'], ['C', 'radio'], ['G', 'garage'], ['U', 'shop'], ['O', 'settings']];
+  drawRoadTo1(c, tx + 32, y + 8, tw - 64, prog.done, prog.total, prog.next, true);
+  y += 80 + 8;
+  // controls grid (key chips, 2 columns, 6 essential keys)
+  const controls = [['WASD', 'move & drive'], ['MOUSE', 'aim'], ['CLICK', 'shoot'], ['E', 'enter car / boat'], ['Q', 'switch weapon'], ['C', 'radio']];
   controls.forEach(([k, l], i) => {
     const col = i % 2, row = Math.floor(i / 2);
-    keyChip(c, tx + 40 + col * 300, ty + 372 + row * 32, k, l);
+    keyChip(c, tx + 32 + col * 210, y + row * 27, k, l);
   });
-  // start button with pulse
+  y += 3 * 27 + 10;
+  // start button with pulse (centered on the panel, not the screen)
   const pulse = 1 + 0.06 * Math.sin(Date.now() / 280);
-  c.save(); c.translate(W2 / 2, ty + th - 46); c.scale(pulse, pulse);
+  c.save(); c.translate(cx, y + 19); c.scale(pulse, pulse);
   c.shadowColor = C.neonCyan; c.shadowBlur = 18;
   c.fillStyle = '#37e0e633'; rr(c, -170, -19, 340, 38, 8); c.fill();
   c.restore();
-  c.lineWidth = 2.5; c.strokeStyle = C.neonCyan; rr(c, W2 / 2 - 170, ty + th - 65, 340, 38, 8); c.stroke();
-  T(c, 'PRESS ENTER TO START', W2 / 2, ty + th - 45, 16, '#ffffff', 'center', 'bold');
-  drawPill(c, W2 / 2 - 78, H2 - 34, 156, 24, '#0e1420e6', C.cash);
-  T(c, 'BEST CASH $' + best.toLocaleString('en-US'), W2 / 2, H2 - 21, 13, C.cash, 'center', 'bold');
+  c.lineWidth = 2.5; c.strokeStyle = C.neonCyan; rr(c, cx - 170, y, 340, 38, 8); c.stroke();
+  T(c, 'PRESS ENTER TO START', cx, y + 19, 16, '#ffffff', 'center', 'bold');
+  drawPill(c, cx - 78, H2 - 34, 156, 24, '#0e1420e6', C.cash);
+  T(c, 'BEST CASH $' + best.toLocaleString('en-US'), cx, H2 - 21, 13, C.cash, 'center', 'bold');
 }
 // ---- mission banner v2 ----
 export function drawMissionBanner2(c, view, chapter, total, title) {

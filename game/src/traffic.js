@@ -1,8 +1,9 @@
-import { BLOCK, ROAD_W, WORLD_H, WORLD_W } from './config.js';
+import { ROAD_W, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, onRoad } from './city.js';
 const TRAFFIC_COUNT = 16;
 const PARKED_COUNT = 12;
 const PED_COUNT = 26;
+const FIXED = { bus: '#e8b93c', fire: '#c0392b', medic: '#f5f5f5' };
 export const CAR_BODIES = {
   sedan: { length: 46, width: 22 },
   hatch: { length: 40, width: 22 },
@@ -10,7 +11,7 @@ export const CAR_BODIES = {
   taxi: { length: 46, width: 22 },
 };
 export function makeCar(x, y, angle, color, kind, body) {
-  const shape = CAR_BODIES[body || 'sedan'];
+  const shape = CAR_BODIES[body || 'sedan'] || { length: 46, width: 22 };
   return {
     x, y, angle, speed: 0, color, kind: kind || 'traffic',
     body: body || 'sedan', length: shape.length, width: shape.width,
@@ -21,8 +22,8 @@ export function createTraffic(city, rng) {
   const cars = [];
   for (let i = 0; i < TRAFFIC_COUNT; i += 1) {
     const vertical = rng.chance(0.5);
-    const body = rng.weighted([['sedan', 5], ['hatch', 3], ['van', 1], ['taxi', 2]]);
-    const color = body === 'taxi' ? '#f7c948' : rng.pick(city.carColors);
+    const body = rng.weighted([['sedan', 4], ['hatch', 2], ['hatchback', 2], ['sedanL', 2], ['pickup', 2], ['van', 1], ['taxi', 2], ['bus', 1], ['fire', 1], ['medic', 1]]);
+    const color = FIXED[body] || (body === 'taxi' ? '#f7c948' : rng.pick(city.carColors));
     let car;
     if (vertical) {
       const rx = rng.pick(city.roadsV);
@@ -48,7 +49,7 @@ export function createTraffic(city, rng) {
   const parked = [];
   for (let i = 0; i < PARKED_COUNT; i += 1) {
     const vertical = rng.chance(0.5);
-    const body = rng.weighted([['sedan', 5], ['hatch', 3], ['van', 1], ['taxi', 1]]);
+    const body = rng.weighted([['sedan', 4], ['hatch', 2], ['hatchback', 2], ['sedanL', 2], ['pickup', 2], ['van', 1], ['taxi', 1]]);
     const color = body === 'taxi' ? '#f7c948' : rng.pick(city.carColors);
     if (vertical) {
       const rx = rng.pick(city.roadsV);
@@ -240,4 +241,3 @@ export function randomRoadPoint(city, rng) {
   if (rng.chance(0.5)) return { x: rng.pick(city.roadsV), y: rng.range(120, WORLD_H - 120) };
   return { x: rng.range(120, WATER_X - 120), y: rng.pick(city.roadsH) };
 }
-export { BLOCK };

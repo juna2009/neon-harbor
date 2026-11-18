@@ -72,10 +72,11 @@ export function spawnPoliceUnit(police, player, rng, kind, city) {
     return;
   }
   const at = spawnPointNear(player, rng, 520, city);
-  if (kind === 'mtruck') {
-    const truck = makeCar(at.x, at.y, 0, '#5a6b3a', 'police', 'van');
+  if (kind === 'mtruck' || kind === 'apc' || kind === 'fire' || kind === 'medic') {
+    const spec = { mtruck: ['#5a6b3a', 'van', 5], apc: ['#4a5a2a', 'apc', 6], fire: ['#c0392b', 'fire', 5], medic: ['#f5f5f5', 'medic', 5] }[kind];
+    const truck = makeCar(at.x, at.y, 0, spec[0], 'police', spec[1]);
     truck.speed = 0;
-    police.units.push({ kind: 'car', military: true, car: truck, health: 5, ramTimer: 0 });
+    police.units.push({ kind: 'car', military: kind === 'mtruck' || kind === 'apc', car: truck, health: spec[2], ramTimer: 0, emergency: kind === 'fire' || kind === 'medic' });
   } else if (kind === 'car') {
     const car = makeCar(at.x, at.y, 0, '#2f6fd0', 'police');
     car.speed = 0;
@@ -191,7 +192,7 @@ export function stepPolice(police, state, dt, rng, events) {
   if (police.roadblockTimer > 0) police.roadblockTimer -= dt;
   if (police.barrierTimer > 0) police.barrierTimer -= dt;
   if (wanted < 5) {
-    police.units = police.units.filter((u) => !u.military && u.kind !== 'soldier' && !u.concrete);
+    police.units = police.units.filter((u) => !u.military && u.kind !== 'soldier' && !u.concrete && !u.emergency);
   }
   const heli = police.heli;
   if (wanted >= 4 && !heli.active) {
@@ -245,8 +246,9 @@ export function stepPolice(police, state, dt, rng, events) {
     const boats = police.units.filter((u) => u.kind === 'boat').length;
     const kind = player.inBoat
       ? (wanted >= 3 && boats < 2 ? 'boat' : null)
-      : (wanted >= 6 && rng.chance(0.45) ? (player.inCar ? 'mtruck' : 'soldier')
-        : (player.inCar && wanted >= 2 ? 'car' : 'foot'));
+      : (wanted >= 5 && !police.units.some((u) => u.emergency) && rng.chance(0.2) ? (rng.chance(0.5) ? 'fire' : 'medic')
+      : (wanted >= 6 && rng.chance(0.45) ? (player.inCar ? (rng.chance(0.5) ? 'mtruck' : 'apc') : 'soldier')
+        : (player.inCar && wanted >= 2 ? 'car' : 'foot')));
     if (kind) {
       spawnPoliceUnit(police, player, rng, kind, state.city);
       if (kind === 'boat' && !police.boatWarned) {
@@ -331,8 +333,8 @@ export function stepPolice(police, state, dt, rng, events) {
         events.crash = true;
         if (player.inCar) {
           player.car.speed *= unit.military ? 0.7 : 0.85;
-          state.player.health = Math.max(0, state.player.health - (unit.military ? 6 : 3));
-        } else {
+          if (!unit.emergency) state.player.health = Math.max(0, state.player.health - (unit.military ? 6 : 3));
+        } else if (!unit.emergency) {
           state.player.health -= unit.military ? 10 : 6;
         }
         car.speed *= 0.5;

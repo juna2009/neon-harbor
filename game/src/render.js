@@ -563,7 +563,8 @@ export function createRenderer(canvas) {
           continue;
         }
         if (unit.car.body === 'van') drawVan(ctx, unit.car.x, unit.car.y, unit.car.angle, unit.car.color);
-        else drawPoliceCar(ctx, unit.car.x, unit.car.y, unit.car.angle);
+        else if (unit.car.body === 'sedan') drawPoliceCar(ctx, unit.car.x, unit.car.y, unit.car.angle);
+        else drawCarShape(ctx, unit.car, night);
         const blink = Math.floor(state.elapsed * 6) % 2 === 0;
         ctx.fillStyle = blink ? '#ff3b30' : '#2f6fd0';
         ctx.beginPath();

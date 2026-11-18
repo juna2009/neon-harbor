@@ -1,3 +1,6 @@
+import { CAR_BODIES } from './traffic.js';
+import { VEHICLE_TYPES, drawVehicleBody, registerVehicleTypes } from './vehicles.js';
+registerVehicleTypes(CAR_BODIES);
 function T(c,x,y,a){c.save();c.translate(x,y);c.rotate(a)}
 function E(c){c.restore()}
 function R(c,x,y,w,h,k){c.fillStyle=k;c.fillRect(x,y,w,h)}
@@ -43,6 +46,7 @@ export function rr(ctx, x, y, w, h, r) {
 export function drawCarShape(ctx, car, night) {
   const L = car.length;
   const W = car.width;
+  if (VEHICLE_TYPES[car.body]) return drawVehicleBody(ctx, car, night);
   ctx.save();
   ctx.translate(car.x, car.y);
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
