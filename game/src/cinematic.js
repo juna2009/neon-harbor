@@ -1,9 +1,16 @@
 import { drawChase3D, drawCity3DFrame, projectChase, resetChaseCam } from './city3d.js';
+import { createRenderer } from './webgl2.js';
 export function createCinematic() {
   let t = 0, ts = 1, bar = 0, barT = 0;
   let pT = 0, pD = 1, pA = 0, sT = 0, sD = 1, sS = 0.35;
   const L = [];
   let vg = null, vw = 0, vh = 0;
+  // WebGL2 chase-cam (R26): kanvas GL dibuat dinamis di sini (post-cut) —
+  // index.html TIDAK diubah. Kanvas GL duduk DI BAWAH kanvas 2D (DOM lebih
+  // dulu + position fixed); kanvas 2D dibersihkan transparan tiap frame
+  // chase supaya GL terlihat, HUD 2D tetap digambar di atasnya oleh render.js.
+  let glR = null, glCanvas = null, glTried = false, glFailed = false, glLast = 0;
+  const glPerf = [];
   const cl = (v, a, b) => v < a ? a : v > b ? b : v;
   const punch = (a = 0.22, d = 0.5) => { pA = a; pD = d; pT = d; };
   const shake = (a, d = 0.6) => { L.push({ a, f: 28 + Math.random() * 22, p: Math.random() * 6, d: 3 / d }); };
@@ -61,8 +68,66 @@ export function createCinematic() {
     if (cool > 0.01) { ctx.fillStyle = `rgba(70,120,255,${(cool * 0.07).toFixed(3)})`; ctx.fillRect(0, 0, w, h); }
   }
   function title3D(ctx, t) { drawCity3DFrame(ctx, t); }
-  function chase3D(ctx, state) { drawChase3D(ctx, state); }
-  function chaseReset() { resetChaseCam(); }
+  // Jalur WebGL2 dulu; gagal (konteks null / shader gagal / throw) ->
+  // fallback Canvas 2D lama. Sekali gagal, jangan coba lagi tiap frame.
+  function tryGL(ctx, state) {
+    if (glFailed) return false;
+    if (!glTried) {
+      glTried = true;
+      try {
+        glCanvas = document.createElement('canvas');
+        glCanvas.id = 'gl3d';
+        glCanvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block;';
+        const c2d = ctx.canvas;
+        c2d.parentNode.insertBefore(glCanvas, c2d);
+        glR = createRenderer(glCanvas);
+        if (!glR) {
+          glFailed = true;
+          glCanvas.style.display = 'none';
+          return false;
+        }
+      } catch (e) {
+        glFailed = true;
+        console.warn('WEBGL2 chase-cam gagal, fallback Canvas 2D:', e);
+        if (glCanvas) glCanvas.style.display = 'none';
+        return false;
+      }
+    }
+    if (!glR) return false;
+    try {
+      const ratio = window.devicePixelRatio || 1;
+      const w = ctx.canvas.clientWidth || ctx.canvas.width;
+      const h = ctx.canvas.clientHeight || ctx.canvas.height;
+      if (glCanvas.width !== Math.round(w * ratio) || glCanvas.height !== Math.round(h * ratio)) glR.resize(w, h, ratio);
+      glCanvas.style.display = 'block';
+      // render.js mengisi kanvas 2D opaque (#0e1420) sebelum chase3D —
+      // hapus supaya GL di bawahnya terlihat; HUD digambar setelah ini.
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      const now = performance.now();
+      const dt = glLast ? Math.min(Math.max((now - glLast) / 1000, 0), 0.05) : 0.016;
+      glLast = now;
+      const st = glR.render(state, dt);
+      glPerf.push({ ms: st.ms, tris: st.tris, calls: st.calls, mode: st.mode });
+      if (glPerf.length > 240) glPerf.shift();
+      window.__webglPerf = glPerf;
+      window.__webglMode = st.mode;
+      return true;
+    } catch (e) {
+      glFailed = true;
+      console.warn('WEBGL2 render gagal, fallback Canvas 2D:', e);
+      if (glCanvas) glCanvas.style.display = 'none';
+      return false;
+    }
+  }
+  function chase3D(ctx, state) {
+    if (tryGL(ctx, state)) return;
+    drawChase3D(ctx, state);
+  }
+  function chaseReset() {
+    resetChaseCam();
+    if (glCanvas) glCanvas.style.display = 'none';
+    glLast = 0;
+  }
   function project(wx, wy, wz) { return projectChase(wx, wy, wz); }
   return { punch, shake, slowmo, bars, update, drawBars, drawGrade, title3D, chase3D, chaseReset, project };
 }

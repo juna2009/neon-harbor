@@ -1,0 +1,226 @@
+// Neon Harbor — 4 palet suasana waktu (pagi / siang / sore / malam).
+// ES module, post-cut, tanpa library. Dibaca dari game state, BUKAN dari
+// file lain: `state.timeOfDay` adalah satu-satunya jembatan ke renderer.
+//
+// KENAPA PERLU: game selama ini hampir selalu sunset — shader langit WebGL2
+// (SKYF) dan langit Canvas (city3d SKY) meng-hardcode gradient oranye-ungu,
+// warna fog HZ oranye, dan warna matahari oranye. `state.daylight` (0..1)
+// hanya menggelapkan/mencerahkan palet sunset itu, bukan menggantinya.
+// Modul ini mengganti paletnya per suasana, dengan SORE = nilai yang sudah
+// ada persis (baseline, jangan diubah).
+//
+// DASAR RISET (bukan riset baru — pakai yang sudah ada):
+//  - graphics-bible/art-direction.md §2.1 palet sunset (SORE = tabel itu),
+//    §2.2 color script ("tiap shot punya suhu berbeda TAPI satu keluarga
+//    palet", "parameterisasi gradient langit + HZ per scene, bukan satu
+//    palet global"), §2.3 blue hour (#0B1E3A -> #274B7A + horizon oranye
+//    #FF8C42 + jendela hangat — dipakai untuk MALAM).
+//  - graphics-bible/webgl-techniques.md §4 sky (6-stop gradient, Mie glow,
+//    anamorphic streak, smog band) + §1 lighting (Half-Lambert, rim, Fresnel).
+//  - city3d.js SKY yang sudah ada: [0]=malam, [1]=sunset, [2]=siang —
+//    sky4 tiap preset di bawah MENGAMBIL anchor yang sama persis.
+//
+// SATUAN: warna [r,g,b] 0..1 untuk WebGL, 0..255 untuk Canvas (sky4).
+// `daylight` = skalar lama yang sudah dimengerti semua renderer (0..1).
+// `nightF` = turunan yang dipakai city3d/render.js (0 siang — 1 malam).
+
+export const PRESETS = {
+  // PAGI — fajar biru-pink dingin, 07:00. Matahari rendah di timur, cahaya
+  // lembut, jalan basah embun (wet 0.7), neon mulai padam, kabut tipis.
+  pagi: {
+    name: 'pagi', label: 'Pagi — fajar', hour: 7, daylight: 0.32, nightF: 0.30,
+    // langit WebGL, horizon -> zenit (5 stop, sama seperti band SKYF)
+    sky5: [[1.00, 0.79, 0.54], [0.95, 0.63, 0.71], [0.72, 0.78, 0.88], [0.42, 0.56, 0.75], [0.18, 0.29, 0.48]],
+    // langit Canvas, [top, mid, horizon, haze] (format SKY city3d.js)
+    sky4: [[46, 74, 122], [150, 170, 210], [255, 201, 138], [232, 217, 200]],
+    sun: { y: 0.18, col: [1.00, 0.82, 0.60], disc: [1.00, 0.88, 0.65], glow: [1.00, 0.80, 0.55], pos: [0.55, 0.52] },
+    moon: 0, moonCol: [0.90, 0.93, 1.00],
+    ambG: [0.30, 0.32, 0.45], ambS: [0.55, 0.55, 0.62],
+    hz: [0.91, 0.85, 0.78],
+    winLit: 0.25, winTint: [1.00, 0.90, 0.85],
+    neonGain: 1.6, lamp: 0.35, headlight: 0.30, wet: 0.70,
+    waterDeep: [0.10, 0.25, 0.38], waterSky: [0.95, 0.70, 0.65],
+    stars: 0, cloud: [0.95, 0.75, 0.85], cloudK: 0.22, smog: 0.50,
+    skyDim: 0.55, exposure: 0.90,
+    facK: 0.55, winCell: [2.2, 2.6], winGlass: 0.7, winWarm: 1, // GEDUNG: sel jendela netral lebih kecil+rapat, kaca gelap di semua waktu
+    contrast: 0, shadowK: 0.5, roadTex: 0, fogK: 1, sunK: 1,
+    bldShadow: false, heroReal: true, // GEDUNG R2: hero v14 realistis di semua waktu (arah R26, hapus gate),
+  },
+  // SIANG — tengah hari biru cerah, 12:00. Matahari tinggi, bayangan keras /
+  // pendek, warna vivid, neon hampir tak terlihat, jalan kering.
+  // SIANG v2 (2026-11-18, agen SIANG-FIX — Juna: shot siang v1 "jelek banget"):
+  // langit zenith LEBIH TUA, matahari LEBIH TINGGI (elevasi ~57°, bayangan
+  // pendek), ambient LEBIH RENDAH + kontras terarah (bayangan tidak lagi
+  // abu-abu terang), fog LEBIH TIPIS (udara jernih), jendela kecil+rapat
+  // + kaca gelap pantul langit, jalan bertekstur. Field baru di bawah
+  // (facK..bldShadow) = 0/netral di preset lain — sore/pagi/malam TIDAK berubah.
+  siang: {
+    name: 'siang', label: 'Siang — tengah hari', hour: 12, daylight: 1.00, nightF: 0.00,
+    sky5: [[0.82, 0.90, 0.97], [0.62, 0.80, 0.94], [0.38, 0.62, 0.88], [0.20, 0.45, 0.80], [0.08, 0.28, 0.65]],
+    sky4: [[20, 71, 166], [70, 130, 200], [170, 205, 235], [150, 180, 205]],
+    sun: { y: 1.35, col: [1.00, 0.98, 0.92], disc: [1.00, 1.00, 0.96], glow: [1.00, 0.98, 0.88], pos: [0.55, 0.78] },
+    moon: 0, moonCol: [0.90, 0.93, 1.00],
+    ambG: [0.32, 0.38, 0.50], ambS: [0.48, 0.56, 0.70],
+    hz: [0.78, 0.86, 0.94],
+    winLit: 0.06, winTint: [0.70, 0.82, 1.00],
+    neonGain: 0.9, lamp: 0.00, headlight: 0.00, wet: 0.05,
+    waterDeep: [0.05, 0.30, 0.50], waterSky: [0.45, 0.65, 0.90],
+    stars: 0, cloud: [0.98, 0.99, 1.00], cloudK: 0.35, smog: 0.15,
+    skyDim: 1.00, exposure: 1.12,
+    facK: 0.72, winCell: [2.0, 2.4], winGlass: 0.7, winWarm: 0.1,
+    contrast: 0.55, shadowK: 0.75, roadTex: 1.0, fogK: 0.45, sunK: 1.1,
+    bldShadow: true, heroReal: true,
+  },
+  // SORE — sunset yang sudah ada, 18:30. BASELINE — semua nilai di bawah
+  // adalah nilai hardcode yang SUDAH ADA di webgl2.js / city3d.js hari ini.
+  // Jangan diubah; preset ini membuktikan patch tidak merusak yang diterima.
+  sore: {
+    name: 'sore', label: 'Sore — sunset (baseline)', hour: 18.5, daylight: 0.45, nightF: 0.43,
+    sky5: [[1.00, 0.72, 0.42], [1.00, 0.50, 0.22], [0.85, 0.28, 0.38], [0.45, 0.14, 0.42], [0.12, 0.05, 0.28]], // = stop SKYF
+    sky4: [[30, 11, 51], [107, 35, 85], [255, 179, 92], [255, 150, 110]], // = SKY[1] city3d
+    sun: { y: 0.30, col: [1.00, 0.55, 0.30], disc: [1.00, 0.91, 0.66], glow: [1.00, 0.75, 0.45], pos: [0.55, 0.56] },
+    moon: 0, moonCol: [0.90, 0.93, 1.00],
+    ambG: [0.35, 0.22, 0.30], ambS: [0.55, 0.30, 0.42], // = amb FS
+    hz: [1.00, 0.55, 0.38], // = HZ FS
+    winLit: 0.58, winTint: [1.00, 1.00, 1.00], // step(0.42) = 1 - 0.58
+    neonGain: 2.2, lamp: 0.70, headlight: 0.50, wet: 0.40, // = base * 2.2 emissive
+    waterDeep: [0.05, 0.20, 0.32], waterSky: [1.00, 0.55, 0.35], // = FS air
+    stars: 0.10, cloud: [1.00, 0.55, 0.55], cloudK: 0.20, smog: 0.35,
+    skyDim: 0.30, exposure: 1.00,
+    facK: 0.55, winCell: [2.2, 2.6], winGlass: 0.7, winWarm: 1, // GEDUNG: sel jendela netral lebih kecil+rapat, kaca gelap di semua waktu
+    contrast: 0, shadowK: 0.5, roadTex: 0, fogK: 1, sunK: 1,
+    bldShadow: false, heroReal: true, // GEDUNG R2: hero v14 realistis di semua waktu (arah R26, hapus gate),
+  },
+  // MALAM — blue hour -> malam, 22:00. Langit biru dalam (bible §2.3) +
+  // horizon oranye tipis, bulan, bintang, neon + lampu jalan dominan,
+  // kerucut lampu depan mobil, jendela menyala lebih banyak.
+  malam: {
+    name: 'malam', label: 'Malam — blue hour', hour: 22, daylight: 0.08, nightF: 1.00,
+    sky5: [[0.55, 0.30, 0.25], [0.10, 0.14, 0.28], [0.07, 0.10, 0.22], [0.05, 0.07, 0.19], [0.02, 0.03, 0.06]],
+    sky4: [[5, 7, 15], [13, 19, 48], [28, 37, 71], [16, 22, 44]], // = SKY[0] city3d
+    sun: { y: 0.45, col: [0.72, 0.80, 1.00], disc: [0.90, 0.93, 1.00], glow: [0.70, 0.78, 1.00], pos: [0.55, 0.85] },
+    moon: 1, moonCol: [0.90, 0.93, 1.00],
+    ambG: [0.10, 0.12, 0.22], ambS: [0.16, 0.20, 0.32],
+    hz: [0.08, 0.11, 0.20],
+    winLit: 0.75, winTint: [1.05, 0.85, 0.55],
+    neonGain: 2.6, lamp: 1.00, headlight: 1.00, wet: 0.50,
+    waterDeep: [0.03, 0.08, 0.18], waterSky: [0.20, 0.30, 0.55],
+    stars: 1.00, cloud: [0.40, 0.50, 0.70], cloudK: 0.12, smog: 0.15,
+    skyDim: 0.90, exposure: 0.80,
+    facK: 0.55, winCell: [2.2, 2.6], winGlass: 0.7, winWarm: 1, // GEDUNG: sel jendela netral lebih kecil+rapat, kaca gelap di semua waktu
+    contrast: 0, shadowK: 0.5, roadTex: 0, fogK: 1, sunK: 1,
+    bldShadow: false, heroReal: true, // GEDUNG R2: hero v14 realistis di semua waktu (arah R26, hapus gate),
+  },
+};
+
+// ---- interpolasi ----
+// Lerp semua field numerik dua preset (array di-lerp per elemen). Dipakai
+// untuk transisi halus (timeOfDayBlend) dan siklus jam (presetForHour).
+export function lerpPreset(a, b, t) {
+  const lerp = (x, y) => x + (y - x) * t;
+  const la = (x, y) => x.map((v, i) => lerp(v, y[i]));
+  const out = { name: t < 0.5 ? a.name : b.name, blend: t };
+  for (const k of ['hour', 'daylight', 'nightF', 'moon', 'winLit', 'neonGain',
+    'lamp', 'headlight', 'wet', 'stars', 'cloudK', 'smog', 'skyDim', 'exposure',
+    'facK', 'winGlass', 'winWarm', 'contrast', 'shadowK', 'roadTex', 'fogK', 'sunK']) {
+    out[k] = lerp(a[k], b[k]);
+  }
+  out.bldShadow = t < 0.5 ? a.bldShadow : b.bldShadow;
+  out.heroReal = t < 0.5 ? a.heroReal : b.heroReal;
+  out.winCell = la(a.winCell, b.winCell);
+  out.sky5 = a.sky5.map((s, i) => la(s, b.sky5[i]));
+  out.sky4 = a.sky4.map((s, i) => la(s, b.sky4[i]));
+  out.sun = {
+    y: lerp(a.sun.y, b.sun.y), col: la(a.sun.col, b.sun.col),
+    disc: la(a.sun.disc, b.sun.disc), glow: la(a.sun.glow, b.sun.glow),
+    pos: la(a.sun.pos, b.sun.pos),
+  };
+  out.moonCol = la(a.moonCol, b.moonCol);
+  out.ambG = la(a.ambG, b.ambG); out.ambS = la(a.ambS, b.ambS);
+  out.hz = la(a.hz, b.hz); out.winTint = la(a.winTint, b.winTint);
+  out.waterDeep = la(a.waterDeep, b.waterDeep); out.waterSky = la(a.waterSky, b.waterSky);
+  out.cloud = la(a.cloud, b.cloud);
+  return out;
+}
+
+// ---- API utama ----
+// Terapkan satu suasana ke game state. Satu-satunya penulis state.timeOfDay.
+// Mengatur JUGA state.daylight (skalar lama, supaya renderer yang belum
+// di-patch tetap berubah) + state.clock.total (jam) + daylightManual=true
+// (mematikan siklus sinus otomatis di world.js:571 — suasana pilihan user
+// tidak ditimpa tiap frame).
+export function applyTimeOfDay(state, name) {
+  const p = PRESETS[name];
+  if (!p) throw new Error('suasana tidak dikenal: ' + name);
+  state.daylight = p.daylight;
+  state.daylightManual = true;
+  if (state.clock) state.clock.total = p.hour * 60;
+  state.timeOfDay = p;
+  return p;
+}
+export const setTimeOfDay = applyTimeOfDay;
+
+// Transisi halus antar dua suasana: t 0..1. Dipakai untuk crossfade
+// (misal cutscene pagi -> siang, atau siklus jam yang berjalan).
+export function timeOfDayBlend(state, aName, bName, t) {
+  const p = lerpPreset(PRESETS[aName], PRESETS[bName], Math.max(0, Math.min(1, t)));
+  p.name = 'blend:' + aName + '->' + bName;
+  state.daylight = p.daylight;
+  state.daylightManual = true;
+  if (state.clock) state.clock.total = p.hour * 60;
+  state.timeOfDay = p;
+  return p;
+}
+
+// Siklus jam -> preset (untuk game live, fase 2 — lihat PATCH-SPEC §5).
+// Keyframe: 0 malam, 5 malam, 6.5 pagi, 9.5 pagi, 11 siang, 15.5 siang,
+// 17.5 sore, 19.5 sore, 21 malam, 24 malam. Di antara keyframe: lerp.
+const KEYS = [
+  [0, 'malam'], [5, 'malam'], [6.5, 'pagi'], [9.5, 'pagi'], [11, 'siang'],
+  [15.5, 'siang'], [17.5, 'sore'], [19.5, 'sore'], [21, 'malam'], [24, 'malam'],
+];
+export function presetForHour(hour) {
+  const h = ((hour % 24) + 24) % 24;
+  for (let i = 0; i < KEYS.length - 1; i += 1) {
+    const [h0, n0] = KEYS[i], [h1, n1] = KEYS[i + 1];
+    if (h >= h0 && h < h1) {
+      if (n0 === n1) return PRESETS[n0];
+      return lerpPreset(PRESETS[n0], PRESETS[n1], (h - h0) / (h1 - h0));
+    }
+  }
+  return PRESETS.malam;
+}
+
+// ---- adaptor renderer ----
+// WebGL2 (webgl2.js yang di-patch, PATCH-SPEC §2): satu objek, semua uniform.
+// `sunCol` dipakai ulang untuk SEMUA tint hangat (cat Fresnel, streak kaca,
+// streak jalan, air, ambient sun, spec, rim) — satu warna matahari menggeser
+// seluruh suhu frame, sesuai bible §2.1 (satu pasangan komplementer dominan).
+export function webglUniforms(p) {
+  return {
+    sunY: p.sun.y, sunCol: p.sun.col, sunDisc: p.sun.disc, sunGlow: p.sun.glow,
+    sunPos: p.sun.pos, moon: p.moon,
+    sky0: p.sky5[0], sky1: p.sky5[1], sky2: p.sky5[2], sky3: p.sky5[3], sky4: p.sky5[4],
+    hz: p.hz, ambG: p.ambG, ambS: p.ambS,
+    winLit: 1 - p.winLit, winTint: p.winTint, neonGain: p.neonGain,
+    waterDeep: p.waterDeep, waterSky: p.waterSky,
+    stars: p.stars, cloud: p.cloud, cloudK: p.cloudK, smog: p.smog,
+    skyDim: p.skyDim, exposure: p.exposure,
+    lamp: p.lamp, headlight: p.headlight,
+    // SIANG v2: uniform realisme siang (netral di preset lain — lihat PRESETS)
+    winCell: p.winCell, winGlass: p.winGlass, winWarm: p.winWarm,
+    contrast: p.contrast, shadowK: p.shadowK, roadTex: p.roadTex,
+    fogK: p.fogK, sunK: p.sunK,
+  };
+}
+
+// Canvas fallback (city3d.js yang di-patch, PATCH-SPEC §3): skyFor() cukup
+// diberi sky4 + nightF + sunH/moonH dari preset, sisanya mengikuti mesin
+// nightF yang sudah ada (lampu, neon, bintang, jendela).
+export function canvasPalette(p) {
+  return {
+    sky4: p.sky4, nightF: p.nightF,
+    sunH: p.name === 'siang' ? 42 : p.name === 'pagi' ? 16 : 10,
+    moonH: 26, moon: p.moon,
+  };
+}
