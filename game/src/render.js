@@ -6,7 +6,7 @@ import { createCinematic } from './cinematic.js';
 import { drawBuildingShadow, drawDayTint, drawLightPool, drawLightning, drawWetReflection } from './lighting.js';
 import { drawBuoy, drawBuilding, drawCargoShip, drawContainer, drawCrane, drawCrosswalk, drawHydrant, drawLamp, drawPier, drawSign, drawTree } from './props.js';
 import { drawAmmoIcon, drawBanner, drawButton, drawCashIcon, drawDirectionArrow, drawHeart, drawMenuFrame, drawNeonLine, drawObjectiveIcon, drawSpeedIcon, drawTargetRing, drawWantedRow } from './ui-art.js';
-import { drawBoatWake, drawCarShape, drawExplosionSprite, drawHarborSkyline, drawNeonLogo, drawPedPhone, drawPedestrian, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet, rr } from './assets.js';
+import { drawBoatWake, drawCarShape, drawExplosionSprite, drawHarborSkyline, drawNeonLogo, drawPedPhone, drawPedestrian, drawPerson, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet, rr } from './assets.js';
 import { drawJaxPortrait, drawMaraPortrait, drawPortraitSmall } from './portraits.js';
 import { drawBridge } from './drawbridge.js';
 export const SCREEN_TITLE = 'title';
@@ -37,55 +37,6 @@ function drawTrafficCar(ctx, car, night) {
   else if (car.body === 'van') drawVan(ctx, car.x, car.y, car.angle, car.color);
   else if (car.body === 'sedan' || car.body === 'hatch') drawSportCar(ctx, car.x, car.y, car.angle, car.color);
   else drawCarShape(ctx, car, night);
-}
-function drawPerson(ctx, x, y, angle, ped, walkPhase) {
-  const radius = ped.build === 'wide' ? 11 : 9;
-  const bob = Math.sin(walkPhase) * 1.5;
-  const swing = Math.sin(walkPhase) * 4;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.beginPath();
-  ctx.ellipse(0, radius * 0.8, radius, radius * 0.45, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.translate(0, bob);
-  ctx.rotate(angle);
-  ctx.fillStyle = ped.pants || '#2c3e50';
-  ctx.fillRect(-3, -radius * 0.7, 6, 3);
-  ctx.fillRect(-3 + swing * 0.4, radius * 0.7 - 3, 6, 3);
-  ctx.fillStyle = ped.color;
-  const bw = ped.build === 'wide' ? radius * 1.5 : radius * 1.2;
-  rr(ctx, -radius * 0.7, -bw / 2, radius * 1.4, bw, 4);
-  ctx.fill();
-  ctx.fillStyle = ped.skin || '#e8b98a';
-  ctx.fillRect(radius * 0.3, -bw / 2 - 2, 4, 4);
-  ctx.fillRect(radius * 0.3, bw / 2 - 2, 4, 4);
-  ctx.beginPath();
-  ctx.arc(radius * 0.75, 0, radius * 0.55, 0, Math.PI * 2);
-  ctx.fill();
-  if (ped.hat === 1) {
-    ctx.fillStyle = '#20242a';
-    ctx.beginPath();
-    ctx.arc(radius * 0.75, 0, radius * 0.55, Math.PI * 0.7, Math.PI * 1.9);
-    ctx.fill();
-    ctx.fillRect(radius * 0.75, -radius * 0.55, radius * 0.7, 3);
-  } else if (ped.hat === 2) {
-    ctx.fillStyle = '#8e44ad';
-    ctx.beginPath();
-    ctx.arc(radius * 0.75, 0, radius * 0.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = ped.skin || '#e8b98a';
-    ctx.beginPath();
-    ctx.arc(radius * 0.95, 0, radius * 0.4, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  if (ped.photo > 0) {
-    ctx.fillStyle = '#14181f';
-    ctx.fillRect(radius * 0.75, -radius - 8, 5, 10);
-    ctx.fillStyle = '#bfe6ff';
-    ctx.fillRect(radius * 0.75 + 1, -radius - 7, 3, 8);
-  }
-  ctx.restore();
 }
 function drawPlayer(ctx, p, state) {
   const bob = Math.sin(p.runPhase) * 1.5;

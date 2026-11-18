@@ -116,3 +116,52 @@ export function drawCarShape(ctx, car, night) {
   }
   ctx.restore();
 }
+export function drawPerson(ctx, x, y, angle, ped, walkPhase) {
+  const radius = ped.build === 'wide' ? 11 : 9;
+  const bob = Math.sin(walkPhase) * 1.5;
+  const swing = Math.sin(walkPhase) * 4;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(0, radius * 0.8, radius, radius * 0.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.translate(0, bob);
+  ctx.rotate(angle);
+  ctx.fillStyle = ped.pants || '#2c3e50';
+  ctx.fillRect(-3, -radius * 0.7, 6, 3);
+  ctx.fillRect(-3 + swing * 0.4, radius * 0.7 - 3, 6, 3);
+  ctx.fillStyle = ped.color;
+  const bw = ped.build === 'wide' ? radius * 1.5 : radius * 1.2;
+  rr(ctx, -radius * 0.7, -bw / 2, radius * 1.4, bw, 4);
+  ctx.fill();
+  ctx.fillStyle = ped.skin || '#e8b98a';
+  ctx.fillRect(radius * 0.3, -bw / 2 - 2, 4, 4);
+  ctx.fillRect(radius * 0.3, bw / 2 - 2, 4, 4);
+  ctx.beginPath();
+  ctx.arc(radius * 0.75, 0, radius * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  if (ped.hat === 1) {
+    ctx.fillStyle = '#20242a';
+    ctx.beginPath();
+    ctx.arc(radius * 0.75, 0, radius * 0.55, Math.PI * 0.7, Math.PI * 1.9);
+    ctx.fill();
+    ctx.fillRect(radius * 0.75, -radius * 0.55, radius * 0.7, 3);
+  } else if (ped.hat === 2) {
+    ctx.fillStyle = '#8e44ad';
+    ctx.beginPath();
+    ctx.arc(radius * 0.75, 0, radius * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = ped.skin || '#e8b98a';
+    ctx.beginPath();
+    ctx.arc(radius * 0.95, 0, radius * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (ped.photo > 0) {
+    ctx.fillStyle = '#14181f';
+    ctx.fillRect(radius * 0.75, -radius - 8, 5, 10);
+    ctx.fillStyle = '#bfe6ff';
+    ctx.fillRect(radius * 0.75 + 1, -radius - 7, 3, 8);
+  }
+  ctx.restore();
+}
