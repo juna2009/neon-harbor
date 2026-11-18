@@ -31,3 +31,88 @@ export function drawTireSmoke(c,x,y,r,a){c.globalAlpha=a;C(c,x,y,r,'#aaa');c.glo
 export function drawBoatWake(c,x,y,a,l){T(c,x,y,a);c.strokeStyle='#fffb';c.beginPath();c.moveTo(-l,-l/3);c.lineTo(0,0);c.lineTo(-l,l/3);c.stroke();E(c)}
 export function drawNeonLogo(c,x,y,s){c.textAlign='center';c.font=`bold ${28*s}px sans-serif`;c.strokeStyle='#0ff';for(let i=3;i--;){c.globalAlpha=.3+i/4;c.lineWidth=8-2*i;c.strokeText('NEON HARBOR',x,y)}c.globalAlpha=1;c.font=`${12*s}px sans-serif`;c.fillStyle='#f7c';c.fillText('The Mara Job',x,y+18*s)}
 export function drawHarborSkyline(c,x,y,w,h){for(let i=5,b;i--;)R(c,x+i*w/5,y+h-(b=h*(.5+.1*(i%3))),w/5-3,b,'#124');R(c,x+w-14,y,8,h,'#223');R(c,x+w-44,y+2,30,6,'#fe98');R(c,x+10,y+h-6,24,6,'#335')}
+export function rr(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+export function drawCarShape(ctx, car, night) {
+  const L = car.length;
+  const W = car.width;
+  ctx.save();
+  ctx.translate(car.x, car.y);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(2, 3, L / 2 + 2, W / 2 + 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.rotate(car.angle);
+  if (night > 0.3) {
+    ctx.fillStyle = `rgba(255,240,170,${(0.10 * night).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(L / 2, -W / 2 + 3);
+    ctx.lineTo(L / 2 + 120, -34);
+    ctx.lineTo(L / 2 + 120, 34);
+    ctx.lineTo(L / 2, W / 2 - 3);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.fillStyle = '#14181f';
+  rr(ctx, -L / 2 - 2, -W / 2 - 2, L + 4, W + 4, 6);
+  ctx.fill();
+  ctx.fillStyle = car.color;
+  rr(ctx, -L / 2, -W / 2, L, W, 5);
+  ctx.fill();
+  if (car.body === 'van') {
+    ctx.fillStyle = '#bfe6ff';
+    ctx.fillRect(-L / 2 + 8, -W / 2 + 3, L - 22, W - 6);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(2, -W / 2 + 2, 2, W - 4);
+  } else if (car.body === 'taxi') {
+    ctx.fillStyle = '#20242a';
+    for (let i = 0; i < 6; i += 1) {
+      if (i % 2 === 0) ctx.fillRect(-L / 2 + 8 + i * 5, -W / 2 + 2, 5, 5);
+      else ctx.fillRect(-L / 2 + 8 + i * 5, W / 2 - 7, 5, 5);
+    }
+    ctx.fillStyle = '#ffd23e';
+    ctx.fillRect(-6, -W / 2 - 3, 12, 4);
+    if (car.pink) {
+      ctx.fillStyle = '#ffd23e';
+      ctx.beginPath();
+      ctx.moveTo(-8, -W / 2 - 8);
+      ctx.lineTo(-4, -W / 2 - 14);
+      ctx.lineTo(0, -W / 2 - 8);
+      ctx.lineTo(4, -W / 2 - 14);
+      ctx.lineTo(8, -W / 2 - 8);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    const roofLen = car.body === 'hatch' ? 16 : 20;
+    rr(ctx, -roofLen / 2, -W / 2 + 3, roofLen, W - 6, 3);
+    ctx.fill();
+    ctx.fillStyle = '#bfe6ff';
+    ctx.fillRect(L / 2 - 15, -W / 2 + 3, 8, W - 6);
+    ctx.fillStyle = '#20242a';
+    ctx.fillRect(-L / 2 + 6, -W / 2 + 3, 7, W - 6);
+  }
+  ctx.fillStyle = '#fff6c8';
+  ctx.fillRect(L / 2 - 2, -W / 2 + 2, 3, 4);
+  ctx.fillRect(L / 2 - 2, W / 2 - 6, 3, 4);
+  ctx.fillStyle = '#ff3b30';
+  ctx.fillRect(-L / 2 - 1, -W / 2 + 2, 3, 4);
+  ctx.fillRect(-L / 2 - 1, W / 2 - 6, 3, 4);
+  if (car.kind === 'police') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-5, -W / 2 + 2, 10, W - 4);
+    ctx.fillStyle = '#ff3b30';
+    ctx.fillRect(-L / 2 + 2, -W / 2 + 2, 5, 5);
+    ctx.fillStyle = '#2f6fd0';
+    ctx.fillRect(-L / 2 + 2, W / 2 - 7, 5, 5);
+  }
+  ctx.restore();
+}

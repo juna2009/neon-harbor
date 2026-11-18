@@ -6,7 +6,7 @@ import { createCinematic } from './cinematic.js';
 import { drawBuildingShadow, drawDayTint, drawLightPool, drawLightning, drawWetReflection } from './lighting.js';
 import { drawBuoy, drawBuilding, drawCargoShip, drawContainer, drawCrane, drawCrosswalk, drawHydrant, drawLamp, drawPier, drawSign, drawTree } from './props.js';
 import { drawAmmoIcon, drawBanner, drawButton, drawCashIcon, drawDirectionArrow, drawHeart, drawMenuFrame, drawNeonLine, drawObjectiveIcon, drawSpeedIcon, drawTargetRing, drawWantedRow } from './ui-art.js';
-import { drawBoatWake, drawExplosionSprite, drawHarborSkyline, drawNeonLogo, drawPedPhone, drawPedestrian, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet } from './assets.js';
+import { drawBoatWake, drawCarShape, drawExplosionSprite, drawHarborSkyline, drawNeonLogo, drawPedPhone, drawPedestrian, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet, rr } from './assets.js';
 import { drawJaxPortrait, drawMaraPortrait, drawPortraitSmall } from './portraits.js';
 import { drawBridge } from './drawbridge.js';
 export const SCREEN_TITLE = 'title';
@@ -16,15 +16,6 @@ export const SCREEN_OVER = 'over';
 export const SCREEN_SETTINGS = 'settings';
 export const SCREEN_SHOP = 'shop';
 const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
-function rr(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
 function makeGlowSprite(size, inner, outer) {
   const c = document.createElement('canvas');
   c.width = size;
@@ -36,82 +27,6 @@ function makeGlowSprite(size, inner, outer) {
   g.fillStyle = grad;
   g.fillRect(0, 0, size, size);
   return c;
-}
-function drawCarShape(ctx, car, night) {
-  const L = car.length;
-  const W = car.width;
-  ctx.save();
-  ctx.translate(car.x, car.y);
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.beginPath();
-  ctx.ellipse(2, 3, L / 2 + 2, W / 2 + 2, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.rotate(car.angle);
-  if (night > 0.3) {
-    ctx.fillStyle = `rgba(255,240,170,${(0.10 * night).toFixed(3)})`;
-    ctx.beginPath();
-    ctx.moveTo(L / 2, -W / 2 + 3);
-    ctx.lineTo(L / 2 + 120, -34);
-    ctx.lineTo(L / 2 + 120, 34);
-    ctx.lineTo(L / 2, W / 2 - 3);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.fillStyle = '#14181f';
-  rr(ctx, -L / 2 - 2, -W / 2 - 2, L + 4, W + 4, 6);
-  ctx.fill();
-  ctx.fillStyle = car.color;
-  rr(ctx, -L / 2, -W / 2, L, W, 5);
-  ctx.fill();
-  if (car.body === 'van') {
-    ctx.fillStyle = '#bfe6ff';
-    ctx.fillRect(-L / 2 + 8, -W / 2 + 3, L - 22, W - 6);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fillRect(2, -W / 2 + 2, 2, W - 4);
-  } else if (car.body === 'taxi') {
-    ctx.fillStyle = '#20242a';
-    for (let i = 0; i < 6; i += 1) {
-      if (i % 2 === 0) ctx.fillRect(-L / 2 + 8 + i * 5, -W / 2 + 2, 5, 5);
-      else ctx.fillRect(-L / 2 + 8 + i * 5, W / 2 - 7, 5, 5);
-    }
-    ctx.fillStyle = '#ffd23e';
-    ctx.fillRect(-6, -W / 2 - 3, 12, 4);
-    if (car.pink) {
-      ctx.fillStyle = '#ffd23e';
-      ctx.beginPath();
-      ctx.moveTo(-8, -W / 2 - 8);
-      ctx.lineTo(-4, -W / 2 - 14);
-      ctx.lineTo(0, -W / 2 - 8);
-      ctx.lineTo(4, -W / 2 - 14);
-      ctx.lineTo(8, -W / 2 - 8);
-      ctx.closePath();
-      ctx.fill();
-    }
-  } else {
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
-    const roofLen = car.body === 'hatch' ? 16 : 20;
-    rr(ctx, -roofLen / 2, -W / 2 + 3, roofLen, W - 6, 3);
-    ctx.fill();
-    ctx.fillStyle = '#bfe6ff';
-    ctx.fillRect(L / 2 - 15, -W / 2 + 3, 8, W - 6);
-    ctx.fillStyle = '#20242a';
-    ctx.fillRect(-L / 2 + 6, -W / 2 + 3, 7, W - 6);
-  }
-  ctx.fillStyle = '#fff6c8';
-  ctx.fillRect(L / 2 - 2, -W / 2 + 2, 3, 4);
-  ctx.fillRect(L / 2 - 2, W / 2 - 6, 3, 4);
-  ctx.fillStyle = '#ff3b30';
-  ctx.fillRect(-L / 2 - 1, -W / 2 + 2, 3, 4);
-  ctx.fillRect(-L / 2 - 1, W / 2 - 6, 3, 4);
-  if (car.kind === 'police') {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(-5, -W / 2 + 2, 10, W - 4);
-    ctx.fillStyle = '#ff3b30';
-    ctx.fillRect(-L / 2 + 2, -W / 2 + 2, 5, 5);
-    ctx.fillStyle = '#2f6fd0';
-    ctx.fillRect(-L / 2 + 2, W / 2 - 7, 5, 5);
-  }
-  ctx.restore();
 }
 function drawTrafficCar(ctx, car, night) {
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
