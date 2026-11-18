@@ -434,21 +434,209 @@ function boat3d(wx, wy, angle, len, wid, color, o) {
   const cx = wx * CS, cz = wy * CS;
   const dep = Math.hypot(cx - ccX, cz - ccZ);
   const fx = Math.cos(angle), fz = Math.sin(angle);
-  flatQuad(wx - len / 2 - 4, wy - wid / 2 - 4, wx + len / 2 + 4, wy + wid / 2 + 4, -0.22, 'rgba(255,255,255,0.18)');
+  const rx = -fz, rz = fx;
+  const pt = (f, r, y) => [cx + fx * f + rx * r, y, cz + fz * f + rz * r];
+  const hullDk = sh(hx3(color), 0.62, hz(dep));
+  const stripeC = '#f5f5f5';
+  // BOAT-FIX (VB-02/VB-12/VB-27): the old boat was 3 stacked boxes + a flat
+  // white slab under it (read as a grey board) + 2 flat wake trapezoids
+  // (read as a road). Rebuilt per graphics-bible 2.1/2.2: vertical transom
+  // + waterline stripe, bow rising ~19 deg, 2 outboards, console + sloped
+  // windshield + driver, side stripes, Kelvin V-wake + prop-wash foam.
+  // Contact shadow is dark now (was a pale white slab).
+  flatQuad(wx - len / 2 - 4, wy - wid / 2 - 4, wx + len / 2 + 4, wy + wid / 2 + 4, -0.22, 'rgba(0,0,0,0.25)');
+  // hull base
   box3(cx, -0.25, cz, Wd, 0.7, L, angle, color, dep);
-  box3(cx + fx * L * 0.32, -0.2, cz + fz * L * 0.32, Wd * 0.7, 0.5, L * 0.3, angle, color, dep);
-  box3(cx - fx * L * 0.08, 0.45, cz - fz * L * 0.08, Wd * 0.6, 0.55, L * 0.36, angle, '#e8e4d8', dep);
-  vQuad(cx, cz, angle, L * 0.1, 0, Wd * 0.5, 0.5, 0.95, 'rgba(120,180,230,0.55)');
+  // BOAT-REBUILD (VB-02/VB-12): the hull top face was one flat slab of
+  // hull colour — from the chase-cam it read as a wide pink (hero) /
+  // blue (police) field with nothing on it, and the BOAT batch admitted
+  // the mid-deck was "still a wide pink field". The deck is now two-tone
+  // like a real speedboat: coloured gunwale strips down each side, a
+  // pale deck between them, a dark cockpit aft with a bench seat, and a
+  // helm seat under the driver (his torso used to float above the deck).
+  // Depth ties with the hull top face (same fwdD) are broken by
+  // insertion order — the hull box paints first, the deck after it.
+  // BOAT-REBUILD-V2: the v1 bow rose only 0.5 (tip 0.95) — at chase-cam
+  // distance the rise collapsed to a few px, so the boat still read as a
+  // flat slab. The sheer now rises 0.85 (tip 1.30, ~24 deg) + a stem peak,
+  // and raised gunwale rails run the deck edges, so the silhouette from
+  // behind is rail-dip-rail with a centre bow peak, not one flat line.
+  const bowY = (f) => 0.45 + ((f - 0.12 * L) / (0.38 * L)) * 0.85; // bow-wedge surface height
+  const deckC = o.pol ? '#eef2f5' : '#f2ead9'; // pale deck: white (police) / cream (hero)
+  const deckDk = sh(hx3(deckC), 0.92, hz(dep));
+  const gunC = sh(hx3(color), 1.15, hz(dep));
   for (const s of [-1, 1]) {
-    const sx = cx - fx * (L / 2) + (-fz) * s * Wd * 0.4, sz = cz - fz * (L / 2) + fx * s * Wd * 0.4;
-    const rx = -fz, rz = fx;
-    QW([[sx - rx * Wd * 0.3, -0.2, sz - rz * Wd * 0.3], [sx + rx * Wd * 0.3, -0.2, sz + rz * Wd * 0.3],
-      [sx - fx * 7 + rx * Wd * 0.9, -0.2, sz - fz * 7 + rz * Wd * 0.9], [sx - fx * 7 - rx * Wd * 0.9, -0.2, sz - fz * 7 - rz * Wd * 0.9]], 'rgba(255,255,255,0.25)');
+    QW([pt(-0.5 * L, s * 0.32 * Wd, 0.47), pt(0.12 * L, s * 0.32 * Wd, 0.47), pt(0.12 * L, s * 0.5 * Wd, 0.47), pt(-0.5 * L, s * 0.5 * Wd, 0.47)], gunC);
   }
+  QW([pt(-0.5 * L, -0.32 * Wd, 0.47), pt(-0.5 * L, 0.32 * Wd, 0.47), pt(0.12 * L, 0.32 * Wd, 0.47), pt(0.12 * L, -0.32 * Wd, 0.47)], deckDk);
+  // cockpit: dark floor aft + bench seat across it
+  QW([pt(-0.48 * L, -0.3 * Wd, 0.48), pt(-0.48 * L, 0.3 * Wd, 0.48), pt(-0.27 * L, 0.3 * Wd, 0.48), pt(-0.27 * L, -0.3 * Wd, 0.48)], '#23262c');
+  box3(cx - fx * L * 0.36, 0.48, cz - fz * L * 0.36, Wd * 0.62, 0.3, L * 0.09, angle, '#2e3238', dep);
+  topStrip(cx, cz, angle, -L * 0.36, 0, Wd * 0.56, L * 0.07, 0.8, 'rgba(232,228,216,0.9)');
+  // helm seat under the driver (non-police only — the police boat carries
+  // the light bar on its console instead of a driver)
+  if (!o.pol) {
+    box3(cx - fx * L * 0.2, 0.48, cz - fz * L * 0.2, 0.6, 0.55, 0.34, angle, '#2e3238', dep);
+    topStrip(cx, cz, angle, -L * 0.2, 0, 0.54, 0.3, 1.05, 'rgba(232,228,216,0.9)');
+  }
+  // foredeck: converging pinstripes + dark anchor-locker hatch on the bow
+  // wedge (white on pink hero deck, blue on white police deck)
+  const stripeC2 = o.pol ? '#2f6fd0' : '#f5f5f5';
+  for (const s of [-1, 1]) {
+    QW([pt(0.16 * L, s * 0.135 * Wd, bowY(0.16 * L) + 0.02), pt(0.16 * L, s * 0.185 * Wd, bowY(0.16 * L) + 0.02),
+      pt(0.44 * L, s * 0.095 * Wd, bowY(0.44 * L) + 0.02), pt(0.44 * L, s * 0.045 * Wd, bowY(0.44 * L) + 0.02)], stripeC2);
+  }
+  QW([pt(0.2 * L, -0.09 * Wd, bowY(0.2 * L) + 0.02), pt(0.2 * L, 0.09 * Wd, bowY(0.2 * L) + 0.02),
+    pt(0.38 * L, 0.05 * Wd, bowY(0.38 * L) + 0.02), pt(0.38 * L, -0.05 * Wd, bowY(0.38 * L) + 0.02)], '#3a3f47');
+  // bow wedge: deck slopes up 0.5 over a 0.38L run (~19 deg) to the bow tip.
+  // CLEAN-STANDARD: police boats get a WHITE foredeck (two-tone livery),
+  // so they read as police at a glance, like the friend's black-and-white
+  // POLICE cars — not just a solid-blue boat with a tiny light bar.
+  const bowDeck = o.pol ? sh([245, 245, 245], 1.15, hz(dep)) : sh(hx3(color), 1.15, hz(dep));
+  QW([pt(0.12 * L, -0.34 * Wd, 0.45), pt(0.12 * L, 0.34 * Wd, 0.45), pt(0.5 * L, 0.12 * Wd, 1.3), pt(0.5 * L, -0.12 * Wd, 1.3)], bowDeck);
+  for (const s of [-1, 1]) {
+    QW([pt(0.12 * L, s * 0.34 * Wd, 0.45), pt(0.5 * L, s * 0.12 * Wd, 1.3), pt(0.5 * L, s * 0.12 * Wd, 0.45)], hullDk);
+  }
+  // stem peak: a small tab at the bow tip so the sheer ends in a visible
+  // centre peak from behind (the v1 tip vanished into the horizon haze)
+  box3(cx + fx * (L * 0.47), 0.95, cz + fz * (L * 0.47), 0.14, 0.5, 0.14, angle, o.pol ? '#eef2f5' : color, dep);
+  // transom: vertical rear face + waterline stripe + rub rail.
+  // CLEAN-STANDARD-2: the white foredeck above is occluded by the console
+  // + light bar from the chase-cam, so the police two-tone livery lives
+  // HERE, on the face the camera actually sees: white transom + blue stripe.
+  const transomC = o.pol ? '#eef2f5' : hullDk;
+  const transomStripe = o.pol ? '#2f6fd0' : stripeC;
+  vQuad(cx, cz, angle, -L / 2 - 0.06, 0, Wd * 0.92, -0.25, 0.45, transomC);
+  vQuad(cx, cz, angle, -L / 2 - 0.09, 0, Wd * 0.9, -0.02, 0.12, transomStripe);
+  topStrip(cx, cz, angle, -L / 2 - 0.02, 0, Wd * 0.9, 0.12, 0.47, 'rgba(245,245,245,0.9)');
+  // side stripes (white band + rub rail), both sides; the far side hides
+  // behind the hull via the painter's algorithm
+  for (const s of [-1, 1]) {
+    QW([pt(-0.42 * L, s * (Wd / 2 + 0.02), 0.02), pt(0.3 * L, s * (Wd / 2 + 0.02), 0.02), pt(0.3 * L, s * (Wd / 2 + 0.02), 0.16), pt(-0.42 * L, s * (Wd / 2 + 0.02), 0.16)], stripeC);
+    QW([pt(-0.45 * L, s * (Wd / 2 + 0.02), 0.4), pt(0.32 * L, s * (Wd / 2 + 0.02), 0.4), pt(0.32 * L, s * (Wd / 2 + 0.02), 0.46), pt(-0.45 * L, s * (Wd / 2 + 0.02), 0.46)], 'rgba(245,245,245,0.85)');
+  }
+  // BOAT-REBUILD-V2: raised gunwale rails. v1's deck edges were coplanar
+  // with the deck, so from the chase-cam the boat was one flat pink
+  // trapezoid. The rails stand 0.45 proud of the deck aft, rising with the
+  // sheer to the bow — from behind the transom top reads rail-dip-rail,
+  // and the two bright top strips converge on the bow peak like a real
+  // speedboat's sheer line. Police rails are blue with white tops.
+  // V2b: each rail is TWO segments split at the console (f=-0.04L). As one
+  // quad the rail's depth was its nearest (aft) corner, so the FAR rail
+  // painted over the console/driver and read as a plank crossing the
+  // cockpit (worst on the white police rails). Split, the fwd segment's
+  // depth is its own — the console/driver (nearer) now occlude it, and the
+  // rail only shows where it belongs: along the sheer to the bow tip.
+  const railTopC = o.pol ? '#eef2f5' : gunC;
+  const railTop = (f) => 0.92 + ((f + 0.48 * L) / (0.9 * L)) * 0.4;
+  const railBot = (f) => f < 0.12 * L ? 0.47 : bowY(f);
+  const railOut = (f) => (0.52 - ((f + 0.48 * L) / (0.9 * L)) * 0.37) * Wd;
+  const railIn = (f) => (0.36 - ((f + 0.48 * L) / (0.9 * L)) * 0.27) * Wd;
+  for (const s of [-1, 1]) {
+    for (const [fa, fb] of [[-0.48 * L, -0.04 * L], [-0.04 * L, 0.42 * L]]) {
+      QW([pt(fa, s * railOut(fa), railBot(fa)), pt(fa, s * railOut(fa), railTop(fa)),
+        pt(fb, s * railOut(fb), railTop(fb)), pt(fb, s * railOut(fb), railBot(fb))], hullDk);
+      QW([pt(fa, s * railIn(fa), railTop(fa)), pt(fa, s * railOut(fa), railTop(fa)),
+        pt(fb, s * railOut(fb), railTop(fb)), pt(fb, s * railIn(fb), railTop(fb))], railTopC);
+    }
+    vQuad(cx, cz, angle, -L * 0.48 - 0.02, s * 0.44 * Wd, 0.3, 0.47, 0.92, railTopC);
+  }
+  // 2 outboard motors on the transom + silver cavitation plates.
+  // BOAT-REBUILD: the motors read as two flat black rectangles — a
+  // coloured cowl cap (hull colour) + a white band on the rear face make
+  // them read as outboards, not slabs.
+  for (const s of [-1, 1]) {
+    const mx = cx + fx * (-L / 2 - 0.28) + rx * s * 0.32 * Wd, mz = cz + fz * (-L / 2 - 0.28) + rz * s * 0.32 * Wd;
+    box3(mx, -0.35, mz, 0.34, 0.62, 0.34, angle, '#1b1e24', dep);
+    box3(mx, 0.12, mz, 0.3, 0.16, 0.3, angle, '#2e3238', dep);
+    box3(mx, 0.24, mz, 0.3, 0.26, 0.3, angle, color, dep); // v2: bigger cowl cap, crests the transom
+    vQuad(cx, cz, angle, -L / 2 - 0.47, s * 0.32 * Wd, 0.3, -0.12, 0.08, '#c8ccd4');
+    vQuad(cx, cz, angle, -L / 2 - 0.47, s * 0.32 * Wd, 0.26, 0.08, 0.16, 'rgba(245,245,245,0.9)');
+  }
+  // console + sloped windshield (dark glass + diagonal sky streak)
+  box3(cx - fx * L * 0.08, 0.45, cz - fz * L * 0.08, Wd * 0.6, 0.55, L * 0.36, angle, '#e8e4d8', dep);
+  topStrip(cx, cz, angle, -L * 0.08, 0, Wd * 0.55, L * 0.3, 1.02, 'rgba(255,255,255,0.85)');
+  QW([pt(0.1 * L, -0.26 * Wd, 1.0), pt(0.1 * L, 0.26 * Wd, 1.0), pt(-0.02 * L, 0.26 * Wd, 1.42), pt(-0.02 * L, -0.26 * Wd, 1.42)], 'rgba(18,38,58,0.9)');
+  QW([pt(0.08 * L, -0.2 * Wd, 1.08), pt(0.08 * L, -0.05 * Wd, 1.08), pt(0.0, 0.15 * Wd, 1.38), pt(0.0, 0.0, 1.38)], 'rgba(255,255,255,0.45)');
   if (o.pol) {
+    // police: light bar on the console roof (no driver — the bar must read
+    // from behind); red/blue lenses on its rear face, blinking
+    // BOAT-FIX-2: the first bar read as a dark box at depth ~32 (lenses
+    // 0.14 tall = ~4 px). Taller bar + taller lenses + a soft glow halo
+    // behind each lens so red/blue read at a glance.
+    // BOAT-REBUILD: at boat3d distance the bar still read small, so it
+    // grows again (1.15 wide, lenses 0.38 tall) and the halos get
+    // stronger — the bar is the police boat's whole identity from behind.
     const blink = Math.floor((o.t || 0) * 6) % 2 === 0;
-    vQuad(cx, cz, angle, -L * 0.08, -Wd * 0.2, 0.45, 1.0, 1.25, blink ? '#ff4040' : '#2f6fd0');
-    vQuad(cx, cz, angle, -L * 0.08, Wd * 0.2, 0.45, 1.0, 1.25, blink ? '#2f6fd0' : '#ff4040');
+    box3(cx - fx * L * 0.08, 1.0, cz - fz * L * 0.08, 1.15, 0.34, 0.55, angle, '#14161a', dep);
+    vQuad(cx, cz, angle, -L * 0.08 - 0.3, -0.26, 0.72, 0.92, 1.46, blink ? 'rgba(255,64,64,0.45)' : 'rgba(47,111,208,0.45)');
+    vQuad(cx, cz, angle, -L * 0.08 - 0.3, 0.26, 0.72, 0.92, 1.46, blink ? 'rgba(47,111,208,0.45)' : 'rgba(255,64,64,0.45)');
+    vQuad(cx, cz, angle, -L * 0.08 - 0.3, -0.26, 0.52, 1.0, 1.38, blink ? '#ff4040' : '#2f6fd0');
+    vQuad(cx, cz, angle, -L * 0.08 - 0.3, 0.26, 0.52, 1.0, 1.38, blink ? '#2f6fd0' : '#ff4040');
+  } else {
+    // driver v2: PROBE proved the v1 driver never read — the dark torso
+    // merged with the dark windshield (invisible) and only a 16x2 px
+    // sliver of the yellow helmet peeked above it ("kubus kuning nyasar").
+    // Now: bright orange life-vest torso (contrasts with the windshield),
+    // wider shoulders, a bigger helmet standing proud of the windshield
+    // (top 1.72 vs glass 1.42) with a dark visor band + white crown stripe
+    // on its rear face, so it reads as a person, not a stray cube.
+    box3(cx - fx * L * 0.2, 1.02, cz - fz * L * 0.2, 0.62, 0.42, 0.34, angle, '#ff5a1f', dep);
+    box3(cx - fx * L * 0.2, 1.42, cz - fz * L * 0.2, 0.36, 0.3, 0.36, angle, '#ffd23e', dep);
+    vQuad(cx, cz, angle, -L * 0.2 - 0.2, 0, 0.3, 1.46, 1.6, '#1b1e24');
+    topStrip(cx, cz, angle, -L * 0.2, 0, 0.2, 0.22, 1.73, 'rgba(255,255,255,0.9)');
+  }
+  // BOAT-REBUILD (VB-27): the old V-arms ran 2.2L in dead-straight rails
+  // to the frame edge and the foam trail read as a white road — doubly
+  // so, because the hero boat was drawn TWICE (boats loop + hero-last),
+  // doubling every wake alpha (fixed below: the loop skips the hero).
+  // Arms are now shorter (1.5L from the bow, ~1.0L past the transom),
+  // two-segment with a 3-deg outward bend + fading alpha so they curve
+  // instead of ruling straight, with side spray at the transom corners,
+  // a rooster tail behind the transom, fainter transverse arcs, and an
+  // irregular foam trail (fewer, faster-fading blobs).
+  const wakeA = 19.47 * Math.PI / 180;
+  for (const s of [-1, 1]) {
+    const bx = cx + fx * (L / 2) + rx * s * (Wd * 0.32), bz = cz + fz * (L / 2) + rz * s * (Wd * 0.32);
+    let kx = bx, kz = bz;
+    for (const [d0, d1, aOff, al, w0, w1] of [[0, 0.75 * L, 0, 0.38, 0.1, 0.22], [0.75 * L, 1.5 * L, 3 * Math.PI / 180, 0.18, 0.22, 0.34]]) {
+      const af = -Math.cos(wakeA + aOff), ar = s * Math.sin(wakeA + aOff);
+      const dx = fx * af + rx * ar, dz = fz * af + rz * ar;
+      const px = -dz, pz = dx;
+      const ex = kx + dx * (d1 - d0), ez = kz + dz * (d1 - d0);
+      QW([[kx - px * w0, -0.18, kz - pz * w0], [kx + px * w0, -0.18, kz + pz * w0],
+        [ex + px * w1, -0.18, ez + pz * w1], [ex - px * w1, -0.18, ez - pz * w1]], 'rgba(255,255,255,' + al + ')');
+      kx = ex; kz = ez;
+    }
+    // bow spray + transom-corner side spray
+    const sf = L / 2, sr = s * (Wd * 0.55);
+    QW([pt(sf - 0.25, sr - 0.15, -0.18), pt(sf + 0.25, sr - 0.15, -0.18), pt(sf + 0.25, sr + 0.15, -0.18), pt(sf - 0.25, sr + 0.15, -0.18)], 'rgba(255,255,255,0.5)');
+    QW([pt(-0.5 * L, s * 0.5 * Wd, -0.18), pt(-0.3 * L, s * 0.45 * Wd, -0.18), pt(-0.3 * L, s * 0.78 * Wd, -0.18), pt(-0.5 * L, s * 0.82 * Wd, -0.18)], 'rgba(255,255,255,0.4)');
+  }
+  // rooster tail v2: the two v1 vertical rects read as glass cards stacked
+  // behind the transom ("tangga kaca"). One sloped spray wedge instead —
+  // wide + low at the transom, narrowing and rising as it falls behind.
+  QW([pt(-L / 2 - 0.25, -0.26, -0.12), pt(-L / 2 - 0.25, 0.26, -0.12),
+    pt(-L / 2 - 0.95, 0.07, 0.38), pt(-L / 2 - 0.95, -0.07, 0.38)], 'rgba(255,255,255,0.32)');
+  for (let k = 1; k <= 2; k += 1) {
+    const dk = L * 0.5 + k * L * 0.45;
+    for (let sg = -1; sg <= 1; sg += 1) {
+      const r0 = sg * 0.45 - 0.4, r1 = sg * 0.45 + 0.4;
+      const curve = 0.18 * (1 - Math.abs(sg) * 0.5);
+      QW([pt(-L / 2 - dk - curve, r0, -0.18), pt(-L / 2 - dk - curve, r1, -0.18), pt(-L / 2 - dk - 0.18 - curve, r1, -0.18), pt(-L / 2 - dk - 0.18 - curve, r0, -0.18)], 'rgba(255,255,255,0.1)');
+    }
+  }
+  for (let i = 0; i < 6; i += 1) {
+    // Foam v2: v1 stacked 6 near-centreline rects — at chase-cam depth they
+    // overlapped into nested hard-edged cards ("tangga kaca"). Now each puff
+    // is a DIAMOND (pointed ends foreshorten to lens shapes at grazing
+    // angle), fanned in a zigzag that widens behind the boat instead of a
+    // centreline stack, with softer/faster-fading alpha.
+    const fc = -L / 2 - (0.7 + i * 0.8), sd = i % 2 === 0 ? -1 : 1;
+    const rc = sd * (0.18 + i * 0.26) * (0.6 + 0.4 * h2(i, 4));
+    const hs = 0.3 + h2(i, 9) * 0.16 + i * 0.05;
+    QW([pt(fc - hs, rc, -0.18), pt(fc, rc - hs * 0.7, -0.18), pt(fc + hs, rc, -0.18), pt(fc, rc + hs * 0.7, -0.18)],
+      'rgba(255,255,255,' + (0.3 - i * 0.045).toFixed(2) + ')');
   }
 }
 function plane3d(wx, wy, angle, plane, o) {
@@ -461,7 +649,11 @@ function plane3d(wx, wy, angle, plane, o) {
   // alt 340 m -> 40.8 units (above the skyline). The camera eye rises on
   // the SAME scale (drawChase3D), so the plane stays framed at any alt.
   const L = 6.0, Wd = 6.0; // 60 px long, 60 px wingspan (drawPlane top-down)
-  const alt = plane.alt || 0;
+  const alt = (plane.alt || 0) - (o.jet ? 4 : 0); // PLANE-41 (VB-41): HAF jets
+  // pursue from BEHIND-BELOW the hero (4 m lower) so their wings no longer
+  // align with the hero wing at the same screen height — the three wings
+  // used to form one continuous bar across the frame (probe: hero wing
+  // y 449-470, jet wings y 438-473, all in one band).
   const altU = alt * 0.12;
   const y0 = altU + 0.55; // fuselage base (gear height when parked)
   const cx = wx * CS, cz = wy * CS;
@@ -480,7 +672,10 @@ function plane3d(wx, wy, angle, plane, o) {
   // buildings). Body + wing brightened again; the rear cap below is now
   // light OLIVE for jets instead of the hero's white-grey.
   const body = jet ? '#5d7055' : '#f7fafc';
-  const wingC = jet ? '#4a5c44' : '#d5dde4';
+  // PLANE-41 (VB-08): jet wing was #4a5c44 — near-black olive against the
+  // tan buildings, so it read as a dark bar. Lighter than the body so the
+  // wing separates from the fuselage and from the buildings behind it.
+  const wingC = jet ? '#6b7f60' : '#d5dde4';
   // plane-local (f = forward, r = right) -> world [x, y, z]
   const pt = (f, r, y) => [cx + fx * f + rx * r, y, cz + fz * f + rz * r];
   // contact shadow: fades + grows + drifts with altitude (drawPlane formula)
@@ -506,15 +701,39 @@ function plane3d(wx, wy, angle, plane, o) {
   vQuad(cx, cz, angle, -L / 2 - 0.09, 0, 1.5, y0 + 0.1, y0 + 0.32, 'rgba(20,20,28,0.55)');
   topStrip(cx, cz, angle, -L / 2 - 0.05, 0, 1.4, 0.3, y0 + 0.98, 'rgba(255,210,140,0.95)');
   // canopy: dark glass + sky reflection streak (takeoff3d)
-  box3(cx + fx * (L * 0.22), y0 + 0.95, cz + fz * (L * 0.22), 0.85, 0.5, L * 0.3, angle, jet ? '#10141a' : '#1c3050', dep);
-  vQuad(cx, cz, angle, L * 0.22, 0, 0.8, y0 + 1.0, y0 + 1.4, 'rgba(150,200,240,0.55)');
+  // PLANE-41 (VB-41): the canopy read as a loose dark box floating on the
+  // fuselage — no glass highlight, no connection to the nose/tail. Wider,
+  // brighter glass, a stronger sky streak on the rear face, and a dorsal
+  // spine strip tying the canopy back to the tail fins.
+  box3(cx + fx * (L * 0.22), y0 + 0.95, cz + fz * (L * 0.22), 1.05, 0.5, L * 0.3, angle, jet ? '#232a30' : '#2a4a72', dep);
+  // PLANE-41 ROUND 2: the old sky streak sat at the canopy box's CENTRE
+  // plane (f +1.32) — buried inside the box, invisible from behind, so
+  // the canopy read as a plain brown box (warm sunset shading turns the
+  // blue glass brown on the rear face). The glass now lives ON the rear
+  // face (f +0.40, just behind the box rear at +0.42): a light-blue glass
+  // quad with a bright streak, so the canopy reads as glass from the
+  // chase-cam.
+  vQuad(cx, cz, angle, 0.40, 0, 0.9, y0 + 1.04, y0 + 1.38, 'rgba(125,185,235,0.9)');
+  vQuad(cx, cz, angle, 0.38, -0.2, 0.35, y0 + 1.08, y0 + 1.36, 'rgba(220,240,255,0.85)');
+  topStrip(cx, cz, angle, -1.0, 0, 0.5, 2.6, y0 + 0.96, 'rgba(28,32,40,0.6)'); // dorsal spine canopy -> tail
   // swept wings: horizontal quads (drawPlane silhouette); darker top so
   // they read apart from the fuselage; warm rim on the sun-side edge
+  // PLANE-41 (VB-41): the flat wing projected only 21 px tall over a
+  // 401 px span (probe) — a 20:1 bar, not a wing — because it sits nearly
+  // at eye level and its screen height came only from the 2.6-unit chord
+  // foreshortening. Now DIHEDRAL: tips rise 0.5 (9.5 deg) so each wing
+  // reads as a shallow V from behind, with a real leading-edge face, a
+  // trailing-edge face and a tip cap (a slab, not a line).
   for (const s of [-1, 1]) {
-    QW([pt(0.6, s * 0.4, y0 + 0.55), pt(-2.0, s * 3.0, y0 + 0.55), pt(-1.4, s * 3.0, y0 + 0.55), pt(-1.0, s * 0.2, y0 + 0.55)], sh(hx3(wingC), 0.92, hz(dep)));
-    QW([pt(-1.0, s * 0.2, y0 + 0.45), pt(-1.4, s * 3.0, y0 + 0.45), pt(-1.4, s * 3.0, y0 + 0.62), pt(-1.0, s * 0.2, y0 + 0.62)], sh(hx3(wingC), 0.55, hz(dep))); // trailing-edge thickness
-    if (rimOn) QW([pt(0.6, s * 0.4, y0 + 0.58), pt(-2.0, s * 3.0, y0 + 0.58), pt(-1.95, s * 3.0, y0 + 0.58), pt(0.55, s * 0.4, y0 + 0.58)], 'rgba(255,200,130,0.5)'); // leading-edge rim
-    QW([pt(-2.2, s * 0.5, y0 + 0.7), pt(-3.0, s * 1.7, y0 + 0.7), pt(-2.8, s * 1.7, y0 + 0.7), pt(-2.2, s * 0.5, y0 + 0.7)], sh(hx3(wingC), 0.95, hz(dep))); // stabilizer
+    QW([pt(0.6, s * 0.4, y0 + 0.55), pt(-2.0, s * 3.0, y0 + 1.05), pt(-1.4, s * 3.0, y0 + 1.05), pt(-1.0, s * 0.2, y0 + 0.55)], sh(hx3(wingC), 0.92, hz(dep)));
+    QW([pt(-1.0, s * 0.2, y0 + 0.45), pt(-1.4, s * 3.0, y0 + 0.95), pt(-1.4, s * 3.0, y0 + 1.12), pt(-1.0, s * 0.2, y0 + 0.62)], sh(hx3(wingC), 0.72, hz(dep))); // trailing-edge thickness
+    QW([pt(0.6, s * 0.4, y0 + 0.38), pt(-2.0, s * 3.0, y0 + 0.88), pt(-2.0, s * 3.0, y0 + 1.05), pt(0.6, s * 0.4, y0 + 0.55)], sh(hx3(wingC), 0.72, hz(dep))); // leading-edge thickness
+    QW([pt(-2.0, s * 3.0, y0 + 0.88), pt(-1.4, s * 3.0, y0 + 0.95), pt(-1.4, s * 3.0, y0 + 1.12), pt(-2.0, s * 3.0, y0 + 1.05)], sh(hx3(wingC), 0.7, hz(dep))); // wingtip cap
+    if (rimOn) QW([pt(0.6, s * 0.4, y0 + 0.58), pt(-2.0, s * 3.0, y0 + 1.08), pt(-1.95, s * 3.0, y0 + 1.08), pt(0.55, s * 0.4, y0 + 0.58)], 'rgba(255,200,130,0.5)'); // leading-edge rim
+    // stabilizer: same dihedral treatment (was a flat quad, 6 px tall on
+    // screen — another thin line across the tail). Tips rise 0.3.
+    QW([pt(-2.2, s * 0.5, y0 + 0.7), pt(-3.0, s * 1.7, y0 + 1.0), pt(-2.8, s * 1.7, y0 + 1.0), pt(-2.2, s * 0.5, y0 + 0.7)], sh(hx3(wingC), 0.95, hz(dep))); // stabilizer
+    QW([pt(-2.2, s * 0.5, y0 + 0.62), pt(-2.8, s * 1.7, y0 + 0.92), pt(-2.8, s * 1.7, y0 + 1.0), pt(-2.2, s * 0.5, y0 + 0.7)], sh(hx3(wingC), 0.55, hz(dep))); // stabilizer trailing face
     // JETFIX: tail fin SWEPT BACK + shorter — the old vertical fin (1.2
     // tall, straight up) read as a pole from the chase-cam; the swept fin
     // (top edge 0.5 further back, height 0.85) reads as a jet tail.
@@ -529,18 +748,43 @@ function plane3d(wx, wy, angle, plane, o) {
     // a parallelogram (top as wide as the base). A real fin TAPERS: wide
     // base (0.8) -> narrow top (0.3), swept back. The tapered profile
     // reads as a fin from behind; the bar never did.
-    QW([pt(-2.2, s * 0.55, y0 + 0.7), pt(-3.0, s * 0.55, y0 + 0.7), pt(-3.6, s * 0.85, y0 + 1.55), pt(-3.3, s * 0.85, y0 + 1.55)], jet ? '#4a5c44' : '#05d9e8'); // tail fin (cyan)
-    if (rimOn) QW([pt(-3.3, s * 0.85, y0 + 1.53), pt(-3.6, s * 0.85, y0 + 1.53), pt(-3.6, s * 0.85, y0 + 1.6), pt(-3.3, s * 0.85, y0 + 1.6)], 'rgba(255,210,130,0.8)'); // fin top rim
+    // PLANE-41 (VB-07): the fin projected ~15 px wide x 64 tall — a bar —
+    // because its plane is parallel to the view direction and only the
+    // 0.3 cant gave it width. Now canted further out (top r 0.85 -> 1.2,
+    // 0.65 lateral = ~40 px on screen), taller (1.55 -> 1.75), swept
+    // further back (-3.6 -> -3.9), with a top edge that has real lateral
+    // width (0.95 -> 1.2) so the fin tapers in the rear view instead of
+    // reading as a uniform bar, plus a warm leading-edge rim.
+    // PLANE-41 ROUND 2: probe showed the near-side fin tapering the WRONG
+    // way in screen space (top edge wider than the base — an inverted
+    // taper, hence the "ribbon" look). Top edge shortened (r 1.1 -> 1.2,
+    // f -3.7 -> -3.9) and the root lengthened (base rear -3.0 -> -3.3) so
+    // the fin is widest at its root and narrows to the tip, as a fin does.
+    // PLANE-41 v2 (papan cyan): sirip hero '#05d9e8' SATU WARNA DATAR tanpa
+    // shading terbaca sebagai PAPAN di jets/takeoff/planehigh — cyan jenuh
+    // itu benda asing di badan putih, bukan bagian pesawat. Samakan olive
+    // '#6b7f60' jet HAF (terbukti terbaca sebagai sirip jet di shot yang
+    // sama) + tone per sisi ala box3 (port 0.8 / starboard 0.95) supaya
+    // kedua sirip terbaca 3D, bukan satu bidang datar. Rim hangat tetap.
+    QW([pt(-2.2, s * 0.55, y0 + 0.7), pt(-3.3, s * 0.55, y0 + 0.7), pt(-3.9, s * 1.2, y0 + 1.75), pt(-3.7, s * 1.1, y0 + 1.75)], sh(hx3('#6b7f60'), s < 0 ? 0.8 : 0.95, hz(dep))); // tail fin (olive, per-side tone)
+    if (rimOn) QW([pt(-3.7, s * 1.1, y0 + 1.73), pt(-3.9, s * 1.2, y0 + 1.73), pt(-3.9, s * 1.2, y0 + 1.8), pt(-3.7, s * 1.1, y0 + 1.8)], 'rgba(255,210,130,0.8)'); // fin top rim
+    if (rimOn) QW([pt(-2.2, s * 0.57, y0 + 0.72), pt(-3.7, s * 1.12, y0 + 1.73), pt(-3.7, s * 1.12, y0 + 1.78), pt(-2.2, s * 0.57, y0 + 0.77)], 'rgba(255,210,130,0.65)'); // fin leading-edge rim
   }
   // JETFIX: wingtip nav lights (red port / green starboard) + warm rim on
   // the wing trailing edge + dark cheatline on each fuselage side — from
   // directly behind, the wings were a thin dark line and the fuselage a
   // flat white slab; the lights + rim make the span read at a glance.
-  vQuad(cx, cz, angle, -1.7, -3.0, 0.3, y0 + 0.4, y0 + 0.7, '#ff3b30', dep);
-  vQuad(cx, cz, angle, -1.7, 3.0, 0.3, y0 + 0.4, y0 + 0.7, '#37e05a', dep);
+  // PLANE-41 (VB-08): the old lights were flat vQuad squares floating at
+  // the wingtips — they read as loose red/green squares, not lights ON
+  // the plane. Now small 3D bulbs (box3) sitting astride the dihedral
+  // wingtip, and the cheatline pulled in to r 0.76 so it no longer floats
+  // 0.03 off the fuselage side (a visible gap at 2x zoom).
   for (const s of [-1, 1]) {
-    QW([pt(-1.0, s * 0.2, y0 + 0.63), pt(-1.4, s * 3.0, y0 + 0.63), pt(-1.4, s * 3.0, y0 + 0.68), pt(-1.0, s * 0.2, y0 + 0.68)], 'rgba(255,200,130,0.55)', dep); // trailing-edge warm rim
-    QW([pt(2.5, s * 0.78, y0 + 0.45), pt(-2.5, s * 0.78, y0 + 0.45), pt(-2.5, s * 0.78, y0 + 0.62), pt(2.5, s * 0.78, y0 + 0.62)], 'rgba(20,24,32,0.5)', dep); // fuselage side cheatline
+    box3(cx + fx * -1.7 + rx * s * 3.0, y0 + 0.86, cz + fz * -1.7 + rz * s * 3.0, 0.3, 0.28, 0.3, angle, s < 0 ? '#ff3b30' : '#37e05a', dep);
+  }
+  for (const s of [-1, 1]) {
+    QW([pt(-1.0, s * 0.2, y0 + 0.58), pt(-1.4, s * 3.0, y0 + 1.08), pt(-1.52, s * 3.0, y0 + 1.08), pt(-1.12, s * 0.2, y0 + 0.58)], 'rgba(255,200,130,0.55)', dep); // trailing-edge warm rim
+    QW([pt(2.5, s * 0.76, y0 + 0.45), pt(-2.5, s * 0.76, y0 + 0.45), pt(-2.5, s * 0.76, y0 + 0.62), pt(2.5, s * 0.76, y0 + 0.62)], 'rgba(20,24,32,0.5)', dep); // fuselage side cheatline
   }
   // twin afterburner nozzles (rear face) + flame when throttled
   // JETFIX: the old nozzles read as orange WINDOWS on the white rear face
@@ -552,20 +796,45 @@ function plane3d(wx, wy, angle, plane, o) {
   // (box3, 0.55 deep) with the hot core RECESSED at its back end (dep-0.6
   // so it paints after the tube's rear face). The dark tube + orange
   // opening reads as a nozzle pipe, not a window.
+  // PLANE-41 (VB-09): the orange core (0.34 wide) covered 57% of the
+  // 0.6-wide tube mouth, so the nozzle read as an orange WINDOW. Tube
+  // bigger (0.72 x 0.62 x 0.7), core smaller (0.26) — the dark ring is
+  // now ~0.23 on each side and the hot centre reads as a hole, not a
+  // window. Flame start moved to the new tube exit (-3.6).
+  // PLANE-41 ROUND 2: the box3 tube read as TWO BIG BROWN BOXES — box3
+  // shades the side faces warm (rgb 81,49,35 in the probe) and the two
+  // tubes together spanned wider than the fuselage. Now a slim pipe
+  // (0.5 wide, flush with the fuselage sides, 0.375 protrusion) built
+  // from flat near-black QW faces — no warm shading, no brown — with a
+  // small hot core (0.22) recessed in its dark mouth.
   for (const s of [-1, 1]) {
-    box3(cx + fx * (-L / 2 - 0.18) + rx * s * 0.5, y0 + 0.18, cz + fz * (-L / 2 - 0.18) + rz * s * 0.5, 0.6, 0.5, 0.55, angle, '#17171c', dep);
-    vQuad(cx, cz, angle, -L / 2 - 0.48, s * 0.5, 0.34, y0 + 0.28, y0 + 0.58, '#ff9d4d', dep - 0.6);
-    vQuad(cx, cz, angle, -L / 2 - 0.51, s * 0.5, 0.16, y0 + 0.37, y0 + 0.51, '#fff0b4', dep - 0.6);
+    const nr = s * 0.5, nh = 0.25; // nozzle centre r, half-width
+    QW([pt(-3.38, nr - nh, y0 + 0.17), pt(-3.38, nr + nh, y0 + 0.17), pt(-3.38, nr + nh, y0 + 0.72), pt(-3.38, nr - nh, y0 + 0.72)], '#0b0b0e'); // tube mouth (dark)
+    QW([pt(-2.83, nr - nh, y0 + 0.72), pt(-3.38, nr - nh, y0 + 0.72), pt(-3.38, nr + nh, y0 + 0.72), pt(-2.83, nr + nh, y0 + 0.72)], '#141417'); // tube top
+    QW([pt(-2.83, nr + s * nh, y0 + 0.17), pt(-3.38, nr + s * nh, y0 + 0.17), pt(-3.38, nr + s * nh, y0 + 0.72), pt(-2.83, nr + s * nh, y0 + 0.72)], '#0e0e11'); // tube outer side
+    // ROUND 3: the core vQuads were STILL invisible — dep-0.6 paints
+    // BEFORE the tube mouth (the mouth's default depth is ~dep-3.38,
+    // not dep: box3/QW depth is the face's own forward distance, and
+    // JET-FIX-3's dep-0.6 assumed the tube rear sat at dep). The core
+    // must sit BELOW the mouth's depth to paint after it: dep-4.0 for
+    // the orange core, dep-4.3 for the bright centre, dep-4.5 for the
+    // vertical glow (which was hidden for the same reason).
+    vQuad(cx, cz, angle, -L / 2 - 0.41, s * 0.5, 0.22, y0 + 0.32, y0 + 0.56, '#ff9d4d', dep - 4.0);
+    vQuad(cx, cz, angle, -L / 2 - 0.44, s * 0.5, 0.1, y0 + 0.38, y0 + 0.5, '#fff0b4', dep - 4.3);
   }
   if (thr > 0.25) {
     const fl = 1.8 * thr * flick;
     for (const s of [-1, 1]) {
-      // JETFIX-3: the flame starts at the TUBE exit now (-3.45, not -3.0)
+      // JETFIX-3: the flame starts at the TUBE exit now (-3.4, not -3.0)
       // so it looks like it comes out of the nozzle, not the fuselage.
-      QW([pt(-3.45, s * 0.5 - 0.45, y0 + 0.5), pt(-3.45, s * 0.5 + 0.45, y0 + 0.5), pt(-3.45 - fl, s * 0.5, y0 + 0.5)], 'rgba(255,157,77,' + (0.45 + 0.4 * flick * thr).toFixed(2) + ')');
+      QW([pt(-3.4, s * 0.5 - 0.45, y0 + 0.5), pt(-3.4, s * 0.5 + 0.45, y0 + 0.5), pt(-3.4 - fl, s * 0.5, y0 + 0.5)], 'rgba(255,157,77,' + (0.45 + 0.4 * flick * thr).toFixed(2) + ')');
       // JETFIX: vertical afterburner glow — the old flame was a horizontal
       // triangle, edge-on (invisible) from the chase-cam behind.
-      vQuad(cx, cz, angle, -L / 2 - 0.55, s * 0.5, 0.5, y0 + 0.28, y0 + 0.62, 'rgba(255,157,77,0.45)', dep);
+      // ROUND 3b: the glow was 0.62 wide — wider than the 0.5 mouth — so
+      // its 0.45 orange wash turned the whole black mouth brown (the
+      // "orange window" read again). Now it hugs only the hot core
+      // (0.3 wide, 0.35 alpha): the dark ring stays black.
+      vQuad(cx, cz, angle, -L / 2 - 0.42, s * 0.5, 0.3, y0 + 0.3, y0 + 0.58, 'rgba(255,157,77,0.35)', dep - 4.5);
     }
   }
   // landing gear when parked/taxiing (alt < 2): nose + 2 main struts
@@ -712,7 +981,16 @@ function bld3(b, nightF, t) {
       // height — the cyan "sticker" bar). Narrower + shorter + off the ground.
       if (h2(b.x * 13 + 4, b.y * 5) < 0.45 && fi === 0) {
         const ac = h2(b.x, b.y * 11) < 0.5 ? 'rgba(255,179,92,0.85)' : 'rgba(5,217,232,0.7)';
-        vQuad(bx, bz, f.a, f.off + 0.13, -f.span / 2 + f.span * (0.25 + 0.5 * h2(b.x + 7, b.y)), 0.55, 2.0, 2.0 + h3 * 0.55, ac, fDep);
+        // WIN-FIX (VB-11): the single strip ran 55% of the facade height
+        // (441 px tall on takeoff-D, 205 px on chase3d) and read as a
+        // giant bar. Three short segments with dark gaps + a hard cap
+        // read as a segmented sign, never a slab.
+        const acX = -f.span / 2 + f.span * (0.25 + 0.5 * h2(b.x + 7, b.y));
+        const acTop = Math.min(2.0 + h3 * 0.55, 11);
+        for (let k = 0; k < 3; k += 1) {
+          const s0 = 2.0 + (acTop - 2.0) * k / 3, s1 = 2.0 + (acTop - 2.0) * (k + 0.62) / 3;
+          vQuad(bx, bz, f.a, f.off + 0.13, acX, 0.5, s0, s1, ac, fDep);
+        }
       }
       // F3 panel line: one darker horizontal band mid-face (stops the slab look)
       vQuad(bx, bz, f.a, f.off + 0.1, 0, f.span * 0.96, h3 * 0.45, h3 * 0.45 + 0.35, 'rgba(0,0,0,0.25)', fDep);
@@ -731,50 +1009,90 @@ function bld3(b, nightF, t) {
             const sc = s % 3 === 0 ? [255, 179, 92] : s % 3 === 1 ? [5, 217, 232] : [255, 42, 109];
             // REWORK: storefront width capped 2.4 (was span/3*0.62 -> a 4.1
             // unit pink slab on near buildings) + dark frame bar + mullion.
+            // WIN-FIX (VB-11): the flat colour slab (56x45 px on takeoff-D)
+            // still read as a sticker. Dark backing = frame border; two
+            // mullions + a transom split it into 6 panes, so it reads as
+            // a glazed storefront, not a pasted rectangle.
             const sw = Math.min(f.span / 3 * 0.62, 2.4);
+            vQuad(bx, bz, f.a, f.off + 0.11, rOff, sw + 0.3, 0.7, 2.8, 'rgba(10,10,16,0.9)', fDep);
             vQuad(bx, bz, f.a, f.off + 0.12, rOff, sw, 0.8, 2.7, mix(sc, hz(dep)), fDep);
             vQuad(bx, bz, f.a, f.off + 0.13, rOff, sw, 2.7, 2.95, 'rgba(10,10,16,0.85)', fDep);
-            vQuad(bx, bz, f.a, f.off + 0.13, rOff, 0.12, 0.8, 2.7, 'rgba(10,10,16,0.7)', fDep);
+            vQuad(bx, bz, f.a, f.off + 0.13, rOff - sw / 6, 0.1, 0.8, 2.7, 'rgba(10,10,16,0.7)', fDep);
+            vQuad(bx, bz, f.a, f.off + 0.13, rOff + sw / 6, 0.1, 0.8, 2.7, 'rgba(10,10,16,0.7)', fDep);
+            vQuad(bx, bz, f.a, f.off + 0.13, rOff, sw, 1.65, 1.8, 'rgba(10,10,16,0.7)', fDep);
           }
           // vertical neon sign on ~40% of buildings (deterministic gate)
           if (h2(b.x * 3 + 5, b.y * 7) < 0.4 && dep < 100) {
             const nc = ['#ff2a6d', '#05d9e8', '#ffd23e'][Math.floor(h2(b.x, b.y * 3) * 3)];
             const nOff = -f.span / 2 + f.span * (0.2 + 0.6 * h2(b.x + 9, b.y));
-            vQuad(bx, bz, f.a, f.off + 0.16, nOff, 0.55, 3.2, Math.max(6, h3 * 0.68), nc, fDep);
-            vQuad(bx, bz, f.a, f.off + 0.14, nOff, 1.1, 3.2, Math.max(6, h3 * 0.68), nc + '33', fDep);
+            // WIN-FIX (VB-11): the neon ran 68% of the facade (249 px tall
+            // on chase3d) as one solid bar. Segmented like the accent
+            // strip + capped, glow per segment.
+            const nTop = Math.min(Math.max(6, h3 * 0.68), 12);
+            for (let k = 0; k < 3; k += 1) {
+              const s0 = 3.2 + (nTop - 3.2) * k / 3, s1 = 3.2 + (nTop - 3.2) * (k + 0.62) / 3;
+              vQuad(bx, bz, f.a, f.off + 0.14, nOff, 1.1, s0, s1, nc + '33', fDep);
+              vQuad(bx, bz, f.a, f.off + 0.16, nOff, 0.5, s0, s1, nc, fDep);
+            }
           }
         }
       }
     }
   }
   if (dep < 90) {
+    // ROOFTOP (VB-32): roofMin = sort depth of the roof face (its nearest
+    // corner). Props get a depOff that lands them just in front of it;
+    // the deck is a QW quad with an explicit dep. Without this the roof
+    // face painted over every prop on it (probe: props d 45-46, roof
+    // face d 35.0 — props 100% occluded, only the antenna tip poking
+    // above the roofline ever showed).
+    const roofMin = Math.min(fwdD(bx - w / 2, bz - d / 2), fwdD(bx + w / 2, bz - d / 2), fwdD(bx - w / 2, bz + d / 2), fwdD(bx + w / 2, bz + d / 2));
+    const propOff = (px, pz) => (roofMin - 1.0) - fwdD(px, pz);
+    // roof deck: inset panel in a per-building muted tone — breaks the
+    // uniform grey slab without adding noise. QW takes an explicit dep.
+    // (A parapet rim was tried here and REMOVED: the 4 edge strips failed
+    // visual check — the far-edge strips of adjacent same-height
+    // buildings merged into one frame-wide beam, and a near-camera
+    // strip projected as a black spike; verified 2x/4x in the planehigh
+    // and chase3d after-shots. Do not re-add without re-shooting.)
+    const deckCols = [[122, 117, 104], [110, 114, 120], [93, 97, 103], [138, 111, 92], [117, 112, 95], [107, 111, 102]];
+    const deckI = Math.floor(h2(b.x * 3 + 1, b.y * 7) * deckCols.length);
+    QW([[bx - w * 0.43, h3 + 0.06, bz - d * 0.43], [bx + w * 0.43, h3 + 0.06, bz - d * 0.43], [bx + w * 0.43, h3 + 0.06, bz + d * 0.43], [bx - w * 0.43, h3 + 0.06, bz + d * 0.43]], mix(deckCols[deckI], hz(dep)), roofMin - 0.5);
     if (h2(b.x, b.y) > 0.45) {
-      box3(bx + (h2(b.x + 1, b.y) - 0.5) * w * 0.4, h3, bz + (h2(b.x, b.y + 1) - 0.5) * d * 0.4, 2.2, 1.2, 2.2, 0, '#6b7280', dep);
+      const acx = bx + (h2(b.x + 1, b.y) - 0.5) * w * 0.4, acz = bz + (h2(b.x, b.y + 1) - 0.5) * d * 0.4;
+      box3(acx, h3, acz, 2.2, 1.2, 2.2, 0, '#6b7280', dep, propOff(acx, acz));
     }
     if (h2(b.x + 2, b.y) > 0.35) { // 2nd rooftop AC unit
-      box3(bx - (h2(b.x + 3, b.y) - 0.5) * w * 0.4, h3, bz - (h2(b.x, b.y + 3) - 0.5) * d * 0.4, 1.6, 0.9, 1.6, 0, '#7d838c', dep);
+      const ac2x = bx - (h2(b.x + 3, b.y) - 0.5) * w * 0.4, ac2z = bz - (h2(b.x, b.y + 3) - 0.5) * d * 0.4;
+      box3(ac2x, h3, ac2z, 1.6, 0.9, 1.6, 0, '#7d838c', dep, propOff(ac2x, ac2z));
     }
     if (h2(b.x, b.y + 2) > 0.35) { // antenna mast + tip light
-      box3(bx + (h2(b.x + 4, b.y) - 0.5) * w * 0.5, h3, bz + (h2(b.x, b.y + 4) - 0.5) * d * 0.5, 0.18, 3.2, 0.18, 0, '#3a3f47', dep);
-      vQuad(bx + (h2(b.x + 4, b.y) - 0.5) * w * 0.5, bz + (h2(b.x, b.y + 4) - 0.5) * d * 0.5, 0, 0, 0, 0.3, h3 + 3.1, h3 + 3.4, '#ff4040');
+      const anx = bx + (h2(b.x + 4, b.y) - 0.5) * w * 0.5, anz = bz + (h2(b.x, b.y + 4) - 0.5) * d * 0.5;
+      box3(anx, h3, anz, 0.18, 3.2, 0.18, 0, '#3a3f47', dep, propOff(anx, anz));
+      vQuad(anx, anz, 0, 0, 0, 0.3, h3 + 3.1, h3 + 3.4, '#ff4040', roofMin - 1.0);
     }
     if (h2(b.x + 6, b.y + 6) > 0.72) { // T2: water tank on legs (old-town silhouette)
       const txp = bx - (h2(b.x + 8, b.y) - 0.5) * w * 0.4, tzp = bz - (h2(b.x, b.y + 8) - 0.5) * d * 0.4;
-      box3(txp, h3 + 1.0, tzp, 1.9, 2.3, 1.9, 0, '#8a6f4d', dep);
-      box3(txp, h3 + 3.2, tzp, 2.1, 0.25, 2.1, 0, '#6b5638', dep);
+      box3(txp, h3 + 1.0, tzp, 1.9, 2.3, 1.9, 0, '#8a6f4d', dep, propOff(txp, tzp));
+      box3(txp, h3 + 3.2, tzp, 2.1, 0.25, 2.1, 0, '#6b5638', dep, propOff(txp, tzp));
     }
     if (h2(b.x + 9, b.y + 9) > 0.78) { // T2: satellite dish, tilted to the sky
-      box3(bx + (h2(b.x + 10, b.y) - 0.5) * w * 0.4, h3 + 0.6, bz + (h2(b.x, b.y + 10) - 0.5) * d * 0.4, 1.4, 0.2, 1.4, 0.6, '#c8ccd4', dep);
+      const dix = bx + (h2(b.x + 10, b.y) - 0.5) * w * 0.4, diz = bz + (h2(b.x, b.y + 10) - 0.5) * d * 0.4;
+      box3(dix, h3 + 0.6, diz, 1.4, 0.2, 1.4, 0.6, '#c8ccd4', dep, propOff(dix, diz));
     }
   }
 }
 // G1 sun glare: radiating streaks + one horizontal anamorphic streak
 // soft=true (chase/boat): fewer, dimmer, wider streaks — the hard 6-streak
 // starburst was washing out the whole frame. Title frame never calls this.
+// SUN-PALM VB-39: soft alpha 0.16->0.22, half-width 4->5 — the old streaks
+// were invisible against the glow (probe: no brightening along the streak
+// angles). Still soft; the anamorphic stays 0.25 so it never reads as a
+// line painted on a facade (VB-01).
 function sunStreaks(sx, sy, len, soft) {
   x.save(); x.globalCompositeOperation = 'lighter';
   const angs = soft ? [-1.1, -0.3, 0.6, 1.7] : [-1.25, -0.55, 0.15, 0.85, 1.6, 2.5];
-  const a0 = soft ? 0.16 : 0.32, hw = soft ? 4 : 2;
+  const a0 = soft ? 0.22 : 0.32, hw = soft ? 5 : 2;
   for (let i = 0; i < angs.length; i += 1) {
     const L = len * (0.55 + (i % 3) * 0.25);
     x.save(); x.translate(sx, sy); x.rotate(angs[i]);
@@ -805,6 +1123,7 @@ export function drawChase3D(ctx, state) {
   const city = state.city;
   const p = state.player;
   const hero = p.inPlane && p.plane ? p.plane : p.inCar && p.car ? p.car : p.inBoat && p.boat ? p.boat : p;
+  const boatView = !!(p.inBoat && p.boat); // BOAT-FIX: boat-scene-only changes below
   const hx = hero.x, hy = hero.y, ha = hero.angle || 0;
   const now = performance.now();
   let dt = ccLast ? (now - ccLast) / 1000 : 0.016;
@@ -830,35 +1149,55 @@ export function drawChase3D(ctx, state) {
   else ccYaw += angDiff(ha, ccYaw) * Math.min(1, dt * 4.0);
   const fx = Math.cos(ccYaw), fz = Math.sin(ccYaw);
   const tx = hx * CS - fx * dist - fz * latOff, tz = hy * CS - fz * dist + fx * latOff;
-  if (snap || still) { ccX = tx; ccZ = tz; ccInit = true; }
-  else { ccX += (tx - ccX) * Math.min(1, dt * 8); ccZ += (tz - ccZ) * Math.min(1, dt * 8); }
-  ccHX = hx; ccHY = hy;
   // T2 (clip #6, TERBUKTI 4x): clamp the chase camera OUT of buildings and
   // keep it over water when the hero is in a boat. Without this the camera
   // sits inside a wall and the R22 cull hides that building (visible pop).
-  // Push-out along the smallest penetration axis; iterate so a push out of
-  // one building never leaves the camera inside a neighbour.
-  {
-    let camWX = ccX / CS, camWY = ccZ / CS;
-    const inBoat = !!(p.inBoat && p.boat);
-    const M = 26; // px: camera near-plane (2 units) + wall clearance
-    if (inBoat) camWX = Math.max(camWX, WATER_X + 24);
+  // CAM-CLAMP (BUG-BLITZ, R25d): the old rule clamped ONLY the camera, with
+  // M=26 — so the lerp target could sit inside the ejection zone. In a
+  // 16 px gap between two buildings the expanded rects overlap by 36 px:
+  // the 4-iteration push-out ping-ponged 2222<->2258 and the camera froze
+  // 18-36 px off target (probe: raw target (2240,869) -> camera stuck at
+  // (2222,869); plane +100 px right in frame). Fix: clamp the TARGET first
+  // with a small margin, so the lerp target never lies inside the ejection
+  // zone and the loop cannot fight itself; the same rule guards the camera
+  // as a safety net for corner clips on the lerp path. M=6: a 16 px gap
+  // keeps a 4 px free corridor (6 < 16/2), so the camera can sit in a
+  // genuine gap, while the point still never enters a wall rect. No
+  // hysteresis state is needed: the clamped target is a pure function of
+  // the raw target, and the camera converges to it instead of being
+  // re-ejected every frame.
+  const inBoat = !!(p.inBoat && p.boat);
+  const clampPt = (wx, wy) => {
+    const M = 6; // px: keep the camera point out of wall rects, nothing more
+    if (inBoat) wx = Math.max(wx, WATER_X + 24);
     for (let iter = 0; iter < 4; iter += 1) {
       let hit = null;
       for (const b of city.buildings) {
-        if (camWX > b.x - M && camWX < b.x + b.w + M && camWY > b.y - M && camWY < b.y + b.h + M) { hit = b; break; }
+        if (wx > b.x - M && wx < b.x + b.w + M && wy > b.y - M && wy < b.y + b.h + M) { hit = b; break; }
       }
       if (!hit) break;
-      const l = camWX - (hit.x - M), r = (hit.x + hit.w + M) - camWX;
-      const tp = camWY - (hit.y - M), bt = (hit.y + hit.h + M) - camWY;
+      const l = wx - (hit.x - M), r = (hit.x + hit.w + M) - wx;
+      const tp = wy - (hit.y - M), bt = (hit.y + hit.h + M) - wy;
       const mn = Math.min(l, r, tp, bt);
-      if (mn === l) camWX = hit.x - M;
-      else if (mn === r) camWX = hit.x + hit.w + M;
-      else if (mn === tp) camWY = hit.y - M;
-      else camWY = hit.y + hit.h + M;
-      if (inBoat) camWX = Math.max(camWX, WATER_X + 24);
+      if (mn === l) wx = hit.x - M;
+      else if (mn === r) wx = hit.x + hit.w + M;
+      else if (mn === tp) wy = hit.y - M;
+      else wy = hit.y + hit.h + M;
+      if (inBoat) wx = Math.max(wx, WATER_X + 24);
     }
-    ccX = camWX * CS; ccZ = camWY * CS;
+    return [wx, wy];
+  };
+  const tc = clampPt(tx / CS, tz / CS);
+  const txC = tc[0] * CS, tzC = tc[1] * CS;
+  if (snap || still) { ccX = txC; ccZ = tzC; ccInit = true; }
+  else { ccX += (txC - ccX) * Math.min(1, dt * 8); ccZ += (tzC - ccZ) * Math.min(1, dt * 8); }
+  ccHX = hx; ccHY = hy;
+  // Safety net: the straight lerp path can clip a rect corner — run the
+  // same small-margin rule over the camera itself (T2's clip #6 guard,
+  // margin 26 -> 6 so a camera already in a genuine gap is not ejected).
+  {
+    const cp = clampPt(ccX / CS, ccZ / CS);
+    ccX = cp[0] * CS; ccZ = cp[1] * CS;
     // boat hugging the shore: the water clamp can pull the camera almost
     // onto the boat — raise the eye so the view goes over it, not through it
     if (inBoat && Math.hypot(ccX - hx * CS, ccZ - hy * CS) < 6) camH = 9;
@@ -917,11 +1256,31 @@ export function drawChase3D(ctx, state) {
       const sg2 = x.createRadialGradient(sunP[0], sunP[1], 4, sunP[0], sunP[1], 190);
       sg2.addColorStop(0, 'rgba(255,230,160,0.95)'); sg2.addColorStop(0.25, 'rgba(255,170,90,0.55)'); sg2.addColorStop(1, 'rgba(255,140,80,0)');
       x.fillStyle = sg2; x.fillRect(sunP[0] - 190, sunP[1] - 190, 380, 380);
-      x.fillStyle = '#ffe9a8'; x.beginPath(); x.arc(sunP[0], sunP[1], 18, 0, 7); x.fill();
+      // SUN-PALM VB-39: gradient disc (hot white core -> warm rim) instead
+      // of the flat #ffe9a8 fill, which read as a pale sticker. Still drawn
+      // here, BEFORE the 3D ops — VB-01 stays dead (buildings occlude it).
+      const dg = x.createRadialGradient(sunP[0], sunP[1], 0, sunP[0], sunP[1], 18);
+      dg.addColorStop(0, '#fffdf0'); dg.addColorStop(0.55, '#ffe9a8'); dg.addColorStop(1, '#ffb45e');
+      x.fillStyle = dg; x.beginPath(); x.arc(sunP[0], sunP[1], 18, 0, 7); x.fill();
       sunStreaks(sunP[0], sunP[1], 190, true); // G1 soft (round 21)
     }
   }
   // ground tiles (segmented so quads never straddle the camera plane)
+  // BOAT-FIX (VB-42, boat view only — chase3d/jets byte-identical): one
+  // water-coloured backing quad under the water tiles. Adjacent water tiles
+  // share an exact edge; rasterisation leaves a 1px crack showing the pale
+  // horizon fill = the diagonal "fan" seam (probe: two tiles, identical
+  // rgb(29,111,158), shared edge (844,478)->(2151,1183)). With water-coloured
+  // backing the crack is invisible. Seeded ripple dashes break the flat sheet.
+  if (boatView) {
+    flatQuad(WATER_X, -320, WORLD_W + 320, WORLD_H + 320, -0.4, sh([29, 111, 158], shadeK, 0));
+    for (let i = 0; i < 36; i += 1) {
+      const rwx = WATER_X + 30 + h2(i, 7) * (WORLD_W + 280 - WATER_X - 60);
+      const rwy = ccZ / CS - 1400 + h2(i, 11) * 2400;
+      if (!inRange(rwx, rwy, 175, 135)) continue;
+      flatQuad(rwx, rwy, rwx + 30 + h2(i, 13) * 50, rwy + 6, -0.3, 'rgba(255,255,255,0.13)');
+    }
+  }
   for (let gx = -320; gx < WORLD_W + 320; gx += 320) {
     for (let gy = -320; gy < WORLD_H + 320; gy += 320) {
       const cxp = gx + 160, cyp = gy + 160;
@@ -940,6 +1299,11 @@ export function drawChase3D(ctx, state) {
         for (const dd of city.districts) {
           if (cxp >= dd.x && cxp < dd.x + dd.w) { ground = dd.ground; break; }
         }
+        // LAMP-WALK VB-29: Harbor green (#2f6b5a) read as a grass strip
+        // beside the road in chase3d (probe: rgb(23,53,45) below the road
+        // edge, y 508-605). Use the Downtown slate already in this view so
+        // bare land matches the road/sidewalk palette. Parks keep green.
+        if (ground === '#2f6b5a') ground = '#4b5563';
         flatQuad(gx, gy, WATER_X, gy + 320, 0, sh(hx3(ground), shadeK, hz(td)));
         flatQuad(WATER_X, gy, gx + 320, gy + 320, -0.35, sh([29, 111, 158], shadeK, hz(td)));
       } else if (cxp > WATER_X) {
@@ -949,6 +1313,7 @@ export function drawChase3D(ctx, state) {
         for (const dd of city.districts) {
           if (cxp >= dd.x && cxp < dd.x + dd.w) { ground = dd.ground; break; }
         }
+        if (ground === '#2f6b5a') ground = '#4b5563'; // LAMP-WALK VB-29, see above
         flatQuad(gx, gy, gx + 320, gy + 320, 0, sh(hx3(ground), shadeK, hz(td)));
       }
     }
@@ -971,9 +1336,63 @@ export function drawChase3D(ctx, state) {
     flatQuad(2344, 540, 2360, 556, 0.07, '#c98a3d');
     const hdep = Math.hypot(2166 * CS - ccX, 680 * CS - ccZ);
     box3(2166 * CS, 0.02, 680 * CS, 10, 6, 8, 0, '#7d838c', hdep); // hangar
-    vQuad(2166 * CS, 680 * CS, Math.PI / 2, 4.1, 0, 6, 0.8, 2.4, '#05d9e8'); // hangar door glow (south face)
+    // WIN-FIX (VB-14): the south door glow was at fOff 4.1 — INSIDE the box
+    // (the south face sits at fOff 5.0), so the face painted over it; and
+    // from the staged takeoff camera its y 0.8-2.4 projects BELOW the
+    // frame (probe: glow bbox y 779-961, hangar faces dep 6.7 fill
+    // x 0-465, y 368-800 blank). Fix the offset to 5.1 AND put the real
+    // door on the EAST face — the face this camera actually sees.
+    // SOUTH-GLOW (R25k follow-up): that south-face glow quad (6 wide x
+    // 1.6 tall, solid cyan, fOff 5.1) is DELETED — the real door lives on
+    // the EAST face (below), so this quad had no function, and from the
+    // gap-staging camera it projected as a ~310x110 px cyan sticker slab
+    // on the hangar's south face. The south face keeps its framed windows
+    // + roofline trim (WIN-FIX r2, below), so it does not go blank.
+    // East face (a=0, fOff 4.1 = d/2+0.1): a grazing face, so detail needs
+    // an explicit dep just in front of the face's nearest corner (same
+    // trap as bld3 windows: box3 sorts the face by its nearest corner
+    // and would paint over detail at computed dep).
+    const hgx = 2166 * CS, hgz = 680 * CS;
+    const hEastDep = fwdD(hgx + 4, hgz + 5) - 0.5;
+    // tall hangar door: dark panel (not a solid cyan slab) + cyan header
+    // + slats + side frames. On screen: x 313-447, y 415-800.
+    vQuad(hgx, hgz, 0, 4.1, 0, 6, 0.8, 5.2, '#33383f', hEastDep);
+    vQuad(hgx, hgz, 0, 4.12, 0, 6, 5.2, 5.5, '#05d9e8', hEastDep);
+    for (const sy of [2.0, 3.2, 4.4]) vQuad(hgx, hgz, 0, 4.12, 0, 6, sy, sy + 0.14, 'rgba(0,0,0,0.5)', hEastDep);
+    vQuad(hgx, hgz, 0, 4.12, -3.06, 0.14, 0.8, 5.2, 'rgba(10,10,16,0.75)', hEastDep);
+    vQuad(hgx, hgz, 0, 4.12, 3.06, 0.14, 0.8, 5.2, 'rgba(10,10,16,0.75)', hEastDep);
+    // flanking clerestory windows + panel seams + roofline/base trims
+    // WIN-FIX r2: the clerestory glass was one flat yellow slab at 4x —
+    // split each into 4 panes (mullion + transom) like the tower windows.
+    for (const wx of [-4.2, 4.2]) {
+      vQuad(hgx, hgz, 0, 4.11, wx, 1.6, 4.1, 5.5, 'rgba(10,10,16,0.85)', hEastDep);
+      vQuad(hgx, hgz, 0, 4.12, wx, 1.3, 4.2, 5.4, 'rgba(255,205,120,0.95)', hEastDep);
+      vQuad(hgx, hgz, 0, 4.13, wx, 0.1, 4.2, 5.4, 'rgba(10,10,16,0.7)', hEastDep);
+      vQuad(hgx, hgz, 0, 4.13, wx, 1.3, 4.72, 4.85, 'rgba(10,10,16,0.7)', hEastDep);
+      vQuad(hgx, hgz, 0, 4.12, wx, 0.12, 0.8, 4.0, 'rgba(0,0,0,0.4)', hEastDep);
+    }
+    vQuad(hgx, hgz, 0, 4.12, 0, 10, 5.7, 6.0, 'rgba(0,0,0,0.35)', hEastDep);
+    vQuad(hgx, hgz, 0, 4.12, 0, 10, 0.1, 1.0, 'rgba(0,0,0,0.35)', hEastDep);
+    // WIN-FIX r2: the SOUTH face sliver (screen x 0-202, y 368-800) was
+    // still blank tan — only 1.6 world units of it are on screen, so a
+    // column of two small framed windows + a roofline trim is all that
+    // fits, and it is all the strip needs to stop reading as a void.
+    vQuad(2166 * CS, 680 * CS, Math.PI / 2, 5.1, 0, 8, 5.7, 6.0, 'rgba(0,0,0,0.35)');
+    for (const wy of [2.8, 4.5]) {
+      vQuad(2166 * CS, 680 * CS, Math.PI / 2, 5.08, -3.2, 1.5, wy - 0.1, wy + 1.1, 'rgba(10,10,16,0.85)');
+      vQuad(2166 * CS, 680 * CS, Math.PI / 2, 5.1, -3.2, 1.2, wy, wy + 1.0, 'rgba(255,205,120,0.95)');
+      vQuad(2166 * CS, 680 * CS, Math.PI / 2, 5.12, -3.2, 0.1, wy, wy + 1.0, 'rgba(10,10,16,0.7)');
+    }
     box3(2138 * CS, 0.02, 518 * CS, 3.6, 14, 3.6, 0, '#8a8f98', hdep); // tower
-    vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.9, 0, 2.4, 9, 11.5, 'rgba(255,205,120,0.95)'); // tower windows (south face)
+    // WIN-FIX (VB-14): the tower window band was one flat pale slab
+    // (2.4x2.5, no divisions) on an otherwise blank face. Dark frame +
+    // 3 panes + transom, plus a second row lower (still above the
+    // hangar's roofline from this camera).
+    vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.87, 0, 2.6, 8.9, 11.6, 'rgba(10,10,16,0.85)');
+    for (const wx of [-0.8, 0, 0.8]) vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.9, wx, 0.66, 9, 11.5, 'rgba(255,205,120,0.95)');
+    vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.92, 0, 2.4, 10.15, 10.3, 'rgba(10,10,16,0.7)');
+    vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.87, 0, 2.6, 6.5, 8.6, 'rgba(10,10,16,0.85)');
+    for (const wx of [-0.8, 0, 0.8]) vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.9, wx, 0.66, 6.6, 8.5, 'rgba(255,205,120,0.9)');
     box3(2138 * CS, 14, 518 * CS, 0.18, 3.2, 0.18, 0, '#3a3f47', hdep); // antenna
     vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.9, 0, 0.3, 17.1, 17.4, '#ff4040'); // tip light
     for (const tk of [[2352, 700], [2352, 744]]) {
@@ -1038,18 +1457,17 @@ export function drawChase3D(ctx, state) {
     QW([[nx + rx * 1.5, 0.12, nz + rz * 1.5], [nx - rx * 1.5, 0.12, nz - rz * 1.5],
       [fx2 - rx * 2.5, 0.12, fz2 - rz * 2.5], [fx2 + rx * 2.5, 0.12, fz2 + rz * 2.5]], 'rgba(255,195,115,0.35)', 'far');
   }
-  // G2 smog clouds: faint pink/orange haze wisps hugging the horizon.
-  // JETFIX-2 Bug 1: the old slabs (26-52 high, 360-420 out, alpha 0.35)
-  // read as solid pink rectangles floating in the sky (probe: bands at
-  // y 300-344, d 362-419, in the circled sky region). Lower + thinner +
-  // fainter + wider so they read as horizon haze, not objects.
-  for (let i = 0; i < 5; i += 1) {
-    const cLat = -190 + h2(i, 41) * 380, cFwd = 360 + h2(i, 42) * 60;
-    const cy0 = 14 + h2(i, 43) * 10, ch = 5 + h2(i, 44) * 5, cw = 100 + h2(i, 45) * 80;
-    const wxp = ccX + (-cfZ) * cLat + cfX * cFwd;
-    const wzp = ccZ + cfX * cLat + cfZ * cFwd;
-    QW([[wxp, cy0, wzp], [wxp + (-cfZ) * cw, cy0, wzp + cfX * cw], [wxp + (-cfZ) * cw, cy0 + ch, wzp + cfX * cw], [wxp, cy0 + ch, wzp]], mix(i % 2 ? [255, 120, 90] : [255, 150, 110], 0.22));
-  }
+  // VB-06-REDO: the G2 smog-cloud loop is REMOVED, not retuned. Probe
+  // (boat3d, seed 7, R25d): its 5 quads — rgb(239,138,119) /
+  // rgb(239,161,134), x 221-1154, y 321-346, d 361-419 — TILED into the
+  // solid peach bar across the horizon. JETFIX-2 only moved the bar
+  // (old y 26-52 -> new y 14-24); opaque rgb quads, 100-180 wide, at
+  // near-identical height/forward distance, always tile into a
+  // hard-edged strip — no alpha/size tweak can un-tile them. The
+  // gradient smog band above (HOR-60..HOR+40) already does horizon
+  // haze smoothly; these quads added nothing but the bar. Do NOT
+  // re-add horizon quads here — any opaque quad at this distance
+  // reads as a floating bar (VB-06).
   // JETFIX-2 Bug 1: the distant skyline silhouettes are REMOVED. They were
   // 10 dark slabs fixed 400-430 units ahead of the camera, standing on
   // y=0 at z ~ -313 — far beyond the ground tiles (which end at z -32),
@@ -1092,6 +1510,25 @@ export function drawChase3D(ctx, state) {
   }
   if (inRange(marina.x + marina.w / 2, marina.y + marina.h / 2, 130, 110)) {
     flatQuad(marina.x, marina.y, marina.x + marina.w, marina.y + marina.h, 0.1, '#6b5a44');
+  }
+  // BOAT-FIX (VB-43, boat view only): the shoreline was one straight hard
+  // line with zero dock detail. Quay furniture hugging x=WATER_X (clear of
+  // the boat lane and the shore road): concrete quay edge + yellow safety
+  // line, iron bollards on the edge, tyre fenders on the quay face.
+  if (boatView && inRange(WATER_X, 1000, 130, 110)) {
+    const qdep = Math.hypot(WATER_X * CS - ccX, 1000 * CS - ccZ);
+    flatQuad(WATER_X - 10, 640, WATER_X, 1560, 0.06, '#8a8f98');
+    flatQuad(WATER_X - 11, 640, WATER_X - 8, 1560, 0.07, '#ffd23e');
+    // BOAT-FIX-3: bollards/tires sit ON a ground tile whose painter depth
+    // ties with theirs (~26.2 vs ~26.8), so the tile painted over the
+    // bollard's lower-left edge (3 px light nick at 4x). depOff -1 forces
+    // the quay furniture to paint after the ground it stands on.
+    for (const by of [760, 880, 1000, 1120, 1240]) {
+      box3((WATER_X - 6) * CS, 0.1, by * CS, 0.5, 0.7, 0.5, 0, '#1c1f24', qdep, -1);
+    }
+    for (const ty of [820, 940, 1060, 1180]) {
+      box3((WATER_X + 2) * CS, -0.3, ty * CS, 0.4, 0.55, 0.7, 0, '#14161a', qdep, -1);
+    }
   }
   // gas station
   const gas = state.gasStation;
@@ -1188,6 +1625,11 @@ export function drawChase3D(ctx, state) {
   // boats (world boats + player boat)
   for (const boat of state.boats || []) {
     if (!boat.alive || !inRange(boat.x, boat.y, 150, 100)) continue;
+    // BOAT-REBUILD: the hero boat is drawn again below ("hero last") —
+    // drawing it here too doubled every wake/foam alpha and read as a
+    // solid white road behind the hero. Skip it here; the hero-last pass
+    // draws it once, last (nearest).
+    if (p.inBoat && p.boat === boat) continue;
     boat3d(boat.x, boat.y, boat.angle, boat.length, boat.width, boat.color, { hero: p.inBoat && p.boat === boat, t });
   }
   // helicopter + searchlight
@@ -1215,6 +1657,14 @@ export function drawChase3D(ctx, state) {
   for (const c of state.collectibles) {
     if (c.taken || !inRange(c.x, c.y, 90, 90)) continue;
     box3(c.x * CS, 0.4, c.y * CS, 1.1, 1.1, 1.1, t * 2, '#ffd23e', Math.hypot(c.x * CS - ccX, c.y * CS - ccZ));
+    // BOAT-FIX (VB-26): the harbour token at (2446,1166) sat 2 px from the
+    // water with no shadow or base, reading as a floating yellow cube on
+    // the dock. Near-water tokens sit on a wooden crate with a contact
+    // shadow, so they read as placed supplies.
+    if (c.x > WATER_X - 80) {
+      box3(c.x * CS, 0.05, c.y * CS, 1.5, 0.35, 1.5, 0, '#6b4a2f', Math.hypot(c.x * CS - ccX, c.y * CS - ccZ));
+      flatQuad(c.x - 12, c.y - 12, c.x + 12, c.y + 12, 0.03, 'rgba(0,0,0,0.35)');
+    }
   }
   // UFO
   const ufo = state.ufo;
@@ -1302,11 +1752,35 @@ export function drawChase3D(ctx, state) {
     if (!inRange(wxp, wzp, 175, 135)) continue;
     const pdep = Math.hypot(pxp - ccX, pzp - ccZ);
     box3(pxp, 0, pzp, 0.5, 7.2, 0.5, 0, '#1c1410', pdep);
-    for (let fr = 0; fr < 3; fr += 1) {
-      const fa = h2(pi * 5 + fr, 11) * Math.PI;
-      box3(pxp, 7.0 + fr * 0.15, pzp, 2.0, 0.22, 0.7, fa, '#241a12', pdep);
+    // PALM-REBUILD (VB-40 in-game / VB-23): the old 3 flat slabs stacked
+    // into ONE horizontal bar on screen = the "T". Now 8 separate fronds,
+    // each a 3-segment ribbon arcing out and drooping down (same curve as
+    // the takeoff3d palm, proven there), green like the reference palms,
+    // tapering .34->.14. Trunk position UNCHANGED (POLEFIX2 walkLat 4.8).
+    // Reach shortens toward the road (1.0) so no tip overhangs the
+    // asphalt: tip stays >=38px from the centreline (POLEFIX2 rule);
+    // full 1.9 toward the sidewalk/buildings. Coconut cluster anchors
+    // the crown so the frond bases read as one palm, not loose strokes.
+    const pcy = 7.2, ptz = hz(pdep), pgn = hx3('#4a9e4f'), psd = pi % 2 === 0 ? -1 : 1;
+    box3(pxp, 6.85, pzp, 0.45, 0.45, 0.45, 0, '#2a1a10', pdep);
+    for (let fi = 0; fi < 8; fi += 1) {
+      const fa = h2(pi, 31) * 6.283 + fi * 0.785;
+      const fx = Math.cos(fa), fz = Math.sin(fa);
+      const ftr = psd * (fx * cfZ - fz * cfX); // 1 = straight at the road
+      const frn = 1.9 - 0.9 * Math.max(0, ftr);
+      for (let sg = 0; sg < 3; sg += 1) {
+        const t0 = sg / 3, t1 = (sg + 1) / 3, w0 = 0.34 - 0.10 * sg;
+        const y0 = pcy + 0.7 * t0 - 2.6 * t0 * t0, y1 = pcy + 0.7 * t1 - 2.6 * t1 * t1;
+        // PALM-REBUILD v2: QW(c, col, dep) takes ONE array of 4 points
+        // (v1 passed 4 separate args = Q()'s signature -> NaN polygon,
+        // 24 ribbons silently never drawn). Wrap in one extra array.
+        QW([[pxp + fx * frn * t0, y0 - w0, pzp + fz * frn * t0],
+          [pxp + fx * frn * t1, y1 - w0, pzp + fz * frn * t1],
+          [pxp + fx * frn * t1, y1 + w0, pzp + fz * frn * t1],
+          [pxp + fx * frn * t0, y0 + w0, pzp + fz * frn * t0]],
+          sh(pgn, 0.85 - 0.12 * sg, ptz), pdep);
+      }
     }
-    topStrip(pxp, pzp, 0, 0, 0, 2.0, 0.7, 7.35, 'rgba(255,170,100,0.5)');
   }
   // street lamps at night: glowing dots at nearby intersections
   if (nightF > 0.4) {
