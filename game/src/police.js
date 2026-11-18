@@ -274,9 +274,7 @@ export function stepPolice(police, state, dt, rng, events) {
       while (diff < -Math.PI) diff += Math.PI * 2;
       unit.angle += Math.max(-3.4 * dt, Math.min(3.4 * dt, diff));
       unit.speed = Math.min(600, unit.speed + 480 * dt);
-      const nbx = unit.x + Math.cos(unit.angle) * unit.speed * dt;
-      const nby = unit.y + Math.sin(unit.angle) * unit.speed * dt;
-      if (!boatHitsObstacle(nbx, nby, 27)) { unit.x = nbx; unit.y = nby; }
+      let a=unit.angle;for(const d of[0,1.57,2.4,-1.57]){const x=unit.x+Math.cos(a+d)*unit.speed*dt,y=unit.y+Math.sin(a+d)*unit.speed*dt;if(!boatHitsObstacle(x,y,27)){unit.x=x;unit.y=y;unit.angle=a+d;break}}
       unit.x = Math.max(WATER_X + 16, Math.min(WORLD_W - 16, unit.x));
       unit.y = Math.max(16, Math.min(WORLD_H - 16, unit.y));
       if (Math.abs(unit.speed) > 120) {
@@ -298,7 +296,7 @@ export function stepPolice(police, state, dt, rng, events) {
         state.player.health = Math.max(0, state.player.health - 3);
         if (player.boat) {
           player.boat.speed *= 0.8;
-          player.boat.hp -= 34;
+          player.boat.hp -= 14;
           if (player.boat.hp <= 0) events.boatSunk = { x: player.boat.x, y: player.boat.y };
         }
         unit.speed *= 0.5;
@@ -377,7 +375,7 @@ export function stepPolice(police, state, dt, rng, events) {
       } else if (unit.kind === 'foot' && dist < 60 && player.inCar) {
         if (Math.abs(player.car.speed) < 60) {
           police.arrestTimer += dt;
-          if (police.arrestTimer > 1.0) busted = true;
+          if (police.arrestTimer > 2.8) busted = true;
         }
       } else {
         police.arrestTimer = Math.max(0, police.arrestTimer - dt);

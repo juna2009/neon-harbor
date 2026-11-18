@@ -66,12 +66,12 @@ export const MISSION_DEFS = [
   },
   {
     title: 'Vigilante Shift',
-    brief: 'Day 2 — a crew is shaking down the docks. Hold the line at three stars for a full minute.',
-    objective: 'Survive 60 seconds at 3 stars',
+    brief: 'Day 2 — a crew is shaking down the docks. Hold the line at three stars for 45 seconds.',
+    objective: 'Survive 45 seconds at 3 stars',
     reward: MISSION_REWARDS[6],
     dialogue: [
       'MARA: A crew is shaking down the docks — the harbor is ours, not theirs.',
-      'MARA: Make noise. Three stars, one minute. Show them who runs this water.',
+      'MARA: Make noise. Three stars, 45 seconds. Show them who runs this water.',
     ],
   },
   {
@@ -394,8 +394,9 @@ export function updateMission(world, dt) {
     const done = (world.taxiFaresDone || 0) - (mission.count || 0);
     if (done >= 2) completeMission(world);
   } else if (mission.index === 6) {
-    if (world.wanted < 3) addWanted(world, 3 - world.wanted);
-    if (mission.timer > 60) completeMission(world);
+    world.wanted = 3;
+    world.police.heli.active = false;
+    if (mission.timer > 45) completeMission(world);
   } else if (mission.index === 7) {
     if (mission.stage === 0 && near(world, plazaTarget(city), 60)) {
       mission.stage = 1;
@@ -787,7 +788,7 @@ export function currentObjective(world) {
     return `${n} Night Taxi: fares ${Math.min(2, done)}/2 — grab a cab`;
   }
   if (mission.index === 6) {
-    return `${n} Vigilante Shift: survive ${Math.max(0, 60 - mission.timer).toFixed(0)}s at 3 stars`;
+    return `${n} Vigilante Shift: survive ${Math.max(0, 45 - mission.timer).toFixed(0)}s at 3 stars`;
   }
   if (mission.index === 7) {
     return `${n} Courier Dash: drop ${mission.stage + 1}/3 — ${Math.max(0, (mission.limit || 150) - mission.timer).toFixed(0)}s left`;

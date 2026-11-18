@@ -4,7 +4,7 @@ export const BOAT_MAX_SPEED = 620;
 export const BOAT_ACCEL = 520;
 export function createBoats(city, rng) {
   const spots = [
-    { x: WATER_X + 40, y: city.marina.y + 80, angle: -Math.PI / 2 },
+    { x: WATER_X + 40, y: city.marina.y - 80, angle: -Math.PI / 2 },
     { x: WATER_X + 40, y: 900, angle: Math.PI / 2 },
     { x: WATER_X + 40, y: city.docks.y + 140, angle: -Math.PI / 2 },
   ];

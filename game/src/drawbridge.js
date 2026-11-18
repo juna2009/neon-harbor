@@ -25,7 +25,7 @@ export function stepBridge(b, s, dt, fx) {
   }
   if (b.up && ((b.timer -= dt) <= 0 || d > 520)) b.up = false;
   if (inGap && !b.inGap && b.up) {
-    if (sp >= 300) {
+    if (sp >= 230) {
       s.events.jump = true; s.events.bridgeJump = true;
       c.speed = Math.sign(c.speed) * 220;
       if (s.mission.index === 11) fx.floater(px, py - 30, 'BRIDGE JUMP!', '#ffd23e');

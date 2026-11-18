@@ -468,7 +468,7 @@ export function createWorld(rng, savedMission, sp) {
     const nx = car.x + (Math.cos(car.angle) * car.speed - Math.sin(car.angle) * car.slide) * dt;
     const ny = car.y + (Math.sin(car.angle) * car.speed + Math.cos(car.angle) * car.slide) * dt;
     const cr = car.body === 'van' ? 30 : 26;
-    const leafBlock = Math.abs(car.speed) < 300;
+    const leafBlock = Math.abs(car.speed) < 230;
     if (collides(city, nx, car.y, cr) || (leafBlock && !leafHit(state.bridge, car.x, car.y, cr) && leafHit(state.bridge, nx, car.y, cr))) {
       car.speed *= -0.25;
       state.events.crash = true;
@@ -481,8 +481,8 @@ export function createWorld(rng, savedMission, sp) {
     } else {
       car.y = ny;
     }
-    car.x = Math.max(24, Math.min(WORLD_W - 24, car.x));
-    car.y = Math.max(24, Math.min(WORLD_H - 24, car.y));
+    car.x = Math.max(cr, Math.min(WORLD_W - cr, car.x));
+    car.y = Math.max(cr, Math.min(WORLD_H - cr, car.y));
     hitScenery(car);
     collideCars(car, dt);
     if (Math.abs(car.speed) > 200 && Math.abs(steer) > 0.6) {
@@ -573,7 +573,7 @@ export function createWorld(rng, savedMission, sp) {
     }
     if (input.wasPressed && input.wasPressed('interact')) {
       if (sp && p.inPlane) sp.exitPlane(state);
-      else if (sp && sp.tryBoardPlane(state)) { /* boarded */ }
+      else if (sp && sp.tryBoardPlane(state)) { }
       else if (p.inBoat) exitBoat();
       else if (p.inCar) exitCar();
       else {
@@ -723,9 +723,7 @@ export function createWorld(rng, savedMission, sp) {
       p.angle = p.boat.angle;
     } else if (p.inCar && p.car) {
       driveCar(p.car, input, dt);
-      p.x = p.car.x;
-      p.y = p.car.y;
-      p.angle = p.car.angle;
+      if (p.car) { p.x = p.car.x; p.y = p.car.y; p.angle = p.car.angle; }
     } else {
       const angle = aimAngle(input, state.camera, view.w, view.h);
       walkPlayer(input, dt, angle);
