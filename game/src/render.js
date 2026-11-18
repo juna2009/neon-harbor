@@ -1,14 +1,14 @@
-import { COLORS, PLAYER, UPGRADES, WEAPONS, WORLD_H, WORLD_W } from './config.js';
+import { COLORS, PLAYER, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, districtAt } from './city.js';
-import { currentObjective, garageHot } from './missions.js';
-import { drawMinimap } from './minimap.js';
+import { MISSION_DEFS, currentObjective, garageHot } from './missions.js';
 import { createCinematic } from './cinematic.js';
 import { drawBuildingShadow, drawDayTint, drawLightPool, drawLightning, drawWetReflection } from './lighting.js';
 import { drawBuoy, drawBuilding, drawCargoShip, drawContainer, drawCrane, drawCrosswalk, drawHydrant, drawLamp, drawPier, drawSign, drawTree } from './props.js';
-import { drawAmmoIcon, drawBanner, drawButton, drawCashIcon, drawDirectionArrow, drawHeart, drawMenuFrame, drawNeonLine, drawObjectiveIcon, drawSpeedIcon, drawTargetRing, drawWantedRow } from './ui-art.js';
-import { drawBoatWake, drawCarShape, drawExplosionSprite, drawHarborSkyline, drawNeonLogo, drawPedPhone, drawPedestrian, drawPerson, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet, rr } from './assets.js';
-import { drawJaxPortrait, drawMaraPortrait, drawPortraitSmall } from './portraits.js';
+import { drawDirectionArrow, drawMenuFrame, drawTargetRing } from './ui-art.js';
+import { drawBoatWake, drawCarShape, drawExplosionSprite, drawHarborSkyline, drawPedPhone, drawPedestrian, drawPerson, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet, rr } from './assets.js';
+import { drawJaxPortrait, drawMaraPortrait } from './portraits.js';
 import { drawBridge } from './drawbridge.js';
+import { drawHud2, drawPause2, drawShop2, drawTitle2 } from './ui2.js';
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
 export const SCREEN_PAUSED = 'paused';
@@ -946,100 +946,31 @@ export function createRenderer(canvas) {
     }
     return { camX, camY };
   }
-  function drawStars(ctx2, wanted, x, y) {
-    drawWantedRow(ctx2, x + 11, y - 8, 11, 6, Math.floor(wanted), 26);
+  // Mission progress for the ROAD TO #1 meter (HUD + title): done = missions
+  // finished (index advances on completion; mission.done flags the finale).
+  function missionProgress(state) {
+    const done = state.mission.done ? 12 : state.mission.index;
+    return { done, total: 12, next: state.mission.done ? '' : MISSION_DEFS[state.mission.index].title };
   }
   function drawHud(state, best, ui) {
     const p = state.player;
-    const collected = state.collectibles.filter((c) => c.taken).length;
-    ctx.fillStyle = 'rgba(14,20,32,0.82)';
-    ctx.fillRect(12, 12, 250, 132);
-    drawCashIcon(ctx, 22, 29, 11);
-    text(`$${state.cash}`, 40, 40, 26, COLORS.cash, 'left', 'bold');
-    text(`Best $${best}`, 150, 40, 15, '#c8cdd6', 'left');
-    ctx.fillStyle = '#3a0d0d';
-    ctx.fillRect(24, 52, 160, 14);
-    ctx.fillStyle = p.health > 30 ? '#4ade80' : '#ef4444';
-    ctx.fillRect(24, 52, Math.max(0, 160 * (p.health / 100)), 14);
-    drawHeart(ctx, 197, 59, 9);
-    drawStars(ctx, state.wanted, 24, 96);
-    const weapon = WEAPONS[p.weapon];
-    drawAmmoIcon(ctx, 24, 112, 9);
-    text(`${weapon.name}  ${p.ammo} / ${p.reserve}`, 40, 118, 15, '#eef1f5', 'left');
-    text(`◆ ${collected}/${state.collectibles.length}`, 24, 138, 14, COLORS.neonYellow, 'left', 'bold');
-    if ((p.inCar && p.car) || (p.inBoat && p.boat)) {
-      const vehicle = p.inCar ? p.car : p.boat;
-      const speed = Math.round(Math.abs(vehicle.speed) * 0.36);
-      ctx.fillStyle = 'rgba(14,20,32,0.82)';
-      ctx.fillRect(view.w - 188, view.h - 116, 172, 52);
-      drawSpeedIcon(ctx, view.w - 178, view.h - 90, 16, 2.36 + Math.min(1, Math.abs(vehicle.speed) / 540) * 3.14);
-      text(`${speed} km/h`, view.w - 28, view.h - 78, 30, '#ffffff', 'right', 'bold');
-      if (p.inCar && p.car) {
-        const hp = Math.max(0, Math.round(p.car.hp || 0));
-        text(`Car ${hp}%`, view.w - 28, view.h - 100, 12, '#c8cdd6', 'right');
-      } else {
-        text(`Boat ${Math.max(0, Math.round(p.boat.hp || 0))}%`, view.w - 28, view.h - 100, 12, '#c8cdd6', 'right');
-      }
-      if (p.car && p.car.tiresPopped) {
-        text('TIRES POPPED — garage $150 (G)', view.w - 16, view.h - 128, 14, '#ff5a3c', 'right', 'bold');
-      }
-    }
-    const hints = p.inCar
-      ? 'E exit · Q weapon · C radio · G repair/respray · M mute'
-      : p.inBoat
-        ? 'E step ashore · C radio · M mute'
-        : 'E enter car / boat · R reload · Q weapon · C radio · M mute';
-    text(hints + ' · V switch view', view.w - 16, view.h - 24, 14, '#c8cdd6', 'right');
-    const objective = currentObjective(state);
-    ctx.font = `bold 16px ${FONT}`;
-    const ow = Math.min(view.w - 32, ctx.measureText(objective).width + 62);
-    ctx.fillStyle = 'rgba(14,20,32,0.9)';
-    ctx.fillRect(16, view.h - 64, ow, 34);
-    ctx.fillStyle = COLORS.neonCyan;
-    ctx.fillRect(16, view.h - 64, 4, 34);
-    drawObjectiveIcon(ctx, 30, view.h - 47, 10);
-    text(objective, 48, view.h - 41, 16, '#ffffff', 'left', 'bold');
-    if (ui && ui.stationName) {
-      const label = `♪ ${ui.stationName}`;
-      ctx.font = `bold 13px ${FONT}`;
-      const lw = ctx.measureText(label).width;
-      ctx.fillStyle = 'rgba(14,20,32,0.82)';
-      ctx.fillRect(12, 152, lw + 24, 24);
-      text(label, 24, 168, 13, COLORS.neonPink, 'left', 'bold');
-    }
-    drawMinimap(ctx, state, view.w - 216, 16, 200, 150);
-    const total = state.clock ? state.clock.total : 0;
-    const day = 1 + Math.floor(total / 1440);
-    const hh = String(Math.floor(total / 60) % 24).padStart(2, '0');
-    const mm = String(Math.floor(total) % 60).padStart(2, '0');
-    const district = districtAt(state.city, state.player.x, state.player.y);
+    const district = districtAt(state.city, p.x, p.y);
     const heatIdx = state.city.districts.indexOf(district);
     const heat = state.heat ? Math.round(state.heat[heatIdx] || 0) : 0;
-    const hot = heat >= 60;
-    const blackout = state.blackout && state.blackout.active;
-    const readout = `DAY ${day} · ${hh}:${mm} · ${district.name.toUpperCase()} · HEAT ${heat}${hot ? ' HOT!' : ''}${blackout ? ' · BLACKOUT' : ''}`;
-    ctx.font = `bold 15px ${FONT}`;
-    const rw = ctx.measureText(readout).width + 28;
-    ctx.fillStyle = 'rgba(14,20,32,0.82)';
-    ctx.fillRect((view.w - rw) / 2, 12, rw, 28);
-    ctx.fillStyle = hot ? '#ff8a7a' : COLORS.neonCyan;
-    ctx.fillRect((view.w - rw) / 2, 12, 4, 28);
-    text(readout, view.w / 2, 31, 15, hot ? '#ff8a7a' : '#ffffff', 'center', 'bold');
-    if (state.wanted >= 6) drawBanner(ctx, (view.w - 340) / 2, 44, 340, '⚠ MILITARY RESPONSE ⚠', '#ff5a3c');
-    if (state.mission.dialogueTimer > 0 && state.mission.dialogue.length > 0) {
-      drawPortraitSmall(ctx, 16, view.h - 236, 'mara', (state.wanted >= 4 || blackout) ? 'worried' : 'alert');
-      const line = state.mission.dialogue[0];
-      ctx.fillStyle = 'rgba(14,20,32,0.88)';
-      ctx.fillRect(16, view.h - 150, Math.min(view.w - 32, 640), 62);
-      ctx.fillStyle = COLORS.neonPink;
-      ctx.fillRect(16, view.h - 150, 4, 62);
-      text(line, 30, view.h - 126, 16, '#ffffff', 'left');
-      text('MARA — Harbor Crew', 30, view.h - 104, 13, COLORS.neonPink, 'left', 'bold');
-    }
-    if (state.wanted >= 3) {
-      ctx.fillStyle = 'rgba(239,68,68,0.08)';
-      ctx.fillRect(0, 0, view.w, view.h);
-    }
+    const blackout = !!(state.blackout && state.blackout.active);
+    const prog = missionProgress(state);
+    drawHud2(ctx, {
+      ...state,
+      missionDone: prog.done,
+      missionTotal: prog.total,
+      nextMission: prog.next,
+      objective: currentObjective(state),
+      dialogue: (state.mission.dialogueTimer > 0 && state.mission.dialogue.length > 0) ? state.mission.dialogue[0] : null,
+      dialogueMood: (state.wanted >= 4 || blackout) ? 'worried' : 'alert',
+      districtName: district.name.toUpperCase(),
+      heat,
+      portrait: (c, x, y, w, h, e) => drawMaraPortrait(c, x, y, w, h, e),
+    }, best, ui, view);
   }
   function drawPanel(title, lines, prompt, accent, subtitle) {
     const width = Math.min(640, view.w - 48);
@@ -1054,16 +985,6 @@ export function createRenderer(canvas) {
     });
     text(prompt, view.w / 2, y + height - 30, 20, COLORS.neonYellow, 'center', 'bold');
   }
-  const TITLE_LINES = [
-    'Jax Marlowe came to Neon Harbor to drive — the crew had other plans.',
-    'His fixer Mara set him up to save his life. Now they rob the vault.',
-    'Twelve missions across three days: steal, run, lose the heat.',
-    'WASD / arrows — move & drive    Mouse — aim    Click / Space — shoot',
-    'E — enter / exit car or boat    R — reload    Q — switch weapon    C — radio',
-    'G — garage repair / respray    U — upgrade shop    O — settings',
-    'V — switch 2D top-down / 3D chase-cam view',
-    'Street races, taxi fares, harbor tokens and weapon pickups.',
-  ];
   function drawSettings(ui) {
     const settings = ui.settings;
     const lines = [
@@ -1092,34 +1013,10 @@ export function createRenderer(canvas) {
     text('Up / Down to choose · Esc to go back', view.w / 2, y + height - 30, 16, COLORS.neonYellow, 'center', 'bold');
   }
   function drawShop(state, ui) {
-    const closed = garageHot(state);
-    const width = Math.min(680, view.w - 48);
-    const lineH = 52;
-    const height = 150 + UPGRADES.length * lineH + 60 + (closed ? 30 : 0);
-    const x = (view.w - width) / 2;
-    const y = (view.h - height) / 2;
-    drawMenuFrame(ctx, x, y, width, height, COLORS.neonCyan);
-    text('GARAGE — UPGRADE SHOP', view.w / 2, y + 58, 30, '#ffffff', 'center', 'bold');
-    text(`Cash $${state.cash} — fitted for good, kept for this visit`, view.w / 2, y + 88, 15, COLORS.cash, 'center');
-    if (closed) {
-      const g = state.city.garage;
-      const d = districtAt(state.city, g.x, g.y);
-      const heat = state.heat ? Math.round(state.heat[state.city.districts.indexOf(d)] || 0) : 0;
-      text(`CLOSED — ${d.name} is too hot (HEAT ${heat}). Come back when it cools.`, view.w / 2, y + 112, 15, '#ff8a7a', 'center', 'bold');
-    }
-    UPGRADES.forEach((u, i) => {
-      const owned = state.upgrades && state.upgrades[u.id];
-      const selected = i === ui.shopIndex;
-      const rowY = y + 108 + (closed ? 30 : 0) + i * lineH;
-      if (selected) {
-        ctx.fillStyle = 'rgba(55,224,230,0.18)';
-        ctx.fillRect(x + 16, rowY, width - 32, lineH - 8);
-      }
-      text(u.name, x + 32, rowY + 24, 18, selected ? '#ffffff' : '#eef1f5', 'left', selected ? 'bold' : '');
-      text(u.desc, x + 32, rowY + 44, 13, '#c8cdd6', 'left');
-      text(owned ? 'OWNED' : `$${u.cost}`, x + width - 32, rowY + 30, 17, owned ? COLORS.cash : COLORS.neonYellow, 'right', 'bold');
-    });
-    text('Up / Down to choose · Enter to buy · Esc to close', view.w / 2, y + height - 24, 16, COLORS.neonYellow, 'center', 'bold');
+    const g = state.city.garage;
+    const d = districtAt(state.city, g.x, g.y);
+    const heat = state.heat ? Math.round(state.heat[state.city.districts.indexOf(d)] || 0) : 0;
+    drawShop2(ctx, { ...state, garageClosed: garageHot(state), heat }, ui, view);
   }
   // 3D chase-cam view mode (round 20). Default: 3D chase-cam; V toggles to the
   // 2D top-down view and back. The mode lives on state.view3d so shots and
@@ -1140,10 +1037,10 @@ export function createRenderer(canvas) {
     ctx.font = `bold 13px ${FONT}`;
     const w = ctx.measureText(label).width + 28;
     ctx.fillStyle = 'rgba(14,20,32,0.82)';
-    ctx.fillRect(12, 184, w, 24);
+    ctx.fillRect(12, 228, w, 24);
     ctx.fillStyle = on ? COLORS.neonPink : COLORS.neonCyan;
-    ctx.fillRect(12, 184, 4, 24);
-    text(label, 28, 201, 13, '#ffffff', 'left', 'bold');
+    ctx.fillRect(12, 228, 4, 24);
+    text(label, 28, 245, 13, '#ffffff', 'left', 'bold');
   }
   function drawTargetCompass(state) {
     const tgt = state.mission && state.mission.target;
@@ -1183,21 +1080,7 @@ export function createRenderer(canvas) {
     ctx.fillRect(0, 0, view.w, view.h);
     if (screen === SCREEN_TITLE) {
       const t = state.titleT3d ?? ((performance.now() / 1000) % 20);
-      cine.title3D(ctx, t);
-      if (view.w >= 1160) {
-        drawJaxPortrait(ctx, 56, 250, 200, 260, 'stern');
-        drawMaraPortrait(ctx, view.w - 256, 250, 200, 260, 'alert');
-      }
-      const tw = Math.min(640, view.w - 48);
-      const th = 120 + TITLE_LINES.length * 32 + 70;
-      const tx = (view.w - tw) / 2;
-      const ty = (view.h - th) / 2;
-      drawMenuFrame(ctx, tx, ty, tw, th, COLORS.neonCyan);
-      drawNeonLogo(ctx, view.w / 2, ty + 66, 1.4);
-      drawNeonLine(ctx, tx + 24, ty + 104, tw - 48, COLORS.neonCyan);
-      TITLE_LINES.forEach((line, i) => text(line, view.w / 2, ty + 126 + i * 32, 16, '#c8cdd6', 'center'));
-      drawButton(ctx, view.w / 2 - 170, ty + th - 62, 340, 38, 'PRESS ENTER TO START', 1);
-      text(`Best cash $${best}`, view.w / 2, view.h - 40, 16, '#c8cdd6', 'center');
+      drawTitle2(ctx, view, best, missionProgress(state), (c) => cine.title3D(c, t), { jax: drawJaxPortrait, mara: drawMaraPortrait });
       return;
     }
     if (chaseOn(state)) cine.chase3D(ctx, state);
@@ -1209,7 +1092,7 @@ export function createRenderer(canvas) {
       if (chaseOn(state)) drawTargetCompass(state);
     }
     if (screen === SCREEN_PAUSED) {
-      drawPanel('Paused', ['The city waits for no one — except right now.', 'O — settings'], 'Press P or Esc to resume', COLORS.neonCyan);
+      drawPause2(ctx, view);
     } else if (screen === SCREEN_SETTINGS) {
       drawSettings(ui || { settings: { volume: 0.8, stationName: 'Harbor FM', bindings: {} }, settingsIndex: 0, capturing: -1 });
     } else if (screen === SCREEN_SHOP) {
