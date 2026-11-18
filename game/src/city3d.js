@@ -1266,7 +1266,18 @@ export function drawChase3D(ctx, state) {
     const roadX = city.roadsV.reduce((a, b) => Math.abs(b - hx) < Math.abs(a - hx) ? b : a);
     return (roadX * CS - ccX) * -cfZ;
   })();
-  const walkLat = 4.3; // sidewalk centre, in 3D units (43px from road centre)
+  // POLEFIX2: lamps + palms sit HARD on the sidewalk, flush with the
+  // building line — walkLat 4.8 (48px from the road centreline: 12px
+  // past the 36px asphalt edge, 2px off the 50px facade). JF4's 4.3
+  // (mid-sidewalk, 7px past the edge) FAILED on screen: at the
+  // chase-cam's grazing angle the 7px strip projects to a sliver, so
+  // the trunk base still read as standing on the asphalt edge and the
+  // T-arm overhung the road (parent verified at 2x zoom: trunk x~571,
+  // base y~510, dark asphalt immediately left AND right of the base).
+  // Palms use EXACTLY walkLat now (JF4's +h2*0.3 drifted them to 5.1,
+  // inside the wall). Fronds shortened 3.4 -> 2.0 so the canopy's inner
+  // tip (38px) clears the 36px road edge instead of overhanging it.
+  const walkLat = 4.8; // sidewalk outer edge, in 3D units (48px from road centre)
   // round 21: fill the dark flanks — lamp posts on both sidewalks every
   // ~45 units (pole + lit head + light pool) and palm silhouettes every
   // ~90 units alternating sides (trunk + fronds, dark + warm rim).
@@ -1285,7 +1296,7 @@ export function drawChase3D(ctx, state) {
     }
   }
   if (p.inCar) for (let pi = 0; pi < 3; pi += 1) {
-    const fwd = 30 + pi * 55, lat = roadLat + (pi % 2 === 0 ? -1 : 1) * (walkLat + h2(pi, 7) * 0.3);
+    const fwd = 30 + pi * 55, lat = roadLat + (pi % 2 === 0 ? -1 : 1) * walkLat;
     const pxp = ccX + cfX * fwd + (-cfZ) * lat, pzp = ccZ + cfZ * fwd + cfX * lat;
     const wxp = pxp / CS, wzp = pzp / CS;
     if (!inRange(wxp, wzp, 175, 135)) continue;
@@ -1293,9 +1304,9 @@ export function drawChase3D(ctx, state) {
     box3(pxp, 0, pzp, 0.5, 7.2, 0.5, 0, '#1c1410', pdep);
     for (let fr = 0; fr < 3; fr += 1) {
       const fa = h2(pi * 5 + fr, 11) * Math.PI;
-      box3(pxp, 7.0 + fr * 0.15, pzp, 3.4, 0.22, 0.7, fa, '#241a12', pdep);
+      box3(pxp, 7.0 + fr * 0.15, pzp, 2.0, 0.22, 0.7, fa, '#241a12', pdep);
     }
-    topStrip(pxp, pzp, 0, 0, 0, 3.2, 0.7, 7.35, 'rgba(255,170,100,0.5)');
+    topStrip(pxp, pzp, 0, 0, 0, 2.0, 0.7, 7.35, 'rgba(255,170,100,0.5)');
   }
   // street lamps at night: glowing dots at nearby intersections
   if (nightF > 0.4) {
