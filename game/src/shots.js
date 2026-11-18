@@ -58,6 +58,7 @@ function placePlayerInCar(world, x, y, angle) {
   car.angle = angle;
   car.speed = 0;
   car.color = '#e33e5f';
+  car.staged = true; // round 21: the hero car must never be re-staged as a parked car
   world.enterCar(car);
   world.state.player.x = x;
   world.state.player.y = y;
@@ -195,6 +196,17 @@ export function stageShot(name, world) {
       const u2 = state.police.units[state.police.units.length - 1];
       if (u2) { u2.car.x = px + 460; u2.car.y = 1120 + 18; u2.car.angle = Math.PI; u2.car.speed = 300; }
       stageTrafficCar(world, 'h', 1120, px + 200, 1, 110);
+      // round 21: more traffic ahead for depth + 2 parked cars at the curb
+      stageTrafficCar(world, 'h', 1120, px + 520, -1, 110);
+      stageTrafficCar(world, 'h', 1120, px + 700, 1, 100);
+      const parkSpots = [[px + 260, 1120 - 44], [px + 430, 1120 + 44]];
+      for (const [ppx, ppy] of parkSpots) {
+        const parked = state.traffic.parked.find((c) => !c.staged && c !== state.player.car);
+        if (!parked) break;
+        parked.staged = true;
+        parked.x = ppx; parked.y = ppy; parked.angle = 0;
+        parked.speed = 0; parked.alive = true;
+      }
     }
     const cp = world.state.player;
     stagePhotoPeds(world, [

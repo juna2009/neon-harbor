@@ -11,6 +11,11 @@ const F=640,HZ=[255,150,110];
 const mix=(c,t)=>'rgb('+c.map((v,i)=>Math.round(v+(HZ[i]-v)*t)).join(',')+')';
 const sh=(c,b,t)=>mix(c.map(v=>Math.min(255,v*b|0)),t);
 const hz=d=>cl((d-70)/300,0,.72);
+// round 21: warm sunset bounce for camera-facing faces — the rear of a car
+// (or a building wall) is never pitch black at golden hour; it picks up
+// orange light bounced off the road. NOT multiplied by shadeK.
+const shW=(c,b,t)=>{const m=c.map(v=>Math.min(255,v*b|0)).map((v,i)=>Math.round(v+(HZ[i]-v)*t));
+  return 'rgb('+m.map((v,i)=>Math.round(v*.72+[255,140,80][i]*.28)).join(',')+')';};
 let camZ=0;const ops=[];
 function P(px,py,pz){const dz=pz-camZ;if(dz<2)return 0;return[CX+px*F/dz,HOR-(py-5.6)*F/dz,dz];}
 function Q(a,b,c,d,col,dep){const p=[P(...a),P(...b),P(...c),P(...d)];if(p.includes(0))return;ops.push({d,f(){x.fillStyle=col;x.beginPath();x.moveTo(p[0][0],p[0][1]);for(let i=1;i<4;i++)x.lineTo(p[i][0],p[i][1]);x.closePath();x.fill();}});}
@@ -211,7 +216,7 @@ function box3(cx, y0, cz, w, h, d, a, col, fogD, depOff) {
   QW(f2, sh(c, 0.8 * shadeK, t), dep(f2));
   QW(f3, sh(c, 0.95 * shadeK, t), dep(f3));
   QW(f4, sh(c, 1.05 * shadeK, t), dep(f4));
-  QW(f5, sh(c, 0.65 * shadeK, t), dep(f5));
+  QW(f5, shadeK < 1 ? shW(c, 0.65 * shadeK + 0.22, t) : sh(c, 0.65 * shadeK, t), dep(f5));
 }
 // vertical quad facing along yaw a, centered fOff forward / rOff right of (cx, cz)
 function vQuad(cx, cz, a, fOff, rOff, w, y0, y1, col) {
@@ -272,10 +277,32 @@ function car3d(wx, wy, angle, len, wid, color, o) {
   for (const s of [-1, 1]) {
     vQuad(cx, cz, angle, -L / 2 - 0.06, s * Wd * 0.28, Wd * 0.22, 0.45, 0.72, o.hero ? '#ff5c7a' : '#ff3b30');
     vQuad(cx, cz, angle, L / 2 + 0.06, s * Wd * 0.28, Wd * 0.22, 0.45, 0.7, '#ffe9a8');
-    const wxp = cx + fx * (L / 2 - 0.7) + (-fz) * s * (Wd / 2 - 0.25), wzp = cz + fz * (L / 2 - 0.7) + fx * s * (Wd / 2 - 0.25);
-    box3(wxp, 0.05, wzp, 0.45, 0.5, 0.9, angle, '#0a0a0e', dep);
-    const wxp2 = cx - fx * (L / 2 - 0.7) + (-fz) * s * (Wd / 2 - 0.25), wzp2 = cz - fz * (L / 2 - 0.7) + fx * s * (Wd / 2 - 0.25);
-    box3(wxp2, 0.05, wzp2, 0.45, 0.5, 0.9, angle, '#0a0a0e', dep);
+    const wxp = cx + fx * (L / 2 - 0.7) + (-fz) * s * (Wd / 2 - 0.18), wzp = cz + fz * (L / 2 - 0.7) + fx * s * (Wd / 2 - 0.18);
+    box3(wxp, 0.05, wzp, 0.55, 0.5, 0.9, angle, '#0a0a0e', dep);
+    const wxp2 = cx - fx * (L / 2 - 0.7) + (-fz) * s * (Wd / 2 - 0.18), wzp2 = cz - fz * (L / 2 - 0.7) + fx * s * (Wd / 2 - 0.18);
+    box3(wxp2, 0.05, wzp2, 0.55, 0.5, 0.9, angle, '#0a0a0e', dep);
+    // hub: bright disc on the rear face of the rear wheel (seen from behind)
+    vQuad(cx, cz, angle, -(L / 2 - 0.7), s * (Wd / 2 - 0.18), 0.34, 0.16, 0.42, '#8a8f98');
+  }
+  if (o.hero) {
+    // round 21 hero rear (all emissive / reflective: raw colours, no shadeK)
+    vQuad(cx, cz, angle, -L / 2 - 0.08, 0, Wd * 0.94, 0.5, 0.8, '#ff2a4a'); // taillight bar, full width
+    vQuad(cx, cz, angle, -L / 2 - 0.1, 0, Wd * 0.94, 0.58, 0.72, '#ff6b85'); // hot core of the bar
+    vQuad(cx, cz, angle, -L * 0.32, 0, Wd * 0.68, 1.02, 1.4, 'rgba(255,176,102,0.55)'); // rear glass: sunset reflection
+    vQuad(cx, cz, angle, -L * 0.32, 0, Wd * 0.68, 1.28, 1.4, 'rgba(255,220,160,0.5)'); // sky streak across the glass
+    topStrip(cx, cz, angle, -L * 0.32, 0, Wd * 0.68, 0.3, 1.44, 'rgba(255,200,130,0.8)'); // glass top rim
+    box3(cx - fx * (L / 2 - 0.3), 1.02, cz - fz * (L / 2 - 0.3), Wd * 0.92, 0.09, 0.5, angle, '#14141a', dep); // spoiler
+    topStrip(cx, cz, angle, -(L / 2 - 0.3), 0, Wd * 0.9, 0.5, 1.13, 'rgba(255,179,92,0.9)'); // spoiler rim light
+    vQuad(cx, cz, angle, -L / 2 - 0.07, 0, Wd * 0.96, 0.12, 0.38, '#14141a'); // lower bumper
+    vQuad(cx, cz, angle, -L / 2 - 0.09, -Wd * 0.3, 0.2, 0.16, 0.34, '#c8ccd4'); // exhaust L
+    vQuad(cx, cz, angle, -L / 2 - 0.09, Wd * 0.3, 0.2, 0.16, 0.34, '#c8ccd4'); // exhaust R
+    vQuad(cx, cz, angle, -L / 2 - 0.07, 0, 0.55, 0.26, 0.46, '#e8e4d8'); // plate
+    vQuad(cx, cz, angle, -L / 2 - 0.05, 0, Wd * 0.96, 0.2, 0.85, 'rgba(255,150,90,0.16)'); // warm bounce wash
+    topStrip(cx, cz, angle, L * 0.2, 0, Wd * 0.7, 0.4, 1.53, 'rgba(255,210,140,0.95)'); // roof Fresnel: sky in the paint
+    // sunroof + trunk wash as thin slabs with depOff -0.6 so the painter
+    // puts them ON the roof/deck (plain topStrips lose the depth sort here)
+    box3(cx - fx * 0.05, 1.5, cz - fz * 0.05, Wd * 0.55, 0.04, L * 0.28, angle, '#121620', dep, -1.2);
+    box3(cx - fx * (L * 0.35), 0.87, cz - fz * (L * 0.35), Wd * 0.8, 0.04, 0.6, angle, '#ffb35c', dep, -0.6);
   }
   if (o.pol) {
     const blink = Math.floor((o.t || 0) * 6) % 2 === 0;
@@ -379,11 +406,11 @@ function bld3(b, nightF, t) {
       const nr = Math.max(3, Math.min(dep > 70 ? 4 : 6, Math.round(h3 / 4.5)));
       for (let i = 0; i < nc; i += 1) for (let j = 0; j < nr; j += 1) {
         const q = h2(b.x * 7 + i * 13 + fi * 31, b.y * 3 + j * 17);
-        const ww = (f.span / nc) * 0.55, wh = (h3 / nr) * 0.5;
+        const ww = Math.min((f.span / nc) * 0.55, 1.8), wh = Math.min((h3 / nr) * 0.5, 1.5);
         const rOff = -f.span / 2 + (f.span * (i + 0.5)) / nc;
         const y0 = 2 + (h3 - 3) * (j + 0.25) / nr, y1 = y0 + wh;
         if (nightF > 0.3) {
-          if (q < 0.3) continue;
+          if (q < (nightF < 0.55 ? 0.18 : 0.3)) continue;
           const c = q < 0.78 ? [255, 205, 120] : q < 0.9 ? [120, 215, 255] : [255, 150, 90];
           vQuad(bx, bz, f.a, f.off + 0.12, rOff, ww, y0, y1, mix(c, hz(dep)));
         } else {
@@ -393,6 +420,8 @@ function bld3(b, nightF, t) {
       }
       // F3 panel line: one darker horizontal band mid-face (stops the slab look)
       vQuad(bx, bz, f.a, f.off + 0.1, 0, f.span * 0.96, h3 * 0.45, h3 * 0.45 + 0.35, 'rgba(0,0,0,0.25)');
+      // cornice: dark band just under the roofline
+      vQuad(bx, bz, f.a, f.off + 0.11, 0, f.span * 0.98, h3 - 1.7, h3 - 1.15, 'rgba(0,0,0,0.35)');
       if (fi === 0) {
         // base strip grounds the slab; V1 warm rim on the top edge at low sun
         vQuad(bx, bz, f.a, f.off + 0.12, 0, f.span * 0.96, 0.1, 1.3, 'rgba(0,0,0,0.35)');
@@ -406,28 +435,47 @@ function bld3(b, nightF, t) {
             const sc = s % 3 === 0 ? [255, 179, 92] : s % 3 === 1 ? [5, 217, 232] : [255, 42, 109];
             vQuad(bx, bz, f.a, f.off + 0.12, rOff, f.span / 3 * 0.62, 0.8, 2.7, mix(sc, hz(dep)));
           }
+          // vertical neon sign on ~1 in 3 buildings (deterministic gate)
+          if (h2(b.x * 3 + 5, b.y * 7) < 0.34 && dep < 90) {
+            const nc = ['#ff2a6d', '#05d9e8', '#ffd23e'][Math.floor(h2(b.x, b.y * 3) * 3)];
+            const nOff = -f.span / 2 + f.span * (0.2 + 0.6 * h2(b.x + 9, b.y));
+            vQuad(bx, bz, f.a, f.off + 0.16, nOff, 0.9, 3.2, Math.max(6, h3 * 0.68), nc);
+            vQuad(bx, bz, f.a, f.off + 0.14, nOff, 1.7, 3.2, Math.max(6, h3 * 0.68), nc + '33');
+          }
         }
       }
     }
   }
-  if (h2(b.x, b.y) > 0.6 && dep < 90) {
-    box3(bx + (h2(b.x + 1, b.y) - 0.5) * w * 0.4, h3, bz + (h2(b.x, b.y + 1) - 0.5) * d * 0.4, 2.2, 1.2, 2.2, 0, '#6b7280', dep);
+  if (dep < 90) {
+    if (h2(b.x, b.y) > 0.6) {
+      box3(bx + (h2(b.x + 1, b.y) - 0.5) * w * 0.4, h3, bz + (h2(b.x, b.y + 1) - 0.5) * d * 0.4, 2.2, 1.2, 2.2, 0, '#6b7280', dep);
+    }
+    if (h2(b.x + 2, b.y) > 0.45) { // 2nd rooftop AC unit
+      box3(bx - (h2(b.x + 3, b.y) - 0.5) * w * 0.4, h3, bz - (h2(b.x, b.y + 3) - 0.5) * d * 0.4, 1.6, 0.9, 1.6, 0, '#7d838c', dep);
+    }
+    if (h2(b.x, b.y + 2) > 0.5) { // antenna mast + tip light
+      box3(bx + (h2(b.x + 4, b.y) - 0.5) * w * 0.5, h3, bz + (h2(b.x, b.y + 4) - 0.5) * d * 0.5, 0.18, 3.2, 0.18, 0, '#3a3f47', dep);
+      vQuad(bx + (h2(b.x + 4, b.y) - 0.5) * w * 0.5, bz + (h2(b.x, b.y + 4) - 0.5) * d * 0.5, 0, 0, 0, 0.3, h3 + 3.1, h3 + 3.4, '#ff4040');
+    }
   }
 }
 // G1 sun glare: radiating streaks + one horizontal anamorphic streak
-function sunStreaks(sx, sy, len) {
+// soft=true (chase/boat): fewer, dimmer, wider streaks — the hard 6-streak
+// starburst was washing out the whole frame. Title frame never calls this.
+function sunStreaks(sx, sy, len, soft) {
   x.save(); x.globalCompositeOperation = 'lighter';
-  const angs = [-1.25, -0.55, 0.15, 0.85, 1.6, 2.5];
+  const angs = soft ? [-1.1, -0.3, 0.6, 1.7] : [-1.25, -0.55, 0.15, 0.85, 1.6, 2.5];
+  const a0 = soft ? 0.16 : 0.32, hw = soft ? 4 : 2;
   for (let i = 0; i < angs.length; i += 1) {
     const L = len * (0.55 + (i % 3) * 0.25);
     x.save(); x.translate(sx, sy); x.rotate(angs[i]);
     const lg = x.createLinearGradient(0, 0, L, 0);
-    lg.addColorStop(0, 'rgba(255,180,90,0.32)'); lg.addColorStop(1, 'rgba(255,180,90,0)');
-    x.fillStyle = lg; x.fillRect(0, -2, L, 4);
+    lg.addColorStop(0, 'rgba(255,180,90,' + a0 + ')'); lg.addColorStop(1, 'rgba(255,180,90,0)');
+    x.fillStyle = lg; x.fillRect(0, -hw, L, hw * 2);
     x.restore();
   }
   const hg = x.createLinearGradient(sx - 260, 0, sx + 260, 0);
-  hg.addColorStop(0, 'rgba(255,170,90,0)'); hg.addColorStop(0.5, 'rgba(255,190,120,0.38)'); hg.addColorStop(1, 'rgba(255,170,90,0)');
+  hg.addColorStop(0, 'rgba(255,170,90,0)'); hg.addColorStop(0.5, 'rgba(255,190,120,' + (soft ? 0.25 : 0.38) + ')'); hg.addColorStop(1, 'rgba(255,170,90,0)');
   x.fillStyle = hg; x.fillRect(sx - 260, sy - 2, 520, 4);
   x.restore();
 }
@@ -439,7 +487,7 @@ export function drawChase3D(ctx, state) {
   HZ[0] = sky.haze[0]; HZ[1] = sky.haze[1]; HZ[2] = sky.haze[2];
   const nightF = sky.nightF;
   // sunset: faces toward the camera fall into shadow, warm rim on top edges
-  shadeK = dl > 0.7 ? 1 : dl > 0.3 ? 0.32 : 0.55;
+  shadeK = dl > 0.7 ? 1 : dl > 0.3 ? 0.5 : 0.55;
   rimOn = dl > 0.3;
   const t = state.elapsed || 0;
   const city = state.city;
@@ -472,16 +520,21 @@ export function drawChase3D(ctx, state) {
   const g = x.createLinearGradient(0, 0, 0, HOR + 60);
   g.addColorStop(0, 'rgb(' + sky.top.join(',') + ')');
   g.addColorStop(0.55, 'rgb(' + sky.mid.join(',') + ')');
+  g.addColorStop(0.82, 'rgb(' + sky.hor.join(',') + ')');
   g.addColorStop(1, 'rgb(' + sky.hor.join(',') + ')');
   x.fillStyle = g; x.fillRect(0, 0, W, HOR + 60);
   x.fillStyle = 'rgb(' + sky.hor.join(',') + ')'; x.fillRect(0, HOR, W, H - HOR);
   // G2 smog band: warm haze hugging the horizon (painted before the 3D so
   // buildings occlude it)
-  const smog = x.createLinearGradient(0, HOR - 34, 0, HOR + 26);
+  const smog = x.createLinearGradient(0, HOR - 60, 0, HOR + 40);
   smog.addColorStop(0, 'rgba(255,150,90,0)');
-  smog.addColorStop(0.55, 'rgba(255,150,90,0.22)');
+  smog.addColorStop(0.55, 'rgba(255,150,90,0.32)');
   smog.addColorStop(1, 'rgba(255,150,90,0)');
-  x.fillStyle = smog; x.fillRect(0, HOR - 34, W, 60);
+  x.fillStyle = smog; x.fillRect(0, HOR - 60, W, 100);
+  const smog2 = x.createLinearGradient(0, HOR + 4, 0, HOR + 64);
+  smog2.addColorStop(0, 'rgba(255,140,100,0.16)');
+  smog2.addColorStop(1, 'rgba(255,140,100,0)');
+  x.fillStyle = smog2; x.fillRect(0, HOR + 4, W, 60);
   if (nightF > 0.4) {
     x.fillStyle = '#fff';
     for (let i = 0; i < 70; i += 1) {
@@ -579,7 +632,9 @@ export function drawChase3D(ctx, state) {
     const fx2 = ccX + cfX * 110, fz2 = ccZ + cfZ * 110;
     const rx = -cfZ, rz = cfX;
     QW([[nx + rx * 4, 0.11, nz + rz * 4], [nx - rx * 4, 0.11, nz - rz * 4],
-      [fx2 - rx * 7, 0.11, fz2 - rz * 7], [fx2 + rx * 7, 0.11, fz2 + rz * 7]], 'rgba(255,150,70,0.16)', 'far');
+      [fx2 - rx * 7, 0.11, fz2 - rz * 7], [fx2 + rx * 7, 0.11, fz2 + rz * 7]], 'rgba(255,150,70,0.30)', 'far');
+    QW([[nx + rx * 1.5, 0.12, nz + rz * 1.5], [nx - rx * 1.5, 0.12, nz - rz * 1.5],
+      [fx2 - rx * 2.5, 0.12, fz2 - rz * 2.5], [fx2 + rx * 2.5, 0.12, fz2 + rz * 2.5]], 'rgba(255,195,115,0.35)', 'far');
   }
   // G2 smog clouds: pink/orange slabs high over the skyline
   for (let i = 0; i < 5; i += 1) {
@@ -768,6 +823,35 @@ export function drawChase3D(ctx, state) {
   if (p.inCar && p.car) car3d(p.car.x, p.car.y, p.car.angle, p.car.length, p.car.width, p.car.paint || '#e33e5f', { hero: true, t });
   else if (p.inBoat && p.boat) boat3d(p.boat.x, p.boat.y, p.boat.angle, p.boat.length, p.boat.width, p.boat.color, { hero: true, t });
   else ped3d(p.x, p.y, p.angle, '#ffd23e');
+  // round 21: fill the dark flanks — lamp posts on both sidewalks every
+  // ~45 units (pole + lit head + light pool) and palm silhouettes every
+  // ~90 units alternating sides (trunk + fronds, dark + warm rim).
+  // Positions are camera-relative, so they fill whatever street the chase
+  // is on; all variation is h2-gated, no randomness, no wall clock.
+  if (p.inCar) for (let fwd = 26; fwd < 175; fwd += 45) {
+    for (const lat of [-4.6, 4.6]) {
+      const lx = ccX + cfX * fwd + (-cfZ) * lat, lz = ccZ + cfZ * fwd + cfX * lat;
+      const wxp = lx / CS, wzp = lz / CS;
+      if (!inRange(wxp, wzp, 175, 135)) continue;
+      const ldep = Math.hypot(lx - ccX, lz - ccZ);
+      box3(lx, 0, lz, 0.18, 5.4, 0.18, 0, '#241f28', ldep);
+      vQuad(lx, lz, ccYaw, 0, 0, 0.9, 5.3, 5.65, '#ffd9a0');
+      flatQuad(wxp - 26, wzp - 26, wxp + 26, wzp + 26, 0.08, 'rgba(255,200,120,0.10)');
+    }
+  }
+  if (p.inCar) for (let pi = 0; pi < 3; pi += 1) {
+    const fwd = 30 + pi * 55, lat = (pi % 2 === 0 ? -1 : 1) * (6.6 + h2(pi, 7) * 1.2);
+    const pxp = ccX + cfX * fwd + (-cfZ) * lat, pzp = ccZ + cfZ * fwd + cfX * lat;
+    const wxp = pxp / CS, wzp = pzp / CS;
+    if (!inRange(wxp, wzp, 175, 135)) continue;
+    const pdep = Math.hypot(pxp - ccX, pzp - ccZ);
+    box3(pxp, 0, pzp, 0.5, 7.2, 0.5, 0, '#1c1410', pdep);
+    for (let fr = 0; fr < 3; fr += 1) {
+      const fa = h2(pi * 5 + fr, 11) * Math.PI;
+      box3(pxp, 7.0 + fr * 0.15, pzp, 3.4, 0.22, 0.7, fa, '#241a12', pdep);
+    }
+    topStrip(pxp, pzp, 0, 0, 0, 3.2, 0.7, 7.35, 'rgba(255,170,100,0.5)');
+  }
   // street lamps at night: glowing dots at nearby intersections
   if (nightF > 0.4) {
     for (const pt of city.intersections) {
@@ -798,16 +882,24 @@ export function drawChase3D(ctx, state) {
     for (const pt of city.intersections) {
       if (n >= 6) break;
       if (!inRange(pt.x + 48, pt.y - 48, 100, 90)) continue;
-      smear(pt.x + 48, pt.y - 48, 7, 46, 255, 217, 160, 0.10); n += 1;
+      smear(pt.x + 48, pt.y - 48, 7, 46, 255, 217, 160, 0.16); n += 1;
     }
-    if (city.casino && inRange(city.casino.x, city.casino.y, 120, 100)) smear(city.casino.x, city.casino.y + 40, 12, 64, 255, 210, 62, 0.12);
+    if (city.casino && inRange(city.casino.x, city.casino.y, 120, 100)) smear(city.casino.x, city.casino.y + 40, 12, 64, 255, 210, 62, 0.20);
+    let ns = 0;
+    for (const b of city.buildings) {
+      if (ns >= 4) break;
+      if (!inRange(b.x + b.w / 2, b.y + b.h / 2, 120, 100)) continue;
+      const sc = ['255,179,92', '5,217,232', '255,42,109'][Math.floor(h2(b.x, b.y) * 3)];
+      const parts = sc.split(',').map(Number);
+      smear(b.x + b.w / 2, b.y + b.h / 2, 8, 52, parts[0], parts[1], parts[2], 0.14); ns += 1;
+    }
     for (const unit of state.police.units) {
       if (n >= 10) break;
       if ((unit.kind !== 'car' && unit.kind !== 'mtruck') || !unit.car) continue;
       if (!inRange(unit.car.x, unit.car.y, 120, 100)) continue;
       const blink = Math.floor(t * 6) % 2 === 0;
-      if (blink) smear(unit.car.x, unit.car.y, 9, 40, 255, 64, 64, 0.14);
-      else smear(unit.car.x, unit.car.y, 9, 40, 64, 128, 255, 0.14);
+      if (blink) smear(unit.car.x, unit.car.y, 9, 40, 255, 64, 64, 0.22);
+      else smear(unit.car.x, unit.car.y, 9, 40, 64, 128, 255, 0.22);
       n += 1;
     }
     x.restore();
@@ -820,10 +912,11 @@ export function drawChase3D(ctx, state) {
       x.fillStyle = sg; x.fillRect(sunP[0] - 150, sunP[1] - 150, 300, 300);
       x.fillStyle = '#e6ebff'; x.beginPath(); x.arc(sunP[0], sunP[1], 14, 0, 7); x.fill();
     } else {
-      sg.addColorStop(0, 'rgba(255,230,160,0.95)'); sg.addColorStop(0.25, 'rgba(255,170,90,0.55)'); sg.addColorStop(1, 'rgba(255,140,80,0)');
-      x.fillStyle = sg; x.fillRect(sunP[0] - 150, sunP[1] - 150, 300, 300);
+      const sg2 = x.createRadialGradient(sunP[0], sunP[1], 4, sunP[0], sunP[1], 190);
+      sg2.addColorStop(0, 'rgba(255,230,160,0.95)'); sg2.addColorStop(0.25, 'rgba(255,170,90,0.55)'); sg2.addColorStop(1, 'rgba(255,140,80,0)');
+      x.fillStyle = sg2; x.fillRect(sunP[0] - 190, sunP[1] - 190, 380, 380);
       x.fillStyle = '#ffe9a8'; x.beginPath(); x.arc(sunP[0], sunP[1], 18, 0, 7); x.fill();
-      sunStreaks(sunP[0], sunP[1], 190); // G1
+      sunStreaks(sunP[0], sunP[1], 190, true); // G1 soft (round 21)
     }
   }
   // hero taillight glow
@@ -862,6 +955,13 @@ export function drawChase3D(ctx, state) {
       x.fillStyle = hg; x.fillRect(hp[0] - 260, hp[1] - 260, 520, 520);
     }
   }
+  // round 21 grading (REPORT #7): warm sunset wash + purple shadow push,
+  // before the vignette so the frame reads as one film, not loose quads
+  x.save(); x.globalCompositeOperation = 'overlay';
+  x.fillStyle = 'rgba(255,120,60,0.08)'; x.fillRect(0, 0, W, H);
+  x.globalCompositeOperation = 'multiply';
+  x.fillStyle = 'rgba(20,10,40,0.10)'; x.fillRect(0, 0, W, H);
+  x.restore();
   const vg = x.createRadialGradient(CX, H / 2, H * 0.35, CX, H / 2, H * 0.85);
   vg.addColorStop(0, 'rgba(10,5,15,0)'); vg.addColorStop(1, 'rgba(10,5,15,0.35)');
   x.fillStyle = vg; x.fillRect(0, 0, W, H);
