@@ -306,7 +306,7 @@ export function startMission(world, index) {
   }
   saveCheckpoint(world, `${def.title} — start`);
 }
-function completeMission(world) {
+export function completeMission(world) {
   const mission = world.mission;
   const def = MISSION_DEFS[mission.index];
   world.cash += def.reward;
@@ -318,7 +318,7 @@ function completeMission(world) {
     mission.done = true;
     world.gunmen = 0;
     clearPolice(world.police);
-    mission.dialogue = ['The harbor keeps its secrets. So do we.', 'MARA: Twelve jobs, one harbor. It is ours now, Jax.'];
+    mission.dialogue = ['The harbor keeps its secrets. So do we.', 'MARA: Thirteen jobs, one harbor. It is ours now, Jax.'];
     mission.dialogueTimer = 8;
     clearCheckpoint();
   } else {

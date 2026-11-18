@@ -376,6 +376,59 @@ export function stageShot(name, world) {
       pursuit.x = px + 35; pursuit.y = py - 220; pursuit.angle = -Math.PI / 2; pursuit.speed = 480;
       state.police.heli.x = px + 60; state.police.heli.y = py - 450;
     }
+  } else if (name === 'takeoff') {
+    // misi 13: HA-1 di landasan 09 saat sunset, chase-cam 3D
+    // FIX v2 (STATUS-R25 §6): startMission(state, 12) — startMission(world, 12)
+    // crash karena createWorld tidak punya .mission/.city (milik state).
+    setLight(world, 0.45);
+    state.mission.index = 12;
+    startMission(state, 12);
+    const pl = state.space.plane;
+    const p = state.player;
+    p.inPlane = true; p.plane = pl;
+    pl.x = 2260; pl.y = 660; pl.angle = -Math.PI / 2; pl.speed = 120; pl.alt = 15; pl.throttle = 1;
+    state.mission.stage = 2;
+    state.mission.dialogueTimer = 0; // hide the Mara dialog for this hero shot
+    state.wanted = 0;
+    state.view3d = true;
+    state.camera.x = pl.x; state.camera.y = pl.y;
+  } else if (name === 'planehigh') {
+    // R25 candidate: HA-1 high over the harbor at sunset (alt 340 m) — the
+    // plane reads big against the sky, skyline silhouette below. Test scene
+    // only — NOT in take-shots.mjs, never a dossier shot. (T2's 6-plane-high
+    // proved the framing; this re-shoots it with the fixed HUD position.)
+    setLight(world, 0.45);
+    state.mission.index = 12;
+    startMission(state, 12);
+    const pl = state.space.plane;
+    const p = state.player;
+    p.inPlane = true; p.plane = pl;
+    pl.x = 2260; pl.y = 620; pl.angle = -Math.PI / 2; pl.speed = 560; pl.alt = 340; pl.throttle = 1;
+    state.mission.stage = 2;
+    state.wanted = 0;
+    state.view3d = true;
+    state.camera.x = pl.x; state.camera.y = pl.y;
+  } else if (name === 'jets') {
+    // R25 visual check: HAF military jets at 6 stars, 3D chase view.
+    // Test scene only — NOT in take-shots.mjs, never a dossier shot.
+    // Jets fly at the hero plane's altitude in 3D (city3d.js:1092), so they
+    // are staged ahead of the hero, in frame (spawnJet puts them 520 px
+    // away in a random direction — usually behind the camera).
+    setLight(world, 0.45);
+    state.mission.index = 12;
+    startMission(state, 12);
+    const pl = state.space.plane;
+    const p = state.player;
+    p.inPlane = true; p.plane = pl;
+    pl.x = 2260; pl.y = 720; pl.angle = -Math.PI / 2; pl.speed = 350; pl.alt = 150; pl.throttle = 1;
+    state.mission.stage = 2;
+    state.wanted = 6;
+    state.view3d = true;
+    state.camera.x = pl.x; state.camera.y = pl.y;
+    state.space.jets.push(
+      { x: pl.x - 50, y: pl.y - 150, angle: Math.PI / 2, speed: 560, fireTimer: 1 },
+      { x: pl.x - 180, y: pl.y - 250, angle: Math.PI / 2, speed: 560, fireTimer: 1 },
+    );
   } else if (name === 'blackout') {
     setLight(world, 0.05);
     state.clock.total = 1 * 1440 + 23 * 60 + 40;

@@ -2,14 +2,15 @@ import { CAR, PLAYER, STEP, UFO_DURATION, UFO_HOUR, WANTED, WEAPONS, WORLD_H, WO
 import { WATER_X, buildCity, collides, districtAt, moveCircle } from './city.js';
 import { createBullets, fireWeapon, stepBullets } from './combat.js';
 import { BOAT_ACCEL, BOAT_MAX_SPEED, boatHitsObstacle, createBoats, nearestBoat, stepBoats } from './boats.js';
-import { claimPinkTaxi, createArmored, createCollectibles, createMissionState, createPizza, createRace, createTaxi, createWeaponPickups, loadCheckpoint, maxCarHp, repairAtGarage, resprayAtGarage, saveCheckpoint, targetForMission, updateArmored, updateMission, updatePickups, updatePizza, updateRace, updateTaxi } from './missions.js';
+import { claimPinkTaxi, completeMission, createArmored, createCollectibles, createMissionState, createPizza, createRace, createTaxi, createWeaponPickups, loadCheckpoint, maxCarHp, repairAtGarage, resprayAtGarage, saveCheckpoint, targetForMission, updateArmored, updateMission, updatePickups, updatePizza, updateRace, updateTaxi } from './missions.js';
 import { addWanted, clearPolice, createPolice, decayWanted, spawnPoliceUnit, stepPolice } from './police.js';
 import { createPedestrians, createTraffic, stepPedestrians, stepTraffic } from './traffic.js';
 import { createBridge, leafHit, stepBridge } from './drawbridge.js';
 export const EVENT_OVER = 1;
 export const EVENT_BUSTED = 2;
-export function createWorld(rng, savedMission) {
+export function createWorld(rng, savedMission, sp) {
   const city = buildCity(rng);
+  if (sp) sp.clearSpaceport(city);
   const traffic = createTraffic(city, rng);
   const peds = createPedestrians(city, rng);
   const state = {
@@ -40,6 +41,7 @@ export function createWorld(rng, savedMission) {
     upgrades: {},
     ufo: { active: false, timer: 0, seen: false, x: WATER_X + 56, y: 620 },
     bridge: createBridge(),
+    space: sp ? sp.createSpaceState() : null,
     particles: [],
     skids: [],
     floaters: [],
@@ -61,6 +63,7 @@ export function createWorld(rng, savedMission) {
       car: null,
       inBoat: false,
       boat: null,
+      inPlane: false, plane: null,
       runPhase: 0,
     },
     cash: 0,
@@ -96,6 +99,8 @@ export function createWorld(rng, savedMission) {
     state.player.car = null;
     state.player.inBoat = false;
     state.player.boat = null;
+    state.player.inPlane = false;
+    state.player.plane = null;
     state.cash = 0;
     state.wanted = 0;
     state.wantedTimer = 0;
@@ -133,6 +138,7 @@ export function createWorld(rng, savedMission) {
     state.clock = { total: 21 * 60 };
     state.ufo = { active: false, timer: 0, seen: false, x: WATER_X + 56, y: 620 };
     state.bridge = createBridge();
+    if (sp) state.space = sp.createSpaceState();
     for (const c of state.collectibles) c.taken = false;
     for (const pk of state.pickups) pk.taken = false;
     for (const ped of peds) ped.alive = true;
@@ -566,7 +572,9 @@ export function createWorld(rng, savedMission) {
       state.daylight = 0.55 + 0.45 * Math.sin(state.elapsed * 0.013);
     }
     if (input.wasPressed && input.wasPressed('interact')) {
-      if (p.inBoat) exitBoat();
+      if (sp && p.inPlane) sp.exitPlane(state);
+      else if (sp && sp.tryBoardPlane(state)) { /* boarded */ }
+      else if (p.inBoat) exitBoat();
       else if (p.inCar) exitCar();
       else {
         const boat = nearestBoat(state.boats, p.x, p.y, 70);
@@ -801,6 +809,8 @@ export function createWorld(rng, savedMission) {
     if (!state.police.heli.active) decayWanted(state, dt);
     stepBridge(state.bridge, state, dt, { floater: addFloater, explosion: spawnExplosion });
     updateMission(state, dt);
+    if (sp) sp.stepSpace(state, dt, input);
+    if (sp && state.mission.index === 12 && sp.stepSpaceMission(state, dt)) completeMission(state);
     updateRace(state, dt);
     updateTaxi(state, dt);
     updateArmored(state, dt);

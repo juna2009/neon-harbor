@@ -9,6 +9,7 @@ import { drawBoatWake, drawCarShape, drawExplosionSprite, drawHarborSkyline, dra
 import { drawJaxPortrait, drawMaraPortrait } from './portraits.js';
 import { drawBridge } from './drawbridge.js';
 import { drawHud2, drawPause2, drawShop2, drawTitle2 } from './ui2.js';
+import * as space from './space.js';
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
 export const SCREEN_PAUSED = 'paused';
@@ -777,6 +778,7 @@ export function createRenderer(canvas) {
       ctx.fillText(f.value, f.x, f.y);
       ctx.globalAlpha = 1;
     }
+    if (state.space && inView(2240, 640, 220)) space.drawSpaceport(ctx, state, state.elapsed);
     const p = state.player;
     if (p.inCar && p.car) {
       const car = { ...p.car, color: p.car.paint || COLORS.playerCar, kind: 'player' };
@@ -792,8 +794,12 @@ export function createRenderer(canvas) {
         ctx.restore();
       }
       if (p.car.tiresPopped) drawTireSmoke(ctx, p.car.x - Math.cos(p.car.angle) * 16, p.car.y - Math.sin(p.car.angle) * 16, 7, 0.55);
-    } else if (!p.inBoat) {
+    } else if (!p.inBoat && !p.inPlane) {
       drawPlayer(ctx, p, state);
+    }
+    if (state.space) {
+      for (const j of state.space.jets) space.drawJet(ctx, j, state.elapsed);
+      if (p.inPlane && p.plane) space.drawPlane(ctx, p.plane, state.elapsed);
     }
     if (state.weather && state.weather.rain) {
       ctx.strokeStyle = 'rgba(174,194,224,0.45)';
@@ -950,8 +956,8 @@ export function createRenderer(canvas) {
   // Mission progress for the ROAD TO #1 meter (HUD + title): done = missions
   // finished (index advances on completion; mission.done flags the finale).
   function missionProgress(state) {
-    const done = state.mission.done ? 12 : state.mission.index;
-    return { done, total: 12, next: state.mission.done ? '' : MISSION_DEFS[state.mission.index].title };
+    const done = state.mission.done ? 13 : state.mission.index;
+    return { done, total: 13, next: state.mission.done ? '' : MISSION_DEFS[state.mission.index].title };
   }
   function drawHud(state, best, ui) {
     const p = state.player;
@@ -972,6 +978,7 @@ export function createRenderer(canvas) {
       heat,
       portrait: (c, x, y, w, h, e) => drawMaraPortrait(c, x, y, w, h, e),
     }, best, ui, view);
+    if (p.inPlane) space.drawSpaceHud(ctx, state, view);
   }
   function drawPanel(title, lines, prompt, accent, subtitle) {
     const width = Math.min(640, view.w - 48);

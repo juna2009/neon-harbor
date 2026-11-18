@@ -4,8 +4,10 @@ import { createWorld, EVENT_BUSTED, EVENT_OVER } from './world.js';
 import { ACTION_CONFIRM, ACTION_MUTE, ACTION_PAUSE, ACTION_RADIO, ACTION_SETTINGS, ACTION_SHOP, createInput, keyLabel } from './input.js';
 import { createAudio } from './audio.js';
 import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_SETTINGS, SCREEN_SHOP, SCREEN_TITLE } from './render.js';
-import { buyUpgrade, loadCheckpoint, nearGarage } from './missions.js';
+import { MISSION_DEFS, buyUpgrade, loadCheckpoint, nearGarage } from './missions.js';
 import { stageShot } from './shots.js';
+import * as space from './space.js';
+MISSION_DEFS.push(space.SPACE_MISSION_DEF);
 const MAX_FRAME = 0.25;
 const params = new URLSearchParams(window.location.search);
 const shot = params.get('shot');
@@ -43,7 +45,7 @@ function loadSettings() {
   }
 }
 const savedMission = Math.min(11, Math.max(0, readNumber(PROGRESS_KEY)));
-const world = createWorld(createRandom(seed), savedMission);
+const world = createWorld(createRandom(seed), savedMission, space);
 const renderer = createRenderer(canvas);
 const settings = loadSettings();
 function runShot(name) {

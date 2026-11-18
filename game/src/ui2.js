@@ -188,7 +188,7 @@ export function drawMinimap2(c, st, x, y, w, h) {
   T(c, 'NEON HARBOR', x + 54, y + h + 13, 11, C.neonCyan, 'center', 'bold');
   T(c, 'N ↑', x + w - 4, y + h + 13, 11, '#eef1f5', 'right', 'bold');
 }
-// ---- ROAD TO #1: progress meter toward rank 1 (12 missions = 100%) ----
+// ---- ROAD TO #1: progress meter toward rank 1 (13 missions = 100%) ----
 export function drawRoadTo1(c, x, y, w, done, total, next, big) {
   const pct = total ? Math.round((done / total) * 100) : 0;
   const complete = done >= total;
@@ -359,7 +359,7 @@ export function drawTitle2(c, view, best, prog, backdrop, portraits) {
   y += 22;
   // tagline, wrapped to fit the narrow panel
   y += W(c, 'Jax Marlowe came to Neon Harbor to drive. His fixer Mara set him up — to save his life. Now they rob the police evidence vault together.', tx + 32, y, tw - 64, 14, '#eef1f5', 19) * 19 + 6;
-  y += W(c, 'Steal a car or a speedboat, run the package, lose the heat — twelve missions across three days.', tx + 32, y, tw - 64, 14, '#c8cdd6', 19) * 19 + 10;
+  y += W(c, 'Steal a car or a speedboat, run the package, lose the heat — thirteen missions across three days.', tx + 32, y, tw - 64, 14, '#c8cdd6', 19) * 19 + 10;
   // portraits inside the panel (duo cards, centered)
   if (portraits) {
     const pw = 150, ph = 160, gap = 12;
