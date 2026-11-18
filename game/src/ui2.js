@@ -154,10 +154,29 @@ export function drawMapDot2(c, x, y, r, fill, ring) {
 }
 
 // ---- minimap v2: same world, bigger icons, framed + labeled ----
+// Shape: 'square' (shipped default) or 'round' — preview with ?minimap=round
+// in the URL (shot harness). Juna picks the shipped default; the round
+// variant clips the SAME world to a circle in the SAME slot, so the A/B is
+// shape-only. Title screen keeps its own round minimap (city3d.js, not here).
+function minimapShape() {
+  try {
+    return new URLSearchParams(window.location.search).get('minimap') === 'round' ? 'round' : 'square';
+  } catch (e) { return 'square'; }
+}
 export function drawMinimap2(c, st, x, y, w, h) {
   const sx = w / WORLD_W, sy = h / WORLD_H;
-  drawPanel(c, x - 6, y - 6, w + 12, h + 30, C.neonCyan);
+  const round = minimapShape() === 'round';
+  const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2;
   c.save();
+  if (round) {
+    // dark disc backing so the clipped corners read as panel, not void
+    c.fillStyle = 'rgba(10,15,28,0.85)';
+    c.beginPath(); c.arc(cx, cy, r + 6, 0, 7); c.fill();
+    c.beginPath(); c.arc(cx, cy, r, 0, 7); c.clip();
+  } else {
+    drawPanel(c, x - 6, y - 6, w + 12, h + 30, C.neonCyan);
+  }
+  // ---- world (identical for both shapes — only the clip/frame differs) ----
   c.fillStyle = '#2e6b3a'; c.fillRect(x, y, w, h);
   c.fillStyle = '#1d6f9e'; c.fillRect(x + WATER_X * sx, y, (WORLD_W - WATER_X) * sx, h);
   c.fillStyle = '#4a4f57';
@@ -185,10 +204,29 @@ export function drawMinimap2(c, st, x, y, w, h) {
   const p = st.player;
   drawMapPlayer2(c, x + p.x * sx, y + p.y * sy, 14, p.angle);
   c.restore();
-  // label + north arrow
+  // ---- frame (shape-specific) ----
+  if (round) {
+    c.save();
+    c.shadowColor = C.neonCyan; c.shadowBlur = 12;
+    c.lineWidth = 2; c.strokeStyle = C.neonCyan;
+    c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke();
+    c.restore();
+    c.lineWidth = 1; c.strokeStyle = 'rgba(238,241,245,0.5)';
+    c.beginPath(); c.arc(cx, cy, r - 3, 0, 7); c.stroke();
+  } else {
+    // 1px inner hairline so the map reads as its own surface (bible §6.5)
+    c.lineWidth = 1; c.strokeStyle = 'rgba(238,241,245,0.35)';
+    c.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  }
+  // label + north arrow (same strip, both shapes)
   drawPill(c, x + 2, y + h + 2, 104, 20, '#0e1420e6', C.neonCyan);
   T(c, 'NEON HARBOR', x + 54, y + h + 13, 11, C.neonCyan, 'center', 'bold');
   T(c, 'N ↑', x + w - 4, y + h + 13, 11, '#eef1f5', 'right', 'bold');
+  // PD response panel: right column, below the minimap frame (own function,
+  // appended at the end of this file). Called here because this batch owns
+  // drawMinimap2 only — render.js / drawHud2 are untouched. Panel is 232 px
+  // wide, right edge aligned with the minimap frame's right edge.
+  drawPdPanel2(c, st, x + w + 6 - 232, y + h + 34, 232);
 }
 // ---- ROAD TO #1: progress meter toward rank 1 (13 missions = 100%) ----
 // UI-TOP: the meter counts missions DONE (0-based completed count). The
@@ -279,12 +317,18 @@ export function drawHud2(c, st, best, ui, view) {
   drawPill(c, (W2 - rw) / 2, 12, rw, 30, '#0e1420e6', hot ? '#ff8a7a' : C.neonCyan);
   T(c, readout, W2 / 2, 28, 15, hot ? '#ff8a7a' : '#ffffff', 'center', 'bold');
   drawRoadTo1(c, (W2 - 360) / 2, 52, 360, st.missionDone || 0, st.missionTotal || 12, st.nextMission || '');
-  if (st.wanted >= 6) {
-    // UI-TOP: FIXED slot under the minimap (right rail, aligned with its
-    // panel: x W2-234, y 198). The old full-width band at y 118..148 sat
-    // ON the stats panel (red wash over WANTED/PISTOL rows) and ON the
-    // compass label ("Lighthouse — 1021m" at y ~134). This pill never
-    // moves and never overlaps the meter, the compass or the stats.
+  // R25h: the PD panel (drawn by drawMinimap2 below) starts at y200 and
+  // covers this slot, so the fixed pill is drawn ONLY when the panel
+  // will not show (no responding unit/heli). When the panel shows, the
+  // pill is drawn below it by drawPdPanel2 instead — never twice, never hidden.
+  const pol = st.police || {};
+  const pdShow = (pol.units || []).some((u) => u.kind === 'car' || u.kind === 'boat' || u.kind === 'soldier') || (pol.heli && pol.heli.active);
+  if (st.wanted >= 6 && !pdShow) {
+    // UI-TOP: FIXED slot under the minimap (right rail: x W2-234, y 198).
+    // The old full-width band at y 118..148 sat ON the stats panel (red
+    // wash over WANTED/PISTOL rows) and ON the compass label
+    // ("Lighthouse — 1021m" at y ~134). This pill never moves and never
+    // overlaps the meter, the compass or the stats.
     drawPill(c, W2 - 234, 198, 212, 30, '#ff3b30', '#ffffff');
     T(c, '⚠  MILITARY RESPONSE  ⚠', W2 - 128, 213, 13, '#ffffff', 'center', 'bold');
   }
@@ -535,4 +579,101 @@ export function drawPause2(c, view) {
   T(c, 'O — settings', W2 / 2, y + 128, 17, '#c8cdd6', 'center');
   drawPill(c, W2 / 2 - 120, y + h - 48, 240, 30, '#0e1420e6', C.neonYellow);
   T(c, 'Press P or Esc to resume', W2 / 2, y + h - 32, 15, C.neonYellow, 'center', 'bold');
+}
+
+// ---- BAY PD RESPONSE: active pursuing units (UI-MINIMAP-PD batch) ----
+// Wiring: called from drawMinimap2 (the only HUD hook this batch owns —
+// render.js / drawHud2 are untouched, so the panel rides on the minimap's
+// own call). Shows only when wanted >= 1 (progressive disclosure, bible
+// §6.4); hidden at wanted 0. Data is read-only from state.police —
+// police.js is never edited. Callsigns are display-only derivations:
+// police.js stores no callsigns or officer names, so units are numbered
+// per kind (UNIT-1, BOAT-1, HELI-1, BLOCK-1, APC-1, ...). Gunmen are
+// harbor crew, not PD, so they are deliberately NOT listed. Rows are
+// nearest-first, max 4, with a "+N MORE UNITS" footer when more respond.
+// Panel: right column under the minimap, right edge aligned with the
+// minimap frame; drawPanel house style (dark translucent + cyan border +
+// radius 10, bible §6.5).
+export function drawPdPanel2(c, st, x, y, w) {
+  if (Math.floor(st.wanted || 0) < 1) return;
+  const p = st.player;
+  const px = p.inCar && p.car ? p.car.x : p.x;
+  const py = p.inCar && p.car ? p.car.y : p.y;
+  const rows = [];
+  const seen = {};
+  const tag = (k) => { seen[k] = (seen[k] || 0) + 1; return seen[k]; };
+  for (const u of st.police.units || []) {
+    let row = null;
+    if (u.kind === 'car') {
+      if (u.roadblock) {
+        const i = tag('BLOCK');
+        row = { call: 'BLOCK-' + i, type: u.concrete ? 'WALL' : 'AHEAD', status: 'ROADBLOCK', x: u.car.x, y: u.car.y };
+      } else if (u.military) {
+        const apc = u.car.body === 'apc';
+        const i = tag(apc ? 'APC' : 'MIL');
+        row = { call: (apc ? 'APC-' : 'MIL-') + i, type: apc ? 'APC' : 'MIL', status: 'PURSUING', x: u.car.x, y: u.car.y };
+      } else if (u.emergency) {
+        const fire = u.car.body === 'fire';
+        const i = tag(fire ? 'FIRE' : 'MEDIC');
+        row = { call: (fire ? 'FIRE-' : 'MEDIC-') + i, type: fire ? 'FIRE' : 'EMS', status: 'RESPONDING', x: u.car.x, y: u.car.y };
+      } else {
+        const i = tag('UNIT');
+        row = { call: 'UNIT-' + i, type: 'PD', status: 'PURSUING', x: u.car.x, y: u.car.y };
+      }
+    } else if (u.kind === 'boat') {
+      const i = tag('BOAT');
+      row = { call: 'BOAT-' + i, type: 'SEA', status: 'PURSUING', x: u.x, y: u.y };
+    } else if (u.kind === 'soldier') {
+      const i = tag('SOLDIER');
+      row = { call: 'SOLDIER-' + i, type: 'MIL', status: 'PURSUING', x: u.x, y: u.y };
+    }
+    if (row) { row.d = Math.hypot(row.x - px, row.y - py); rows.push(row); }
+  }
+  if (st.police.heli && st.police.heli.active) {
+    rows.push({ call: 'HELI-1', type: 'AIR', status: 'OVERHEAD',
+      d: Math.hypot(st.police.heli.x - px, st.police.heli.y - py) });
+  }
+  if (!rows.length) return;
+  rows.sort((a, b) => a.d - b.d);
+  const shown = rows.slice(0, 4);
+  const extra = rows.length - shown.length;
+  const rowH = 22, headH = 26;
+  const h = 10 + headH + shown.length * rowH + (extra ? 20 : 0) + 8;
+  drawPanel(c, x, y, w, h, C.neonCyan);
+  // header: police light bar + title + unit count
+  c.fillStyle = '#2f6fd0'; c.fillRect(x + 12, y + 20, 8, 6);
+  c.fillStyle = '#ff3b30'; c.fillRect(x + 21, y + 20, 8, 6);
+  T(c, 'BAY PD RESPONSE', x + 34, y + 23, 13, C.neonCyan, 'left', 'bold');
+  T(c, rows.length + (rows.length === 1 ? ' UNIT' : ' UNITS'), x + w - 10, y + 23, 11, '#c8cdd6', 'right', 'bold');
+  const STATUS_COLOR = { PURSUING: C.neonCyan, OVERHEAD: '#ffd23e', ROADBLOCK: '#ff5a3c', RESPONDING: '#7be382' };
+  shown.forEach((r, i) => {
+    const ry = y + 10 + headH + i * rowH;
+    const col = STATUS_COLOR[r.status] || '#eef1f5';
+    const dist = r.d >= 1000 ? (r.d / 1000).toFixed(1) + 'km' : Math.round(r.d) + 'm';
+    c.font = 'bold 11px ' + FONT;
+    const statusW = c.measureText(r.status).width;
+    c.font = 'bold 12px ' + FONT;
+    const distW = c.measureText(dist).width;
+    const rightX = x + w - 10 - statusW - 8 - distW;
+    c.fillStyle = col; c.beginPath(); c.arc(x + 16, ry + 11, 3.5, 0, 7); c.fill();
+    T(c, r.call, x + 26, ry + 11, 12, '#ffffff', 'left', 'bold');
+    // type tag only when it fits clear of the distance column
+    c.font = 'bold 12px ' + FONT;
+    const callW = c.measureText(r.call).width;
+    c.font = '11px ' + FONT;
+    const typeW = c.measureText(r.type).width;
+    if (x + 26 + callW + 8 + typeW + 12 < rightX) {
+      T(c, r.type, x + 26 + callW + 8, ry + 11, 11, '#c8cdd6', 'left');
+    }
+    T(c, dist, rightX, ry + 11, 12, '#eef1f5', 'left', 'bold');
+    T(c, r.status, x + w - 10, ry + 11, 11, col, 'right', 'bold');
+  });
+  if (extra) T(c, '+' + extra + ' MORE UNIT' + (extra === 1 ? '' : 'S'), x + w / 2, y + 10 + headH + shown.length * rowH + 10, 11, '#c8cdd6', 'center', 'bold');
+  // R25h: at wanted >= 6 the military pill moves BELOW the panel (the
+  // fixed y198 slot is covered by this panel). Same size as the R25g
+  // pill, right edge aligned with the panel.
+  if (Math.floor(st.wanted || 0) >= 6) {
+    drawPill(c, x + w - 212, y + h + 8, 212, 30, '#ff3b30', '#ffffff');
+    T(c, '⚠  MILITARY RESPONSE  ⚠', x + w - 106, y + h + 23, 13, '#ffffff', 'center', 'bold');
+  }
 }

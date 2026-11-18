@@ -1,14 +1,32 @@
 import { WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
 import { drawMapBridge, drawMapGas, drawMapHydrant, drawMapMission, drawMapPlayer, drawMapPolice, drawMapWrench } from './ui-art.js';
+// NOTE: this module is currently unimported — the live minimap is drawMinimap2
+// in ui2.js. It is kept shape-compatible with it (same ?minimap=round switch,
+// same slot, same label) so it can be re-enabled without visual drift.
+// Shape: 'square' (shipped default) or 'round' — preview with ?minimap=round.
+function minimapShape() {
+  try {
+    return new URLSearchParams(window.location.search).get('minimap') === 'round' ? 'round' : 'square';
+  } catch (e) { return 'square'; }
+}
 export function drawMinimap(ctx, state, x, y, w, h) {
   const sx = w / WORLD_W;
   const sy = h / WORLD_H;
+  const round = minimapShape() === 'round';
+  const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2;
   ctx.save();
-  ctx.globalAlpha = 0.92;
-  ctx.fillStyle = '#0e1420';
-  ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
-  ctx.globalAlpha = 1;
+  if (round) {
+    // dark disc backing so the clipped corners read as panel, not void
+    ctx.fillStyle = 'rgba(10,15,28,0.92)';
+    ctx.beginPath(); ctx.arc(cx, cy, r + 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
+  } else {
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = '#0e1420';
+    ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
+    ctx.globalAlpha = 1;
+  }
   ctx.fillStyle = '#2e6b3a';
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = '#1d6f9e';
@@ -123,4 +141,22 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   const p = state.player;
   drawMapPlayer(ctx, x + p.x * sx, y + p.y * sy, 10, p.angle);
   ctx.restore();
+  // ---- frame (shape-specific) + label strip (same for both shapes) ----
+  if (round) {
+    ctx.lineWidth = 2; ctx.strokeStyle = '#37e0e6';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(238,241,245,0.5)';
+    ctx.beginPath(); ctx.arc(cx, cy, r - 3, 0, Math.PI * 2); ctx.stroke();
+  } else {
+    ctx.lineWidth = 1; ctx.strokeStyle = '#37e0e6';
+    ctx.strokeRect(x - 4.5, y - 4.5, w + 9, h + 9);
+  }
+  ctx.font = 'bold 11px system-ui';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#37e0e6';
+  ctx.fillText('NEON HARBOR', x + w / 2, y + h + 12);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#eef1f5';
+  ctx.fillText('N ↑', x + w - 4, y + h + 12);
+  ctx.textAlign = 'left';
 }
