@@ -2,7 +2,16 @@
 // Track MOBIL-REALISTIS (instruksi Juna 12:47 WIB: mobil terus dikembangkan
 // sampai serealistis mungkin). ES module, tanpa dependensi, tanpa network.
 // v13 (2026-11-18): KAWAH — hz 0,80→0,92 (+15% lebar, 0 tris; A/B v13a: nyata di rect, marginal di full shot) + 2 RETAK CAT di sekitar kawah (A/B v13c: terbukti di zoom 3x, tak terlihat di full shot; +4 tris damage-only) + KAMERA damage 15% lebih dekat + target +0,5 & sedan 2,7 (staging demo v13d3 — sedan utuh, kawah ~150 px di layar) + SPOKE — kombinasi [0,88]+stripe[0,98] DITOLAK A/B (identik v12 di full shot 3/4; di macro kontras spine malah melemah 0,16→0,10) → spoke v12 DIPERTAHANKAN ([0,82]+stripe[0,98]); topik SPOKE DITUTUP. v12 (2026-11-18): KAWAH — bibir bawah DIHAPUS + bibir samping tipis/redup/pendek + tepi kawah TAK PERSEGI (sudut digeser ±0,03..0,07) + bibir atas DIPERPENDEK 72% (A/B v12b vs v12a vs v11 di crop-damage: v12a nyaris tak berubah — bingkai bertahan; v12b outline tak beraturan = terbaca 'penyok', bukan 'bingkai foto'; kedalaman TETAP 0,25; -2 tris damage-only) + SPOKE — stripe highlight tengah spoke [0,98] (A/B v12b vs v12a vs v11 di macro: v12a [0,88] marginal — lebih terang tapi datar; v12b stripe = tiap spoke punya highlight spine = terbaca LOGAM, celah gelap tetap, TIDAK jadi bunga; +40 tris, dibayar ban hi 16->14 sisi = -32 tris, hero 1526 <= 1550; A/B macro: ban 14 sisi siluetnya identik 16 di tepi bawah) + FOREGROUND wheel 3/4 — kamera lebih rendah (v12c1) DITOLAK (void makin besar) + kamera mundur/fov 44 (v12c2) DITOLAK (mobil mengecil, void tetap) — solusinya STAGING T4 (bukan modul): marka + manhole di (x 2,2-3,2, z -1,8..+0,2) demo TERBUKTI mengisi void (v12c5, 20.782 px berubah di dalam void). A/B DITOLAK: spoke [0,88] (marginal), bibir kawah v12a (tak terlihat), kamera wheel c1/c2, marka di (4,0,-2,5) v12c3 (di luar frustum). Larangan permanen tetap: flank 7, kap 11, lug besar, kawah >0,25, spoke >0,20, garis panel kuarter, macro lebih ketat.
-// v14 (2026-11-18): KAWAH TETESAN — ujung runcing ke depan, ujung lebar membulat di belakang, kipas 6 segitiga, pusat digeser ke belakang (sisi lebar lebih dalam); bibir hanya 1 dash pendek di tepi atas (depan+belakang DIHAPUS); kedalaman TETAP 0,25; retak v13 + spoke v12 TIDAK disentuh. A/B vs v13, dinilai di FULL shot.
+// v15 (2026-11-19, R27b DE-BOXING — Juna 04:45 WIB: "mobilnya ga kayak
+// mobil asli"): GEOMETRI sedan dibangun ulang dari balok — kap/bagasi =
+// cangkang 3 faset (1,14->0,99 ke hidung; 1,16->1,06 ke ekor), atap =
+// cangkang lengkung (bukan datar), kaca depan/belakang BESAR + MIRING
+// (rx 0,70-0,92 / ~0,97-1,10), kaca samping tumblehome + pilar A/C,
+// kabin menyempit, hidung/belakang bevel + chamfer sudut 45°, bumper
+// menyempit (ban kebaca dari depan/belakang), ban keluar +0,04, wheelD
+// +0,06 (hero 0,68). Bus/api/medic/apc TAK disentuh (boxy by nature).
+// Hero hi ~1410 tris (dari 1526) — di bawah plafon 1550. Spoke v12,
+// kawah v13/v14, dan semua larangan permanen tetap berlaku.
 // v8 (2026-11-18): flank LEBIH DRAMATIS (tonjolan W/2+0,20 — A/B vs v7:
 // siluet melengkung TERBUKTI tanpa kartun, fender/detail ikut keluar) +
 // tapak samping LEBIH KONTRAS (alur 0,88, gelap 0,02, lebar 0,17, dx 0,20;
@@ -165,15 +174,15 @@ const RIMWARM = [1.0, 0.6, 0.3];      // rim light hangat (tepi atap)
 // kabin 12–15% lebih sempit) + §1.6 (resep per kendaraan).
 // ---------------------------------------------------------------------------
 export const CAR_SPECS = {
-  hero:      { label: 'Hero Neon GT',  kind: 'sport',  len: 5.4, wid: 2.3, bodyH: 0.80, cabFrac: 0.48, cabW: 0.78, wheels: 4, wheelD: 0.62, paint: '#e33e5f', spoiler: true,  lightbar: true },
+  hero:      { label: 'Hero Neon GT',  kind: 'sport',  len: 5.4, wid: 2.3, bodyH: 0.80, cabFrac: 0.48, cabW: 0.78, wheels: 4, wheelD: 0.68, paint: '#e33e5f', spoiler: true,  lightbar: true },
   bus:       { label: 'Bus Kota',     kind: 'bus',    len: 9.6, wid: 2.6, bodyH: 1.70, cabFrac: 0.90, cabW: 1.00, wheels: 6, wheelD: 0.70, paint: '#e8b93c', spoiler: false, lightbar: false },
   fire:      { label: 'Pemadam',      kind: 'fire',   len: 8.4, wid: 2.6, bodyH: 1.50, cabFrac: 0.50, cabW: 0.90, wheels: 4, wheelD: 0.70, paint: '#c0392b', spoiler: false, lightbar: true },
   medic:     { label: 'Ambulans',     kind: 'medic',  len: 6.2, wid: 2.4, bodyH: 1.40, cabFrac: 0.60, cabW: 0.90, wheels: 4, wheelD: 0.66, paint: '#f5f5f5', spoiler: false, lightbar: true },
   apc:       { label: 'APC Tentara',  kind: 'apc',    len: 6.8, wid: 2.6, bodyH: 1.30, cabFrac: 0.40, cabW: 0.70, wheels: 6, wheelD: 0.45, paint: '#4a5a2a', spoiler: false, lightbar: false },
-  hatchback: { label: 'Hatchback',    kind: 'hatch',  len: 4.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.62, cabW: 0.80, wheels: 4, wheelD: 0.58, paint: '#2e8b9e', spoiler: true,  lightbar: true },
-  sedanL:    { label: 'Sedan Panjang',kind: 'sedan',  len: 5.4, wid: 2.2, bodyH: 0.80, cabFrac: 0.45, cabW: 0.78, wheels: 4, wheelD: 0.60, paint: '#7d8ea3', spoiler: false, lightbar: true },
-  pickup:    { label: 'Pickup',       kind: 'pickup', len: 5.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.42, cabW: 0.80, wheels: 4, wheelD: 0.60, paint: '#d97b2b', spoiler: false, lightbar: true },
-  police:    { label: 'Polisi',       kind: 'sedan',  len: 4.6, wid: 2.2, bodyH: 0.80, cabFrac: 0.50, cabW: 0.78, wheels: 4, wheelD: 0.60, paint: '#141c3c', spoiler: false, lightbar: true, police: true },
+  hatchback: { label: 'Hatchback',    kind: 'hatch',  len: 4.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.62, cabW: 0.80, wheels: 4, wheelD: 0.64, paint: '#2e8b9e', spoiler: true,  lightbar: true },
+  sedanL:    { label: 'Sedan Panjang',kind: 'sedan',  len: 5.4, wid: 2.2, bodyH: 0.80, cabFrac: 0.45, cabW: 0.78, wheels: 4, wheelD: 0.66, paint: '#7d8ea3', spoiler: false, lightbar: true },
+  pickup:    { label: 'Pickup',       kind: 'pickup', len: 5.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.42, cabW: 0.80, wheels: 4, wheelD: 0.66, paint: '#d97b2b', spoiler: false, lightbar: true },
+  police:    { label: 'Polisi',       kind: 'sedan',  len: 4.6, wid: 2.2, bodyH: 0.80, cabFrac: 0.50, cabW: 0.78, wheels: 4, wheelD: 0.66, paint: '#141c3c', spoiler: false, lightbar: true, police: true },
 };
 export function carSpec(type) { return CAR_SPECS[type] || CAR_SPECS.hero; }
 
@@ -229,6 +238,18 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   const qGlowB = (lx, ly, lz, w, h, c) => {
     const q = at(lx, ly, lz);
     billDir(G, q[0], q[1], q[2], w, h, [-fwd[0], 0, -fwd[1]], c, 7);
+  };
+  // ---- quadOut (v15 R27b): quad dengan normal dari geometri ----
+  // quad a-b-c-d; normal = (b-a)x(c-a); kalau menghadap berlawanan hint,
+  // winding dibalik. Untuk cangkang faset (atap/kap/kaca/pilar/bevel) yang
+  // normalnya tak bisa di-hardcode.
+  const quadOut = (a, b, c, d, hint, col, m) => {
+    let n = norm(cross([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]));
+    if (n[0] * hint[0] + n[1] * hint[1] + n[2] * hint[2] < 0) {
+      quad(B, a, d, c, b, [-n[0], -n[1], -n[2]], [[0, 0], [1, 0], [1, 1], [0, 1]], col, m);
+    } else {
+      quad(B, a, b, c, d, n, [[0, 0], [1, 0], [1, 1], [0, 1]], col, m);
+    }
   };
   // ---- KACA v2: streak HALUS (bukan zebra shader) + bingkai karet ----
   // Material 2 (kaca) di shader T4 memakai streak ruang-layar yang berulang
@@ -304,12 +325,13 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     p(lx, ly, lz, w, h, 0.06, GLASS, 1); // kaca glossy (bukan material 2)
     glassStreak(lx, ly, lz, w * 0.6, 0.12, 0, face, [0.22, 0.28, 0.38], 0, 0.05);
   };
-  // Bevel belakang: talang 45° antara muka belakang dan deck (normal diagonal
-  // → shader memberi gradasi; bodi tidak lagi siku 90° di tepi atas belakang).
-  const rearBevel = (bodyTop, w) => {
+  // Bevel belakang v15: talang antara muka belakang dan deck — dari
+  // (topY-0,10, -L/2-0,03) ke (topY+0,01, -L/2+0,08). Sedan: topY 1,06
+  // (di bawah deck bagasi); bus/api/medic: topY = bodyTop (lebih landai).
+  const rearBevel = (topY, w) => {
     const nrm = dir(0, 0.707, -0.707);
-    quad(B, at(-w / 2, bodyTop - 0.20, -L / 2 - 0.03), at(w / 2, bodyTop - 0.20, -L / 2 - 0.03),
-      at(w / 2, bodyTop - 0.02, -L / 2 + 0.10), at(-w / 2, bodyTop - 0.02, -L / 2 + 0.10),
+    quad(B, at(-w / 2, topY - 0.10, -L / 2 - 0.03), at(w / 2, topY - 0.10, -L / 2 - 0.03),
+      at(w / 2, topY + 0.01, -L / 2 + 0.08), at(-w / 2, topY + 0.01, -L / 2 + 0.08),
       nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], paintDark, 1);
   };
   const wheelD = spec.wheelD, wheelY = wheelD / 2;
@@ -456,7 +478,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     }
   };
   for (const lz of axleZ) {
-    for (const s of [-1, 1]) drawWheel(s * (W / 2 + 0.02), lz, s); // v9: ban +0,12 keluar (A/B v9a vs v9b — +0,16 tidak tambah apa-apa di jarak lineup, +0,12 cukup)
+    for (const s of [-1, 1]) drawWheel(s * (W / 2 + 0.06), lz, s); // v15: ban +0,04 keluar (muka luar ban 1,54 ≈ tonjolan flank 1,55 — ban kebaca dari belakang di bawah beltline)
   }
 
   if (spec.kind === 'bus') return drawBus();
@@ -579,126 +601,173 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     const bodyBot = 0.34, bodyTop = bodyBot + spec.bodyH; // 0.34–1.14
     const cabZ = -L * 0.05, cabH = 0.44;
     const cabY = bodyTop + 0.22; // pusat kabin
-    // Badan: 3 kotak bertumpuk (bawah + bahu + kap) — bible §1.1
-    // v2: kotak bawah pakai paintDark (nada gelap = pantulan tanah).
-    p(0, (bodyBot + bodyTop) / 2 - 0.06, 0, W, spec.bodyH * 0.72, L, paintDark, 1);
-    p(0, bodyTop - 0.08, 0, W * 0.97, 0.2, L * 0.97, col, 1);              // bahu
-    // MAHKOTA BAHU v4: 2 quad membentuk V-terbalik dangkal di atas bahu
-    // (punggung bodyTop+0,045, tepi bodyTop-0,005) — dari belakang, garis
-    // atap bahu kini melengkung, bukan garis datar. Normal diagonal →
-    // gradasi shader (pita terang di tengah).
-    {
-      const zA = -L * 0.42, zB = L * 0.42;
-      const nL = dir(-0.35, 0.94, 0), nR = dir(0.35, 0.94, 0);
-      quad(B, at(0, bodyTop + 0.045, zB), at(0, bodyTop + 0.045, zA),
-        at(-W * 0.48, bodyTop - 0.005, zA), at(-W * 0.48, bodyTop - 0.005, zB),
-        nL, [[0, 0], [1, 0], [1, 1], [0, 1]], paintLight, 1);
-      quad(B, at(0, bodyTop + 0.045, zA), at(0, bodyTop + 0.045, zB),
-        at(W * 0.48, bodyTop - 0.005, zB), at(W * 0.48, bodyTop - 0.005, zA),
-        nR, [[0, 0], [1, 0], [1, 1], [0, 1]], paintLight, 1);
-    }
-    // FLANK MELENGKUNG v7 (bukan slab datar): 5 faset per sisi — (A1) lereng
-    // atas, (A2) lereng tengah-atas, (B) vertikal di garis pinggang, (C1)
-    // lereng bawah-atas, (C2) lereng bawah. Tonjolan garis pinggang
-    // W/2+0,12 (v6 cuma +0,05 — siluet samping tetap lurus, flank cuma
-    // terbaca sebagai shading 3 nada; batch 10 minta tonjolan >0,05 +
-    // faset lebih banyak supaya LENGKUNG SILUET terbaca). Normal dihitung
-    // dari geometri faset (bukan hardcode) supaya konsisten di semua W.
-    // Detail sisi (gagang pintu, garis pintu, strip krom, pintu putih,
-    // penyok) digeser ke W/2+0,13 supaya duduk DI ATAS faset B, bukan
-    // tertimbun (v6: W/2+0,06 di atas faset B v6 di W/2+0,05).
-    // Fender juga digeser keluar (fxc 0,16 — tepi luar W/2+0,14) supaya
-    // lengkung roda tetap di luar flank (lihat drawWheel).
+    // ---- v15 R27b DE-BOXING: siluet samping kini mobil, bukan papan ----
+    // Kap menurun ke hidung, atap melengkung, kaca depan/belakang miring
+    // lebar, kabin menyempit ke atap (tumblehome), sudut membulat.
+    // Kap/bagasi = cangkang faset (bukan 9 kotak); flank atas menurun ke
+    // depan/belakang mengikuti garis kap/bagasi. Semua shell ada di semua
+    // LOD (bentuk tak boleh berubah dengan jarak); hanya segmen yang turun.
+    const nRoof = hi ? 5 : mid ? 4 : 3;
+    const nHood = hi ? 4 : mid ? 3 : 2;
+    const nTrunk = hi ? 3 : mid ? 2 : 2;
+    const cowlZ = 0.185 * L, noseZ = 0.5 * L, flankZ = 0.44 * L;
+    // Kaca depan per jenis (rx = miring dari vertikal): sport tajam,
+    // sedan agak tegak, pickup hampir tegak.
+    const wind = spec.kind === 'pickup' ? { rx: 0.70, h: 0.55, w: 0.80 }
+      : spec.kind === 'sedan' ? { rx: 0.80, h: 0.60, w: 0.78 }
+      : { rx: 0.92, h: 0.63, w: 0.78 };
+    const beltY = 1.16; // garis pinggang = atas bahu
+    const shieldBaseZ = cowlZ - 0.25; // dasar kaca depan (strip cowl 0,25)
+    const shieldTopZ = shieldBaseZ - wind.h * Math.sin(wind.rx);
+    const shieldTopY = beltY + wind.h * Math.cos(wind.rx);
+    const roofFZ = shieldTopZ + 0.12; // tepi depan atap (menutupi kaca depan)
+    const roofRZ = cabZ - (L * spec.cabFrac) / 2 + 0.10; // tepi belakang atap
+    const roofFY = shieldTopY, roofRY = shieldTopY - 0.02;
+    const roofHalf = (W * spec.cabW) / 2 - 0.075;
+    // Lengkung atap: tepi depan -> puncak (tengah, +0,085) -> tepi belakang.
+    const roofEdgeY = (z) => {
+      const t = (z - roofFZ) / (roofRZ - roofFZ);
+      return roofFY + (roofRY - roofFY) * t + 0.085 * Math.sin(Math.PI * t);
+    };
+    // Kaca belakang: atas di bawah tepi belakang atap, bawah di deck.
+    const rearTopZ = roofRZ + 0.15, rearTopY = roofRY;
+    let rearBotZ, rearBotY;
+    if (spec.kind === 'hatch') { rearBotZ = -L / 2 + 0.12; rearBotY = 1.12; }
+    else if (spec.kind === 'pickup') { rearBotZ = rearTopZ - 0.20; rearBotY = 1.15; }
+    else { rearBotZ = rearTopZ - 0.52; rearBotY = rearTopY - 0.36; }
+    const rearRun = rearTopZ - rearBotZ, rearRise = rearTopY - rearBotY;
+    const rearRx = Math.atan2(rearRun, rearRise);
+    const rearH = Math.hypot(rearRun, rearRise);
+    const rearZ = (rearTopZ + rearBotZ) / 2, rearY = (rearTopY + rearBotY) / 2;
+    const rearW = spec.kind === 'pickup' ? 0.80 : spec.kind === 'hatch' ? 0.86 : 0.90;
+    const trunkZ0 = rearBotZ; // awal deck bagasi = dasar kaca belakang
+    // Penurunan tepi atas flank: 0 di tengah, 0,10 di hidung, 0,06 di ekor.
+    const flankDrop = (z) => (z > cowlZ ? 0.10 * Math.min(1, (z - cowlZ) / (flankZ - cowlZ))
+      : z < trunkZ0 ? 0.06 * Math.min(1, (trunkZ0 - z) / (flankZ + trunkZ0)) : 0);
+    // Badan: kotak bawah (tutup 0,99 = tepi depan kap) + bahu tengah.
+    p(0, 0.691, 0, W, 0.598, L, paintDark, 1); // bawah (0,39–0,99)
+    p(0, 1.06, (trunkZ0 + cowlZ) / 2, W * 0.97, 0.2, cowlZ - trunkZ0, col, 1); // bahu (0,96–1,16)
+    // FLANK v15: 5 faset × 3 segmen (depan/tengah/belakang) — tepi atas
+    // menurun mengikuti kap/bagasi; normal dari geometri (quadOut).
+    const flankSegs = [[cowlZ, flankZ], [trunkZ0, cowlZ], [-flankZ, trunkZ0]];
     const flankQuad = (s, ax0, ay0, ax1, ay1, col) => {
-      const x0 = s * ax0, x1 = s * ax1, dx = x1 - x0, dy = ay1 - ay0;
-      const nl = s > 0 ? [-dy, dx] : [dy, -dx];
-      const l = Math.hypot(nl[0], nl[1]) || 1;
-      const nrm = dir(nl[0] / l, nl[1] / l, 0);
-      const z0 = -L * 0.44, z1 = L * 0.44;
-      quad(B, at(x0, ay0, z1), at(x0, ay0, z0), at(x1, ay1, z0), at(x1, ay1, z1),
-        nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], col, 1);
+      for (const [zA, zB] of flankSegs) {
+        quadOut(at(s * ax0, ay0 - flankDrop(zA), zA), at(s * ax0, ay0 - flankDrop(zB), zB),
+          at(s * ax1, ay1 - flankDrop(zB), zB), at(s * ax1, ay1 - flankDrop(zA), zA),
+          [s, 0.5, 0], col, 1);
+      }
     };
     for (const s of [-1, 1]) {
-      flankQuad(s, W * 0.485, 1.06, W / 2 + 0.14, 0.95, paintLight); // (A1) v8
-      flankQuad(s, W / 2 + 0.14, 0.95, W / 2 + 0.20, 0.80, paintLight); // (A2) v8
-      flankQuad(s, W / 2 + 0.20, 0.80, W / 2 + 0.20, 0.55, col); // (B) v8 — tonjolan 0,20
-      flankQuad(s, W / 2 + 0.20, 0.55, W / 2 + 0.10, 0.45, paintDark); // (C1) v8
-      flankQuad(s, W / 2 + 0.10, 0.45, W * 0.46, 0.34, paintDark); // (C2) v8
+      flankQuad(s, W * 0.485, 1.06, W / 2 + 0.14, 0.95, paintLight); // (A1)
+      flankQuad(s, W / 2 + 0.14, 0.95, W / 2 + 0.20, 0.80, paintLight); // (A2)
+      flankQuad(s, W / 2 + 0.20, 0.80, W / 2 + 0.20, 0.55, col); // (B) — tonjolan 0,20
+      flankQuad(s, W / 2 + 0.20, 0.55, W / 2 + 0.10, 0.45, paintDark); // (C1)
+      flankQuad(s, W / 2 + 0.10, 0.45, W * 0.46, 0.34, paintDark); // (C2)
     }
-    // KAP MELENGKUNG v6 (7 segmen, dari 5): pitch -0,02 → -0,55 progresif —
-    // tiap segmen turun sedikit; dari samping garis kap kini lengkung halus,
-    // dari close-up undakan lebih kecil lagi. Normal per-faset otomatis
-    // dari pitch boxR (shader memberi gradasi).
-    const hoodSegs = [[0.25, -0.02, -0.005], [0.2825, -0.06, -0.012], [0.315, -0.11, -0.022], [0.3475, -0.17, -0.035], [0.38, -0.24, -0.05], [0.4125, -0.32, -0.068], [0.445, -0.40, -0.088], [0.4775, -0.48, -0.11], [0.51, -0.56, -0.135]]; // v8: 9 segmen (A/B — deck lebih halus)
-    for (const [zf, rx, yo] of hoodSegs) p(0, bodyTop + yo, L * zf, W * 0.88, 0.13, L * 0.07, col, 1, rx);
+    // KAP v15: cangkang 3 faset (tengah + 2 sisi menurun ke fender) —
+    // 1,14 di cowl menurun ke 0,99 di hidung; sisi luar turun sampai tepi
+    // atas flank (tanpa celah). BAGASI v15: sama, 1,16 -> 1,06 ke ekor
+    // (pickup: tidak ada — bak terbuka; hatch: deck pendek 1 segmen).
+    const hoodY = (t) => 1.14 - 0.15 * Math.pow(t, 1.25);
+    const hoodZ = (t) => cowlZ + (noseZ - cowlZ) * t;
+    for (let i = 0; i < nHood; i += 1) {
+      const t0 = i / nHood, t1 = (i + 1) / nHood;
+      const z0 = hoodZ(t0), z1 = hoodZ(t1), y0 = hoodY(t0), y1 = hoodY(t1);
+      quadOut(at(-0.55, y0, z0), at(-0.55, y1, z1), at(0.55, y1, z1), at(0.55, y0, z0), [0, 1, 0.2], col, 1);
+      for (const s of [-1, 1]) {
+        quadOut(at(s * 0.55, y0, z0), at(s * 0.55, y1, z1),
+          at(s * (W * 0.485), 1.06 - flankDrop(z1) - 0.01, z1), at(s * (W * 0.485), 1.06 - flankDrop(z0) - 0.01, z0),
+          [s * 0.3, 1, 0.2], col, 1);
+      }
+    }
     if (spec.kind !== 'pickup') {
-      // BAGASI MELENGKUNG v6: 7 segmen naik ke ekor (pitch +0,02 → +0,45).
-      const trunkSegs = [[0.25, 0.02, -0.06], [0.2825, 0.05, -0.058], [0.315, 0.09, -0.055], [0.3475, 0.14, -0.05], [0.38, 0.20, -0.044], [0.4125, 0.26, -0.036], [0.445, 0.33, -0.027], [0.4775, 0.40, -0.017], [0.51, 0.47, -0.008]]; // v8: 9 segmen (A/B)
-      for (const [zf, rx, yo] of trunkSegs) p(0, bodyTop + yo, -L * zf, W * 0.9, 0.12, L * 0.07, col, 1, rx);
+      const nTrunkH = spec.kind === 'hatch' ? 1 : nTrunk;
+      const trunkY = (t) => rearBotY - (rearBotY - 1.06) * Math.pow(t, 1.2);
+      const trunkZ = (t) => trunkZ0 + (-noseZ - trunkZ0) * t;
+      for (let i = 0; i < nTrunkH; i += 1) {
+        const t0 = i / nTrunkH, t1 = (i + 1) / nTrunkH;
+        const z0 = trunkZ(t0), z1 = trunkZ(t1), y0 = trunkY(t0), y1 = trunkY(t1);
+        quadOut(at(-0.55, y0, z0), at(-0.55, y1, z1), at(0.55, y1, z1), at(0.55, y0, z0), [0, 1, -0.2], col, 1);
+        for (const s of [-1, 1]) {
+          quadOut(at(s * 0.55, y0, z0), at(s * 0.55, y1, z1),
+            at(s * (W * 0.485), 1.06 - flankDrop(z1) - 0.01, z1), at(s * (W * 0.485), 1.06 - flankDrop(z0) - 0.01, z0),
+            [s * 0.3, 1, -0.2], col, 1);
+        }
+      }
     }
-    // Kabin: inti cat + kaca terpisah (bukan balok kaca utuh — bible §1.3)
-    p(0, cabY, cabZ, W * spec.cabW, cabH, L * spec.cabFrac, col, 1);        // inti kabin
-    p(0, cabY + cabH / 2 + 0.02, cabZ, W * spec.cabW * 0.96, 0.07, L * spec.cabFrac * 0.92, col, 1); // atap
-    // MAHKOTA ATAP v4: V-terbalik dangkal di atas atap kabin (punggung
-    // cabY+cabH/2+0,09, tepi +0,05) — atap tidak lagi datar dari belakang.
-    {
-      const zA = cabZ - L * spec.cabFrac * 0.42, zB = cabZ + L * spec.cabFrac * 0.42;
-      const nL = dir(-0.35, 0.94, 0), nR = dir(0.35, 0.94, 0);
-      const e = W * spec.cabW * 0.44, rY = cabY + cabH / 2 + 0.09, eY = cabY + cabH / 2 + 0.05;
-      quad(B, at(0, rY, zB), at(0, rY, zA), at(-e, eY, zA), at(-e, eY, zB),
-        nL, [[0, 0], [1, 0], [1, 1], [0, 1]], paintLight, 1);
-      quad(B, at(0, rY, zA), at(0, rY, zB), at(e, eY, zB), at(e, eY, zA),
-        nR, [[0, 0], [1, 0], [1, 1], [0, 1]], paintLight, 1);
-    }
+    // HIDUNG v15: bevel miring (0,99 -> 0,45) + chamfer sudut 45° depan &
+    // belakang (kotak tak lagi siku 90°). Chamfer DI LUAR kotak (aditif) —
+    // sudut kotak tertutup di belakangnya, tak menembus.
+    quadOut(at(-W * 0.48, 0.99, noseZ), at(W * 0.48, 0.99, noseZ),
+      at(W * 0.48, 0.45, noseZ + 0.10), at(-W * 0.48, 0.45, noseZ + 0.10), [0, 0.9, 0.4], col, 1);
     for (const s of [-1, 1]) {
-      p(s * (W * spec.cabW / 2 + 0.01), cabY, cabZ, 0.05, 0.34, L * spec.cabFrac * 0.8, GLASS, 1); // kaca samping (v2: material 1, bukan 2-zebra)
+      quadOut(at(s * (W / 2), 0.99, noseZ + 0.08), at(s * (W / 2), 0.40, noseZ + 0.08),
+        at(s * (W / 2 + 0.08), 0.40, noseZ), at(s * (W / 2 + 0.08), 0.99, noseZ), [s, 0, 1], col, 1);
+      quadOut(at(s * (W / 2), 1.06, -noseZ - 0.08), at(s * (W / 2), 0.40, -noseZ - 0.08),
+        at(s * (W / 2 + 0.08), 0.40, -noseZ), at(s * (W / 2 + 0.08), 1.06, -noseZ), [s, 0, -1], col, 1);
     }
-    // Kaca belakang MIRING 30° (rx +0.52) + kaca depan miring (rx -0.48) — bible §1.2
-    // Kaca LEBIH SEMPIT dari muka kabin supaya cat membingkainya (bukan papan hitam).
-    // v2: bingkai karet + kaca material 1 + streak diagonal halus (bukan zebra).
-    const rearZ = cabZ - (L * spec.cabFrac) / 2 + 0.05;
-    const frontZ = cabZ + (L * spec.cabFrac) / 2 - 0.02;
-    if (spec.kind === 'hatch') {
-      // Hatchback: kaca sampai ke ekor (atap kaca panjang)
-      // v3: kaca LEBIH BESAR (0,55→0,64 tinggi, 0,78→0,86 lebar) — batch 5:
-      // area kaca terlalu sempit untuk jadi ciri hero.
-      glassBorder(0, cabY + 0.02, -L * 0.28, W * spec.cabW * 0.86, 0.64, 0.55); // v15: border tipis (bukan panel padat)
-      p(0, cabY + 0.02, -L * 0.28, W * spec.cabW * 0.86, 0.64, 0.07, GLASS, 1, 0.55);
-      skyGlass(0, cabY + 0.02, -L * 0.28, W * spec.cabW * 0.86, 0.64, 0.55); // v15: pantulan langit
-      glassStreak(0, cabY + 0.02, -L * 0.28, W * spec.cabW * 0.55, 0.14, 0.55, -1, [0.22, 0.28, 0.38], 0, 0.05); // v15d: w 0.72->0.55 (top 0.363>hh 0.32, menjulur)
-      glassStreak(0, cabY + 0.02, -L * 0.28, W * spec.cabW * 0.5, 0.07, 0.55, -1, [0.35, 0.42, 0.55], 0, -0.10);
-    } else {
-      // v3: kaca LEBIH BESAR (0,42→0,52 tinggi, 0,78→0,86 lebar) + streak
-      // lebih lebar (2 pita: terang sempit + pudar lebar = gradasi langit).
-      glassBorder(0, cabY - 0.01, rearZ, W * spec.cabW * 0.86, 0.46, 0.52); // v15b: border tipis; kaca dipendek (0.52->0.46) + turun 0.03: tepi atas 1.55 bersih di bawah atap (1.565), tak lagi menembus atap -> tak ada baji segitiga
-      p(0, cabY - 0.01, rearZ, W * spec.cabW * 0.86, 0.46, 0.07, GLASS, 1, 0.52);
-      skyGlass(0, cabY - 0.01, rearZ, W * spec.cabW * 0.86, 0.46, 0.52); // v15b: pantulan langit
-      glassStreak(0, cabY - 0.01, rearZ, W * spec.cabW * 0.42, 0.12, 0.52, -1, [0.22, 0.28, 0.38], 0, 0.0); // v15d: w 0.50->0.42, h 0.14->0.12, dv 0.05->0 (top 0.269>hh 0.23, menjulur di atas kaca/atap)
-      glassStreak(0, cabY - 0.01, rearZ, W * spec.cabW * 0.42, 0.06, 0.52, -1, [0.35, 0.42, 0.55], 0, -0.04); // v15d: w 0.5->0.42, h 0.08->0.06, dv -0.10->-0.04 (bawah -0.291<-hh, menjulur)
+    // Kabin: inti MENYEMPIT (0,84×) + RENDAH (atas 1,50, di bawah atap) —
+    // sisi kabin dibentuk kaca miring (tumblehome), bukan inti kotak.
+    const coreFrontZ = shieldTopZ - 0.05, coreRearZ = rearTopZ - 0.05;
+    p(0, 1.36, (coreFrontZ + coreRearZ) / 2, W * spec.cabW * 0.84, 0.28, coreFrontZ - coreRearZ, col, 1);
+    // ATAP v15: cangkang lengkung (depan -> puncak -> belakang) × V
+    // melintang (punggung +0,05) — atap datar MATI.
+    for (let i = 0; i < nRoof; i += 1) {
+      const t0 = i / nRoof, t1 = (i + 1) / nRoof;
+      const z0 = roofFZ + (roofRZ - roofFZ) * t0, z1 = roofFZ + (roofRZ - roofFZ) * t1;
+      const e0 = roofEdgeY(z0), e1 = roofEdgeY(z1);
+      quadOut(at(0, e0 + 0.05, z0), at(0, e1 + 0.05, z1), at(-roofHalf, e1, z1), at(-roofHalf, e0, z0), [-0.25, 1, 0], col, 1);
+      quadOut(at(0, e0 + 0.05, z0), at(0, e1 + 0.05, z1), at(roofHalf, e1, z1), at(roofHalf, e0, z0), [0.25, 1, 0], col, 1);
     }
-    p(0, cabY + 0.02, frontZ - 0.02, W * spec.cabW * 0.82, 0.46, 0.05, DARK, 5, -0.48); // bingkai
-    p(0, cabY + 0.02, frontZ, W * spec.cabW * 0.78, 0.42, 0.07, GLASS, 1, -0.48);
-    glassStreak(0, cabY + 0.02, frontZ, W * spec.cabW * 0.6, 0.12, -0.48, 1, [0.22, 0.28, 0.38], 0, 0.05);
-    // Pita atap (clear-coat) + bevel belakang — cat 3 lapis TERBACA (v2).
-    // v3: pita dilebarkan (0,42→0,50 lebar kabin) supaya terbaca dari jauh.
-    p(0, cabY + cabH / 2 + 0.06, cabZ, W * spec.cabW * 0.50, 0.05, L * spec.cabFrac * 0.7, paintLight, 1);
-    rearBevel(bodyTop, W * 0.88);
-    // BEVEL BAHU v3: talang 45° di tepi atas kabin (normal diagonal → gradasi
-    // shader; sisi kabin tidak lagi siku 90° ke atap) + garis pinggang
-    // (panel line) di flank — batch 5: sisi masih slab datar.
+    // KACA SAMPING v15: miring ke dalam (tumblehome) + tepi atas mengikuti
+    // lengkung atap; pilar B membagi jendela depan/belakang (hi/mid).
+    const glassBotX = (W * spec.cabW) / 2, glassTopX = roofHalf - 0.025;
+    const sideFZ = roofFZ - 0.05, sideRZ = spec.kind === 'pickup' ? -0.40 : roofRZ + 0.05;
     for (const s of [-1, 1]) {
-      const nrm = dir(s * 0.707, 0.707, 0);
-      const x0 = s * W * spec.cabW / 2, x1 = s * W * spec.cabW * 0.44;
-      const y0 = cabY + 0.06, y1 = cabY + 0.26;
-      const z0 = cabZ - L * spec.cabFrac * 0.45, z1 = cabZ + L * spec.cabFrac * 0.45;
-      const cs = s > 0
-        ? [at(x0, y0, z1), at(x0, y0, z0), at(x1, y1, z0), at(x1, y1, z1)]
-        : [at(x0, y0, z0), at(x0, y0, z1), at(x1, y1, z1), at(x1, y1, z0)];
-      quad(B, cs[0], cs[1], cs[2], cs[3], nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], paintLight, 1);
+      for (let i = 0; i < nRoof; i += 1) {
+        const t0 = i / nRoof, t1 = (i + 1) / nRoof;
+        const z0 = sideFZ + (sideRZ - sideFZ) * t0, z1 = sideFZ + (sideRZ - sideFZ) * t1;
+        quadOut(at(s * glassBotX, beltY, z0), at(s * glassBotX, beltY, z1),
+          at(s * glassTopX, roofEdgeY(z1) - 0.015, z1), at(s * glassTopX, roofEdgeY(z0) - 0.015, z0),
+          [s, 0.4, 0], GLASS, 1);
+      }
+      if (hi || mid) {
+        const bz = cabZ;
+        quadOut(at(s * glassBotX, beltY, bz - 0.03), at(s * glassBotX, beltY, bz + 0.03),
+          at(s * glassTopX, roofEdgeY(bz + 0.03) - 0.015, bz + 0.03), at(s * glassTopX, roofEdgeY(bz - 0.03) - 0.015, bz - 0.03),
+          [s, 0.4, 0], col, 1);
+      }
+      // Pilar A + pilar C: satu quad tiap sisi (daerahnya memang quad;
+      // normal tunggal dari quadOut — lipatan diagonal kecil tak kentara).
+      const aw = wind.w * (W * spec.cabW) / 2; // setengah lebar kaca depan
+      quadOut(at(s * aw, beltY, shieldBaseZ), at(s * glassBotX, beltY, sideFZ),
+        at(s * glassTopX, roofEdgeY(sideFZ) - 0.015, sideFZ), at(s * aw, shieldTopY, shieldTopZ), [s, 0.2, 0.5], col, 1);
+      if (spec.kind !== 'pickup') {
+        const rw = rearW * (W * spec.cabW) / 2; // setengah lebar kaca belakang
+        quadOut(at(s * rw, rearBotY, rearBotZ), at(s * glassBotX, beltY, sideRZ),
+          at(s * glassTopX, roofEdgeY(sideRZ) - 0.015, sideRZ), at(s * rw, rearTopY, rearTopZ), [s, 0.2, -0.5], col, 1);
+      }
+    }
+    // Kaca belakang BESAR + MIRING (rx ~0,97 sedan, ~1,10 hatch) + kaca
+    // depan miring — kaca strip tipis v14 MATI. Bingkai + langit + streak
+    // tetap pakai mesin lama (faceQuad/glassStreak), hanya ukuran/posisi baru.
+    glassBorder(0, rearY, rearZ, W * spec.cabW * rearW, rearH, rearRx);
+    p(0, rearY, rearZ, W * spec.cabW * rearW, rearH, 0.07, GLASS, 1, rearRx);
+    skyGlass(0, rearY, rearZ, W * spec.cabW * rearW, rearH, rearRx);
+    glassStreak(0, rearY, rearZ, W * spec.cabW * 0.42, 0.12, rearRx, -1, [0.22, 0.28, 0.38], 0, 0.0);
+    glassStreak(0, rearY, rearZ, W * spec.cabW * 0.42, 0.06, rearRx, -1, [0.35, 0.42, 0.55], 0, -0.04);
+    const shieldY = beltY + (wind.h * Math.cos(wind.rx)) / 2;
+    const shieldZ = (shieldBaseZ + shieldTopZ) / 2;
+    p(0, shieldY, shieldZ - 0.02, W * spec.cabW * (wind.w + 0.04), wind.h + 0.04, 0.05, DARK, 5, -wind.rx); // bingkai
+    p(0, shieldY, shieldZ, W * spec.cabW * wind.w, wind.h, 0.07, GLASS, 1, -wind.rx);
+    glassStreak(0, shieldY, shieldZ, W * spec.cabW * 0.6, 0.12, -wind.rx, 1, [0.22, 0.28, 0.38], 0, 0.05);
+    rearBevel(1.06, W * 0.88);
+    // Garis pinggang (panel line) di flank — batch 5: sisi masih slab datar.
+    for (const s of [-1, 1]) {
       if (hi) qS(s * (W / 2 + 0.21), 0.98, 0, L * 0.85, 0.03, DARK, 5); // garis pinggang (v7: di atas faset B v7)
     }
     // Rim light hangat di tepi belakang atap (jurus GTA V — bible §1.2 butir 8)
-    if (hi) p(0, cabY + cabH / 2 + 0.05, rearZ + 0.06, W * spec.cabW * 0.78, 0.04, 0.04, [0.9, 0.55, 0.28], 4);
+    if (hi) p(0, roofEdgeY(roofRZ) + 0.02, roofRZ + 0.02, W * spec.cabW * 0.78, 0.04, 0.04, [0.9, 0.55, 0.28], 4);
     // ---- detail kecil (bible §1.7): spion, gagang pintu, panel line, antena ----
     for (const s of [-1, 1]) {
       p(s * (W / 2 + 0.10), bodyTop + 0.08, L * 0.12, 0.12, 0.1, 0.22, col, 1); // spion
@@ -726,7 +795,6 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     if (hi) p(0, cabY + cabH / 2 + 0.16, -L * 0.18, 0.05, 0.22, 0.05, DARK, 5);          // antena
     // ---- belakang (bible §1.2): light bar + bumper + knalpot + plat + garis bagasi ----
     drawRearLights();
-    qB(0, bodyTop - 0.12, -L / 2 - 0.03, W * 0.8, 0.04, DARK, 5);                // garis bagasi
     if (spec.kind === 'pickup') drawPickupBed(bodyTop);
     if (spec.spoiler) {
       p(0, bodyTop + 0.02, -L * 0.47, W * 0.85, 0.07, 0.4, DARK, 5);             // spoiler
@@ -795,35 +863,37 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       };
       flankCrack(1.04, 0.42, 1.10, 0.78); // retak 1: dari bibir atas kawah merambat ke depan-atas
       flankCrack(0.50, -0.92, 0.44, -1.22); // retak 2: dari bibir bawah-belakang merambat ke belakang-bawah (berhenti sebelum penyok kuarter -1,26)
-      const crack = (du, dv) => {
+      const crack = (du, dv) => { // v15: retak di kaca belakang BARU (rearRx, pusat rearY+0,08; vektor ×0,7 supaya muat — setengah tinggi kaca 0,315)
         const l = Math.hypot(du, dv) || 1, pu = -dv / l * 0.014, pv = du / l * 0.014;
-        const a = glassPt(0, cabY + 0.10, rearZ, -pu, -pv, -0.045, 0.52);
-        const b = glassPt(0, cabY + 0.10, rearZ, du - pu, dv - pv, -0.045, 0.52);
-        const c = glassPt(0, cabY + 0.10, rearZ, du + pu, dv + pv, -0.045, 0.52);
-        const d = glassPt(0, cabY + 0.10, rearZ, pu, pv, -0.045, 0.52);
-        quad(B, a, b, c, d, dir(0, Math.sin(0.52), -Math.cos(0.52)),
+        const a = glassPt(0, rearY + 0.08, rearZ, -pu, -pv, -0.045, rearRx);
+        const b = glassPt(0, rearY + 0.08, rearZ, du - pu, dv - pv, -0.045, rearRx);
+        const c = glassPt(0, rearY + 0.08, rearZ, du + pu, dv + pv, -0.045, rearRx);
+        const d = glassPt(0, rearY + 0.08, rearZ, pu, pv, -0.045, rearRx);
+        quad(B, a, b, c, d, dir(0, Math.sin(rearRx), -Math.cos(rearRx)),
           [[0, 0], [1, 0], [1, 1], [0, 1]], [0.90, 0.92, 0.96], 4);
       };
-      crack(0.32, 0.22); crack(-0.30, 0.16); crack(0.08, -0.34);
-      crack(0.28, -0.14); crack(-0.12, -0.30); crack(-0.34, -0.08);
+      crack(0.22, 0.15); crack(-0.21, 0.11); crack(0.06, -0.24);
+      crack(0.20, -0.10); crack(-0.08, -0.21); crack(-0.24, -0.06);
     }
     if (o.damage) drawDamage();
-    drawFrontLights();
+    drawFrontLights(0.183); // v15: lampu/grill miring mengikuti bevel hidung
     return finish();
   }
 
   // ---- bak pickup terbuka (bible §1.6) ----
   function drawPickupBed(bodyTop) {
-    p(0, bodyTop - 0.02, -L * 0.28, W * 0.9, 0.08, L * 0.42, DARK, 5);           // lantai bak
-    for (const s of [-1, 1]) p(s * (W * 0.46), bodyTop + 0.12, -L * 0.28, 0.06, 0.3, L * 0.42, col, 1); // dinding bak
-    p(0, bodyTop + 0.12, -L / 2 - 0.01, W * 0.9, 0.3, 0.06, col, 1);            // tailgate
+    p(0, bodyTop - 0.03, -L * 0.28, W * 0.9, 0.08, L * 0.42, DARK, 5);           // lantai bak (v15: -0,03, atas 1,15 = dasar kaca belakang; dulu -0,02 z-fight dengan bahu)
+    // Dinding bak + tailgate DIPANJANGKAN ke bawah (v15: bahu v15 berhenti
+    // di trunkZ0, jadi dinding harus menutup celah ke flank — bawah 0,99).
+    for (const s of [-1, 1]) p(s * (W * 0.46), bodyTop + 0.07, -L * 0.28, 0.06, 0.44, L * 0.42, col, 1); // dinding bak
+    p(0, bodyTop + 0.09, -L / 2 - 0.01, W * 0.9, 0.36, 0.06, col, 1);            // tailgate
     qB(0, bodyTop + 0.12, -L / 2 - 0.05, W * 0.7, 0.04, DARK, 5);                // garis tailgate
   }
 
   // ---- lampu belakang: light bar penuh + bumper + knalpot + plat (bible §1.2) ----
   function drawRearLights() {
     const barY = 0.86;
-    p(0, 0.45, -L / 2 - 0.05, W * 0.98, 0.22, 0.16, DARK, 5);                    // bumper belakang
+    p(0, 0.48, -L / 2 - 0.05, W * 0.84, 0.18, 0.16, DARK, 5);                    // bumper belakang (v15: menyempit — ban kebaca dari belakang)
     p(0, barY, -L / 2 - 0.03, W * 0.72, 0.15, 0.06, o.brake ? [1.0, 0.25, 0.25] : [0.85, 0.10, 0.13], 4); // light bar
     qGlowB(0, barY, -L / 2 - 0.14, W * 0.95, 0.4, [1.0, 0.15, 0.2]);
     p(0, barY - 0.1, -L / 2 - 0.03, W * 0.72, 0.04, 0.06, CHROME, 1);            // strip krom bawah lampu
@@ -840,13 +910,23 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   }
 
   // ---- lampu depan: grill + headlight + DRL (bible §1.4) ----
-  function drawFrontLights() {
-    p(0, 0.58, L / 2 + 0.01, W * 0.6, 0.16, 0.06, DARK, 5);                      // grill
+  // v15: noseRx = kemiringan bevel hidung (0,183 sedan; 0 = bus/api/medic
+  // lama). Lampu/grill/DRL = kotak miring (rx=-noseRx) yang duduk DI ATAS
+  // bevel (pusat z = bevZ(y)+0,03) — bukan lagi kotak tegak yang menembus.
+  function drawFrontLights(noseRx = 0) {
+    // Muka depan datar (bus/api/medic, noseRx=0): bevel = muka L/2;
+    // sedan: bevel miring — kotak duduk DI ATAS bevel, bukan melayang.
+    const bevZ = (y) => noseRx ? L / 2 + (0.99 - y) * 0.10 / 0.54 : L / 2;
+    const pitched = (lx, y, w, h, colM, m) => {
+      const z = bevZ(y) + 0.03;
+      p(lx, y, z, w, h, 0.06, colM, m, -noseRx);
+    };
+    pitched(0, 0.68, W * 0.6, 0.16, DARK, 5);                                    // grill
     for (const s of [-1, 1]) {
-      qF(s * W * 0.3, 0.66, L / 2 + 0.03, 0.45, 0.13, HEADLIGHT, 4);              // headlight
-      if (hi) qF(s * W * 0.3, 0.56, L / 2 + 0.03, 0.45, 0.04, [1.0, 0.95, 0.8], 4); // DRL
+      pitched(s * W * 0.3, 0.82, 0.45, 0.13, HEADLIGHT, 4);                       // headlight
+      if (hi) pitched(s * W * 0.3, 0.60, 0.45, 0.04, [1.0, 0.95, 0.8], 4);       // DRL
     }
-    p(0, 0.45, L / 2 + 0.05, W * 0.98, 0.2, 0.14, DARK, 5);                      // bumper depan
+    p(0, 0.45, L / 2 + 0.05, W * 0.88, 0.2, 0.14, DARK, 5);                      // bumper depan (v15: menyempit — ban depan kebaca)
   }
 
   function finish() {

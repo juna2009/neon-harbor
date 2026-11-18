@@ -25,6 +25,7 @@
 
 import { PRESETS, webglUniforms } from './timeofday.js';
 import { drawCarRealistic } from './cars3d.js'; // R26: cars3d v15d di game/src/
+import { drawCruiseShips } from './ships3d.js'; // R27b: kapal pesiar + yacht (statis, visual saja)
 
 const S = 0.1; // game px -> unit WebGL
 const W = 1280, H = 800;
@@ -382,6 +383,63 @@ function billDir(B, cx, cy, cz, w, h, nrm, col, m) {
   quad(B, c(-1, -1), c(1, -1), c(1, 1), c(-1, 1), nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], col, m);
 }
 
+// ---- DEBOX R27b: geometri non-kotak (sudut chamfer, silinder, balok antar-titik) ----
+// Prisma segi-N: ring = [[dx,dz],...] (offset dari pusat). Normal luar dihitung
+// dari posisi (bukan urutan ring). Sisi pakai UV dunia (seperti boxR) supaya
+// fasad material 0 tetap berjendela; atap = kipas segitiga.
+function deboxPoly(B, cx, y0, cz, ring, h, col, m) {
+  const n = ring.length;
+  for (let i = 0; i < n; i += 1) {
+    const a = ring[i], b = ring[(i + 1) % n];
+    const ex = b[0] - a[0], ez = b[1] - a[1];
+    const el = Math.hypot(ex, ez) || 1, ux = ex / el, uz = ez / el;
+    let nx = uz, nz = -ux;
+    const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
+    if (nx * mx + nz * mz < 0) { nx = -nx; nz = -nz; }
+    const A = [cx + a[0], y0, cz + a[1]], Bp = [cx + b[0], y0, cz + b[1]];
+    const C = [cx + b[0], y0 + h, cz + b[1]], D = [cx + a[0], y0 + h, cz + a[1]];
+    const uA = A[0] * ux + A[2] * uz, uB = Bp[0] * ux + Bp[2] * uz;
+    quad(B, A, Bp, C, D, [nx, 0, nz], [[uA, y0], [uB, y0], [uB, y0 + h], [uA, y0 + h]], col, m);
+  }
+  const base = B.p.length / 3; // kipas atap (normal +Y — cabang fasad shader tak kena)
+  push(B, [cx, y0 + h, cz], [0, 1, 0], [0, 0], col, m);
+  for (let i = 0; i < n; i += 1) push(B, [cx + ring[i][0], y0 + h, cz + ring[i][1]], [0, 1, 0], [0, 0], col, m);
+  for (let i = 0; i < n; i += 1) B.i.push(base, base + 1 + i, base + 1 + ((i + 1) % n));
+}
+// Kerucut / atap limas di atas ring (puncak di y0+ph).
+function deboxCone(B, cx, y0, cz, ring, ph, col, m) {
+  const n = ring.length, base = B.p.length / 3;
+  push(B, [cx, y0 + ph, cz], [0, 1, 0], [0, 0], col, m);
+  for (let i = 0; i < n; i += 1) {
+    const a = ring[i], r = Math.hypot(a[0], a[1]) || 1;
+    push(B, [cx + a[0], y0, cz + a[1]], norm([ph * a[0] / r, r, ph * a[1] / r]), [0, 0], col, m);
+  }
+  for (let i = 0; i < n; i += 1) B.i.push(base, base + 1 + i, base + 1 + ((i + 1) % n));
+}
+// Ring segi-4 dengan sudut chamfer (massa gedung tidak lagi balok polos).
+function deboxRingRect(w, d, ch) {
+  const hx2 = w / 2, hz2 = d / 2, c = Math.min(ch, hx2 * 0.9, hz2 * 0.9);
+  return [[-hx2 + c, -hz2], [hx2 - c, -hz2], [hx2, -hz2 + c], [hx2, hz2 - c],
+    [hx2 - c, hz2], [-hx2 + c, hz2], [-hx2, hz2 - c], [-hx2, -hz2 + c]];
+}
+// Ring lingkaran segi-n (tangki air, hydrant).
+function deboxRingCircle(r, n) {
+  const ring = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = (i / n) * Math.PI * 2;
+    ring.push([Math.cos(a) * r, Math.sin(a) * r]);
+  }
+  return ring;
+}
+// Balok antar dua titik (batang palem melengkung, lengan lampu): tebal w, sumbu lokal +Z.
+function deboxBeam(B, ax, ay, az, bx, by, bz, w, col, m) {
+  const dx = bx - ax, dy = by - ay, dz = bz - az;
+  const len = Math.hypot(dx, dy, dz) || 1;
+  const ry = Math.asin(Math.max(-1, Math.min(1, dx / len)));
+  const rx = Math.atan2(-dy, dz);
+  boxR(B, (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, w, w, len, ry, rx, col, m);
+}
+
 // ---- builder objek (koordinat dunia WebGL: X = game x*S, Z = game y*S, Y = atas) ----
 const DARK = [0.05, 0.04, 0.06];
 // Mobil: (cx, cz) pusat, yaw = PI/2 - angle game, len/wid dalam unit.
@@ -423,11 +481,13 @@ function car(B, G, cx, cz, yaw, len, wid, paint, police, SHB) { // SIANG v2: SHB
   }
   flat(SHB || G, cx, 0.06, cz, wid + 0.7, len + 0.9, [0, 0, 0], 9); // contact shadow (bucket SH = blending normal; di G aditif hitam = 0 — lihat INTEGRATION.md §6)
 }
-// Perahu (port isyarat Canvas boat3d — BOAT-REBUILD): haluan naik + stem peak,
-// rel gunwale (siluet belakang rail-dip-rail), transom ber-strip, cowl motor
-// warna lambung, driver helm kuning / light bar polisi, V-wake Kelvin.
-// (cx, cz) pusat, yaw sama. opts: {driver} hero/sipil, {pol} polisi.
+// Perahu — lambung LOFT melengkung (bukan balok): 6 stasiun, haluan tirus ke
+// satu titik + sheer naik ke stem, sisi-V (lunas lebih sempit dari sheer),
+// dek ikut menyempit, rub rail putih ikut lekuk sheer. Visual +25% (len/wid
+// di sini saja — footprint/kolisi di boats.js TIDAK berubah).
+// opts: {driver} hero/sipil, {pol} polisi (lambung sama, biru + light bar).
 function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
+  len *= 1.25; wid *= 1.25;
   const fwd = [Math.sin(yaw), Math.cos(yaw)];
   const rgt = [Math.cos(yaw), -Math.sin(yaw)];
   const at = (lx, ly, lz) => [cx + rgt[0] * lx + fwd[0] * lz, ly, cz + rgt[1] * lx + fwd[1] * lz];
@@ -439,39 +499,53 @@ function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
     const q = at(lx, ly, lz);
     boxR(B, q[0], q[1], q[2], w, h, d, yaw, rx, col, m);
   };
+  const Q = (a, b, c, d, n, col, m) => quad(B, a, b, c, d, n, [[0, 0], [1, 0], [1, 1], [0, 1]], col, m);
   const pol = opts && opts.pol;
   const nb = [-fwd[0], 0, -fwd[1]];
-  p(0, 0.45, 0, wid * 0.85, 0.7, len * 0.92, paint, 1); // lambung bawah
-  p(0, 0.85, -0.1, wid, 0.35, len, [0.92, 0.92, 0.90], 5); // dek
-  for (const sx of [-1, 1]) { // rel gunwale + strip putih atas
-    p(sx * wid * 0.44, 1.05, 0, 0.14, 0.35, len * 0.82, paint, 1);
-    p(sx * wid * 0.44, 1.24, 0, 0.16, 0.06, len * 0.82, [0.95, 0.95, 0.93], 5);
+  const dk = [0.92, 0.92, 0.9], wt = [0.95, 0.95, 0.93];
+  const dk2 = paint.map((v) => v * 0.45);
+  // stasiun: [z/len, setengah-lebar, y sheer, y lunas, lunas/shear]
+  const S = [[-0.5, 1, 0.92, 0.16, 0.68], [-0.28, 1, 0.92, 0.12, 0.68], [0, 0.97, 0.96, 0.12, 0.68], [0.24, 0.85, 1.04, 0.2, 0.7], [0.4, 0.6, 1.18, 0.36, 0.72], [0.5, 0.04, 1.36, 0.6, 0.8]];
+  for (let i = 0; i < 5; i++) {
+    const a = S[i], b = S[i + 1];
+    for (const sg of [-1, 1]) {
+      Q(at(sg * a[1] * a[4] * wid / 2, a[3], a[0] * len), at(sg * b[1] * b[4] * wid / 2, b[3], b[0] * len),
+        at(sg * b[1] * wid / 2, b[2], b[0] * len), at(sg * a[1] * wid / 2, a[2], a[0] * len),
+        [rgt[0] * sg, -0.35, rgt[1] * sg], paint, 1); // sisi lambung miring-V
+      Q(at(sg * a[1] * wid / 2, a[2] - 0.02, a[0] * len), at(sg * b[1] * wid / 2, b[2] - 0.02, b[0] * len),
+        at(sg * b[1] * wid / 2, b[2] + 0.07, b[0] * len), at(sg * a[1] * wid / 2, a[2] + 0.07, a[0] * len),
+        [rgt[0] * sg, 0, rgt[1] * sg], wt, 5); // rub rail putih ikut sheer
+    }
+    Q(at(-a[1] * wid / 2, a[2], a[0] * len), at(a[1] * wid / 2, a[2], a[0] * len),
+      at(b[1] * wid / 2, b[2], b[0] * len), at(-b[1] * wid / 2, b[2], b[0] * len), [0, 1, 0], dk, 5); // dek
+    Q(at(-a[1] * a[4] * wid / 2, a[3], a[0] * len), at(a[1] * a[4] * wid / 2, a[3], a[0] * len),
+      at(b[1] * b[4] * wid / 2, b[3], b[0] * len), at(-b[1] * b[4] * wid / 2, b[3], b[0] * len), [0, -1, 0], dk2, 5); // lunas
   }
-  pp(0, 1.0, len * 0.30, wid * 0.7, 0.22, len * 0.34, paint, 1, -0.38); // haluan miring naik
-  p(0, 1.15, len * 0.47, 0.14, 0.5, 0.14, pol ? [0.93, 0.95, 0.96] : paint, 1); // stem peak
-  p(0, 0.86, -len / 2 - 0.02, wid * 0.9, 0.08, 0.06, [0.95, 0.95, 0.93], 5); // rub rail transom
-  p(0, 0.28, -len / 2 - 0.02, wid * 0.88, 0.1, 0.06, [0.95, 0.95, 0.93], 5); // strip waterline
-  p(0, 1.15, -0.6, wid * 0.55, 0.45, len * 0.25, [0.12, 0.13, 0.16], 2); // konsol + kaca
-  pp(0, 1.35, -0.35, wid * 0.5, 0.5, 0.06, [0.10, 0.16, 0.28], 2, -0.5); // kaca depan miring
+  Q(at(-0.68 * wid / 2, 0.16, -len / 2), at(0.68 * wid / 2, 0.16, -len / 2),
+    at(wid / 2, 0.92, -len / 2), at(-wid / 2, 0.92, -len / 2), nb, paint, 1); // transom
+  p(0, 0.86, -len / 2 - 0.02, wid * 0.9, 0.08, 0.06, wt, 5); // strip putih transom
+  p(0, 1.45, len * 0.48, 0.14, 0.45, 0.14, pol ? wt : paint, 1); // stem peak
+  p(0, 1.15, -0.7, wid * 0.55, 0.45, len * 0.22, [0.12, 0.13, 0.16], 2); // konsol + kaca
+  pp(0, 1.38, -0.42, wid * 0.5, 0.5, 0.06, [0.10, 0.16, 0.28], 2, -0.5); // kaca depan miring
   if (pol) { // light bar polisi di atap konsol (identitas dari belakang)
-    p(0, 1.45, -0.6, 1.1, 0.22, 0.4, [0.08, 0.08, 0.10], 5);
-    const l1 = at(-0.28, 1.45, -0.82), l2 = at(0.28, 1.45, -0.82);
+    p(0, 1.48, -0.7, 1.1, 0.22, 0.4, [0.08, 0.08, 0.10], 5);
+    const l1 = at(-0.28, 1.48, -0.92), l2 = at(0.28, 1.48, -0.92);
     billDir(B, l1[0], l1[1], l1[2], 0.4, 0.18, nb, [1.0, 0.12, 0.15], 4);
     billDir(B, l2[0], l2[1], l2[2], 0.4, 0.18, nb, [0.15, 0.35, 1.0], 4);
   } else if (opts && opts.driver) { // driver: rompi oranye + helm kuning
-    p(0, 1.15, -1.45, 0.62, 0.42, 0.34, [1.0, 0.35, 0.12], 5);
-    p(0, 1.55, -1.45, 0.38, 0.32, 0.38, [1.0, 0.82, 0.24], 4);
-    const vs = at(0, 1.55, -1.65);
+    p(0, 1.18, -1.7, 0.62, 0.42, 0.34, [1.0, 0.35, 0.12], 5);
+    p(0, 1.58, -1.7, 0.38, 0.32, 0.38, [1.0, 0.82, 0.24], 4);
+    const vs = at(0, 1.58, -1.9);
     billDir(B, vs[0], vs[1], vs[2], 0.3, 0.12, nb, [0.10, 0.10, 0.12], 5); // visor belakang
   }
-  for (const sx of [-0.32, 0.32]) { // motor tempel: kaki gelap + cowl warna lambung + pita putih
-    p(sx * wid, 0.35, -len / 2 - 0.18, 0.2, 0.7, 0.26, [0.15, 0.15, 0.17], 5);
-    p(sx * wid, 0.85, -len / 2 - 0.15, 0.3, 0.3, 0.3, paint, 1);
-    const bs = at(sx * wid, 0.45, -len / 2 - 0.33);
-    billDir(B, bs[0], bs[1], bs[2], 0.22, 0.1, nb, [0.85, 0.87, 0.9], 5);
+  for (const sx of [-0.32, 0.32]) { // motor tempel: kaki pendek (ujung = garis lunas, bukan roda) + cowl gede
+    p(sx * wid, 0.38, -len / 2 - 0.15, 0.18, 0.4, 0.24, [0.15, 0.15, 0.17], 5);
+    p(sx * wid, 0.95, -len / 2 - 0.12, 0.42, 0.42, 0.42, paint, 1);
+    const bs = at(sx * wid, 0.55, -len / 2 - 0.34);
+    billDir(B, bs[0], bs[1], bs[2], 0.3, 0.12, nb, wt, 5);
   }
-  const ps = at(0, 0.5, -len / 2 - 0.35);
-  billDir(G, ps[0], ps[1], ps[2], wid * 1.4, 0.5, nb, [0.9, 0.95, 1.0], 7); // sembur prop wash
+  const ps = at(0, 0.45, -len / 2 - 0.35);
+  billDir(G, ps[0], ps[1], ps[2], wid * 0.9, 0.4, nb, [0.9, 0.95, 1.0], 7); // sembur prop wash
   // V-wake Kelvin (~19.5 deg) + buih + rooster tail (Canvas boat3d)
   const wc = [0.9, 0.95, 1.0];
   for (const sg of [-1, 1]) {
@@ -503,18 +577,38 @@ function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
   quad(G, [r0[0], 0.5, r0[2]], [r1[0], 0.5, r1[2]], [r2[0], 0.9, r2[2]], [r3[0], 0.9, r3[2]],
     nb, [[0, 0], [1, 0], [1, 1], [0, 1]], wc, 8); // rooster tail miring
 }
-// Gedung: box + neon sign (di muka ke arah jalan terdekat) + AC rooftop (height 3).
+// Gedung DEBOX R27b: massa prisma segi-8 (sudut chamfer, bukan balok) +
+// lantai atas setback (tinggi>=3) / lis atap (rendah) + rooftop props di
+// atap setback: tangki air SILINDER + antena + dish + AC. Tapak/posisi
+// TIDAK berubah (kolisi + minimap aman); hanya siluet + atap dibentuk ulang.
 function bld(B, G, b, idx, facK) { // SIANG v2: facK = pengali kecerahan fasad ikut preset (siang 0.72; lainnya 0.55 = lama)
   const cx = (b.x + b.w / 2) * S, cz = (b.y + b.h / 2) * S;
   const w = b.w * S, d = b.h * S;
   const h = (b.height || 2) * 6.5;
   const col = hx(b.color || '#333344').map((v) => v * (facK === undefined ? 0.55 : facK));
-  box(B, cx, h / 2, cz, w, h, d, col, 0);
-  if ((b.height || 2) >= 3) box(B, cx, h + 0.4, cz, w * 0.3, 0.8, d * 0.3, DARK, 5); // AC rooftop
-  if ((b.height || 2) >= 3) { // GEDUNG: rooftop props (tangki air + antena + dish)
-    if (hash2(idx, 31) < 0.5) box(B, cx + w * 0.22, h + 0.9, cz, 1.6, 1.8, 1.6, [0.45, 0.38, 0.30], 5);
-    if (hash2(idx, 37) < 0.6) box(B, cx - w * 0.25, h + 1.8, cz - d * 0.2, 0.15, 3.6, 0.15, DARK, 5);
-    if (hash2(idx, 43) < 0.4) boxR(B, cx + w * 0.1, h + 0.7, cz + d * 0.25, 1.4, 0.15, 1.4, 0, 0.6, [0.8, 0.8, 0.85], 5);
+  const dark = col.map((v) => v * 0.82);
+  const ch = Math.min(w, d) * 0.12;
+  deboxPoly(B, cx, 0, cz, deboxRingRect(w, d, ch), h, col, 0); // massa chamfer
+  const tall = (b.height || 2) >= 3;
+  const topY = tall ? h + 3.0 : h; // atap setback (tinggi) / atap utama (rendah)
+  if (tall) { // lantai atas setback (menara berundak, bukan menara balok)
+    deboxPoly(B, cx, h, cz, deboxRingRect(w * 0.5, d * 0.5, ch * 0.5), 3.0, dark, 0);
+  } else { // lis atap tipis (parapet) untuk gedung rendah
+    deboxPoly(B, cx, h, cz, deboxRingRect(w * 0.96, d * 0.96, ch * 0.96), 0.5, dark, 0);
+  }
+  if (tall) { // GEDUNG: rooftop props di atap setback (sudut berlawanan, tak tumpang tindih)
+    if (hash2(idx, 31) < 0.5) { // tangki air SILINDER + atap kerucut
+      const tx = cx - w * 0.10, tz = cz + d * 0.10;
+      const ring = deboxRingCircle(Math.min(0.95, w * 0.09, d * 0.09), 10);
+      deboxPoly(B, tx, topY, tz, ring, 1.8, [0.45, 0.38, 0.30], 5);
+      deboxCone(B, tx, topY + 1.8, tz, ring, 0.7, [0.38, 0.32, 0.26], 5);
+    }
+    if (hash2(idx, 37) < 0.6) box(B, cx - w * 0.16, topY + 1.8, cz - d * 0.12, 0.15, 3.6, 0.15, DARK, 5); // antena
+    if (hash2(idx, 43) < 0.4) { // dish (ukuran ikut gedung supaya muat di atap setback)
+      const ds = Math.min(1.4, w * 0.12, d * 0.12);
+      boxR(B, cx + w * 0.10, topY + 0.7, cz + d * 0.12, ds, 0.15, ds, 0, 0.6, [0.8, 0.8, 0.85], 5);
+    }
+    box(B, cx + w * 0.14, topY + 0.4, cz - d * 0.12, w * 0.16, 0.8, d * 0.16, DARK, 5); // AC rooftop
   }
   if (b.landmark === 'lighthouse') {
     box(B, cx, h + 2.2, cz, 1.2, 3.2, 1.2, [0.9, 0.88, 0.8], 5);
@@ -540,39 +634,91 @@ function bld(B, G, b, idx, facK) { // SIANG v2: facK = pengali kecerahan fasad i
     billDir(G, bx2, by, bz2, 1.4, 3.4, [1, 0, 0], bn, 7);
   }
 }
-function lamp(B, G, x, z, k) { // TOD: k = preset.lamp (0 siang — 1 malam). Tiang selalu digambar;
-  // kepala/glow/kolam cahaya HANYA bila k > 0.02 — mat 4 alpha-nya 1.0 (kotak hitam
-  // kalau warnanya 0) dan mat 8 alpha-nya tetap (noda gelap kalau warnanya 0).
-  box(B, x, 2.5, z, 0.18, 5, 0.18, DARK, 5);
+const LAMP_STEEL = [0.30, 0.32, 0.36]; // baja terang — tiang hitam lama hilang di kejauhan
+// Lampu jalan DEBOX R27b (GROUNDING #1 — kepala lampu melayang): tiang baja
+// 0.40 (dulu 0.18 hitam — tak kelihatan di jarak chase-cam) + pondasi beton +
+// lengan 2 segmen ke arah persimpangan + kepala lampu yang NEMPEL di ujung
+// lengan (housing + panel cahaya bawah + halo). (dx, dz) = arah mendatar ke
+// pusat persimpangan (normalisasi). TOD: k = preset.lamp (0 siang — 1 malam).
+// Tiang selalu digambar; kepala/glow/kolam cahaya HANYA bila k > 0.02 — mat 4
+// alpha-nya 1.0 (kotak hitam kalau warnanya 0) dan mat 8 alpha-nya tetap
+// (noda gelap kalau warnanya 0).
+function lamp(B, G, x, z, k, dx, dz) {
+  if (dx === undefined) { dx = 0; dz = 1; }
+  box(B, x, 0.35, z, 0.7, 0.7, 0.7, [0.32, 0.32, 0.34], 5); // pondasi beton
+  box(B, x, 2.5, z, 0.40, 5, 0.40, LAMP_STEEL, 5); // tiang tebal, baja terang
+  const hx2 = x + dx * 1.7, hz2 = z + dz * 1.7; // kepala menggantung di atas jalan
+  deboxBeam(B, x, 4.85, z, x + dx * 0.9, 5.15, z + dz * 0.9, 0.22, LAMP_STEEL, 5); // lengan naik
+  deboxBeam(B, x + dx * 0.9, 5.15, z + dz * 0.9, hx2, 5.05, hz2, 0.22, LAMP_STEEL, 5); // lengan datar
+  const ry = Math.atan2(dx, dz);
+  boxR(B, hx2, 4.95, hz2, 0.5, 0.28, 0.95, ry, 0, LAMP_STEEL, 5); // housing kepala
   if (k === undefined) k = 1;
   if (k <= 0.02) return;
   const sc = (c) => [c[0] * k, c[1] * k, c[2] * k];
-  billDir(B, x, 5.0, z, 0.7, 0.25, [0, 0, -1], sc([1.0, 0.8, 0.45]), 4);
-  billDir(G, x, 5.0, z, 2.2, 1.1, [0, 0, -1], sc([1.0, 0.75, 0.4]), 7);
-  flat(G, x, 0.08, z, 1.4, 7, sc([1.0, 0.7, 0.35]), 8);
+  const pc = (lx, lz) => { const q = rotY(lx, lz, ry); return [hx2 + q[0], 4.80, hz2 + q[1]]; };
+  quad(B, pc(-0.35, -0.18), pc(0.35, -0.18), pc(0.35, 0.18), pc(-0.35, 0.18), // panel cahaya di bawah housing (menghadap bawah)
+    [0, -1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], sc([1.0, 0.8, 0.45]), 4);
+  billDir(G, hx2, 4.95, hz2, 2.2, 1.1, [0, 0, -1], sc([1.0, 0.75, 0.4]), 7); // halo
+  flat(G, hx2, 0.08, hz2, 2.2, 2.2, sc([1.0, 0.7, 0.35]), 8); // kolam cahaya di tanah (bundar di bawah kepala — dulu 1.4x7 = streak laser)
 }
+// Palem DEBOX R27b: batang melengkung (3 segmen) + kanopi pelepah berlapis
+// (8 pelepah × 2 ruas menjuntai, bukan slab hijau) + tandan kelapa.
 function palm(B, x, z) {
-  box(B, x, 2.2, z, 0.28, 4.4, 0.28, [0.12, 0.09, 0.07], 5);
-  box(B, x, 4.6, z, 2.2, 1.2, 2.2, [0.12, 0.36, 0.18], 5); // R26b: kanopi kotak (slab lama = T hitam)
+  const ang = hash2(Math.round(x), Math.round(z)) * Math.PI * 2;
+  const lx = Math.cos(ang) * 0.9, lz = Math.sin(ang) * 0.9; // arah lengkung batang
+  const TRUNK = [0.23, 0.16, 0.11];
+  deboxBeam(B, x, 0, z, x + lx * 0.30, 1.6, z + lz * 0.30, 0.34, TRUNK, 5);
+  deboxBeam(B, x + lx * 0.30, 1.6, z + lz * 0.30, x + lx * 0.65, 3.1, z + lz * 0.65, 0.30, TRUNK, 5);
+  deboxBeam(B, x + lx * 0.65, 3.1, z + lz * 0.65, x + lx * 1.0, 4.4, z + lz * 1.0, 0.26, TRUNK, 5);
+  const tx = x + lx, tz = z + lz, ty = 4.5; // puncak batang
+  box(B, tx, ty, tz, 0.5, 0.5, 0.5, [0.10, 0.30, 0.14], 5); // mahkota
+  const GREENS = [[0.16, 0.46, 0.22], [0.11, 0.37, 0.17]];
+  for (let k = 0; k < 8; k += 1) {
+    const a = (k / 8) * Math.PI * 2 + hash2(Math.round(x), k) * 0.5;
+    const dx = Math.cos(a), dz = Math.sin(a);
+    const px = -dz, pz = dx; // tegak lurus pelepah (lebar)
+    const L = 1.5 + hash2(k, Math.round(z)) * 0.6; // panjang pelepah bervariasi
+    const M = [tx + dx * L * 0.55, ty + 0.45, tz + dz * L * 0.55]; // ruas naik
+    const P = [tx + dx * L, ty - 0.85, tz + dz * L]; // ujung menjuntai
+    const col = GREENS[k % 2];
+    const frond = (A, Bp, wA, wB) => {
+      const e = [Bp[0] - A[0], Bp[1] - A[1], Bp[2] - A[2]];
+      const n = norm(cross(e, [px, 0, pz]));
+      const nn = n[1] < 0 ? [-n[0], -n[1], -n[2]] : n;
+      quad(B, [A[0] - px * wA, A[1], A[2] - pz * wA], [A[0] + px * wA, A[1], A[2] + pz * wA],
+        [Bp[0] + px * wB, Bp[1], Bp[2] + pz * wB], [Bp[0] - px * wB, Bp[1], Bp[2] - pz * wB],
+        nn, [[0, 0], [1, 0], [1, 1], [0, 1]], col, 5);
+    };
+    frond([tx, ty, tz], M, 0.30, 0.24);
+    frond(M, P, 0.24, 0.05);
+  }
+  for (let i = 0; i < 3; i += 1) // tandan kelapa di bawah mahkota
+    box(B, tx + (i - 1) * 0.22, ty - 0.35, tz + 0.1, 0.2, 0.2, 0.2, [0.45, 0.30, 0.12], 5);
 }
-// Helikopter polisi: badan + ekor + rotor (putar, yaw = rotor) + beacon merah.
-// Rotor DULU hitam [0.03] di langit senja = tak terlihat, badan [0.08,0.12,0.35]
-// jadi kotak cokelat. Kini rotor terang ala Canvas heli3d (#c8cdd6), badan
-// lebih terang, kaca kokpit + stabilizer ekor + skid terang.
-function heli(B, G, x, z, rotor, t) {
-  const y = 14;
-  const BODY = [0.14, 0.20, 0.38];
-  box(B, x, y, z, 2.4, 1.7, 4.2, BODY, 1);
-  box(B, x, y + 0.4, z - 3.4, 0.5, 0.5, 3.4, BODY, 1);
-  box(B, x, y + 0.9, z - 5.0, 0.3, 1.4, 0.9, BODY, 1);
-  box(B, x, y + 0.55, z - 4.9, 2.2, 0.08, 0.5, [0.75, 0.78, 0.82], 5); // stabilizer ekor
-  boxR(B, x, y + 1.05, z, 7.5, 0.06, 0.9, rotor, 0, [0.78, 0.80, 0.84], 5); // rotor utama terang
-  boxR(B, x, y + 0.9, z - 5.1, 0.1, 1.6, 0.3, 0, 0, [0.78, 0.80, 0.84], 5); // rotor ekor terang
-  box(B, x, y + 0.15, z + 2.05, 1.5, 0.7, 0.18, [0.45, 0.65, 0.85], 2); // kaca kokpit
-  box(B, x, y - 1.1, z + 0.6, 1.8, 0.25, 0.4, [0.5, 0.52, 0.55], 5); // skid terang
-  box(B, x, y - 1.1, z - 0.6, 1.8, 0.25, 0.4, [0.5, 0.52, 0.55], 5);
-  if (Math.sin(t * 6) > 0) billDir(B, x, y + 1.3, z, 0.5, 0.3, [0, 0, -1], [1.0, 0.1, 0.1], 4);
-  // searchlight: kerucut digambar di buildFrame (di bawah, butuh posisi hero)
+// HELI R27b: putih-biru, disc, profil, skid+fin.
+function heli(B,G,x,z,rotor,t,v){
+ const y=14,yw=Math.atan2(v[0],v[1])+1.5708;
+ const F=[Math.sin(yw),Math.cos(yw)],R=[Math.cos(yw),-Math.sin(yw)];
+ const at=(a,b,c)=>[x+R[0]*a+F[0]*c,y+b,z+R[1]*a+F[1]*c];
+ const p=(a,b,c,w,h,d,c2,m)=>{const q=at(a,b,c);boxR(B,q[0],q[1],q[2],w,h,d,yw,0,c2,m);};
+ const W=[0.88,0.9,0.94],U=[0.13,0.32,0.78],L=[0.78,0.8,0.84],K=[0.55,0.8,1];
+ p(0,0.1,0,2.2,1.3,3.8,W,1);
+ p(0,-0.55,0,2,0.5,3.6,U,4);
+ p(0,-0.1,0,2.32,0.34,3.9,U,4);
+ p(0,0.9,0,1.8,0.35,3,W,1);
+ p(0,0,2.25,1.9,1,1,W,1);
+ p(0,0.25,0.9,2.34,0.85,1.9,K,4);
+ p(0,0.35,-3.6,0.55,0.55,3.2,W,1);
+ p(0,0.6,-5,0.25,1.2,1,U,4);
+ p(0,0.55,-4.6,2.4,0.1,0.6,L,5);
+ const q=at(0.42,0.95,-5);
+ billDir(G,q[0],q[1],q[2],1.7,1.7,[R[0],0,R[1]],[0.9,0.92,0.95],7);
+ boxR(B,x,y+1.35,z,1.1,0.14,13.5,rotor,0,L,4);
+ flat(G,x,y+1.5,z,13,13,[0.72,0.78,0.86],7);
+ for(const s of[-1,1])p(s*0.85,-1.25,0,0.16,0.16,4.4,L,5);
+ for(const s of[-1,1])for(const q2 of[-1,1])p(s*0.85,-0.95,q2*1.2,0.14,0.6,0.14,L,5);
+ p(0,-0.95,1.2,0.5,0.3,0.5,[0.1,0.1,0.12],5);
+ if(Math.sin(t*6)>0)p(0,1.2,0,0.5,0.25,0.5,[1,0.1,0.1],4);
 }
 // Orang jalan kaki: badan + kepala.
 function person(B, x, z, yaw, col) {
@@ -659,6 +805,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     roadSeg(Math.max(0, hx0 - 1500), ry, Math.min(WATER_X, hx0 + 1500), ry, false); // R26: jalan berhenti di tepi air (WATER_X) — dulu sampai 2560, aspal + marka masuk ke laut dan menembus permukaan air (boat3d: perahu terbaca jalan di darat)
   }
 
+
   // Gedung (dekat hero saja) + taman + pohon.
   // Cull: gedung yang terlalu dekat dengan kamera dihilangkan (seperti
   // city3d round 22) — kalau tidak, satu dinding memenuhi sepertiga frame.
@@ -695,6 +842,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     box(OP, (dk.x + dk.w / 2) * S, 0.25, (dk.y + dk.h / 2) * S, dk.w * S, 0.5, dk.h * S, [0.35, 0.30, 0.22], 5);
     const mr = city.marina;
     box(OP, (mr.x + mr.w / 2) * S, 0.25, (mr.y + mr.h / 2) * S, mr.w * S, 0.5, mr.h * S, [0.35, 0.30, 0.22], 5);
+    drawCruiseShips(OP, GL); // R27b: kapal pesiar + yacht (statis, visual saja)
   }
   // Pom bensin + garasi (kalau dekat).
   if (near(955, 1595, R)) {
@@ -795,12 +943,14 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   // Helikopter polisi + kolam cahaya searchlight di hero.
   const hl = state.police.heli;
   if (hl && hl.active) {
-    heli(OP, GL, hl.x * S, hl.y * S, hl.rotor || 0, t);
+    heli(OP, GL, hl.x * S, hl.y * S, hl.rotor || 0, t, cam.fwd);
     flat(GL, hx0 * S, 0.07, hy0 * S, 12, 12, [1.0, 0.9, 0.6], 7);
-    const rx2 = cam.fwd[1], rz2 = -cam.fwd[0]; // right kamera = lebar beam
-    quad(GL, [hl.x * S - rx2 * 0.5, 13, hl.y * S - rz2 * 0.5], [hl.x * S + rx2 * 0.5, 13, hl.y * S + rz2 * 0.5],
-      [hx0 * S + rx2 * 1.2, 0.1, hy0 * S + rz2 * 1.2], [hx0 * S - rx2 * 1.2, 0.1, hy0 * S - rz2 * 1.2],
-      [cam.fwd[0], 0, cam.fwd[1]], [[0, 0], [1, 0], [1, 1], [0, 1]], [1.0, 0.9, 0.6], 7); // kerucut searchlight
+    const rx2 = cam.fwd[1], rz2 = -cam.fwd[0];
+    const dx = hx0 * S - hl.x * S, dz = hy0 * S - hl.y * S, dl = Math.hypot(dx, dz) || 1;
+    const ex = hl.x * S + dx / dl * 1.5 + rx2 * 4, ez = hl.y * S + dz / dl * 1.5 + rz2 * 4;
+    quad(GL, [hl.x * S - rx2 * 0.45, 13.1, hl.y * S - rz2 * 0.45], [hl.x * S + rx2 * 0.45, 13.1, hl.y * S + rz2 * 0.45],
+      [ex + rx2, 9.5, ez + rz2], [ex - rx2, 9.5, ez - rz2],
+      [cam.fwd[0], 0, cam.fwd[1]], [[0, 0], [1, 0], [1, 1], [0, 1]], [1.0, 0.9, 0.6], 7);
   }
 
   // Perahu (bukan hero) + UFO + pejalan kaki + collectible.
@@ -822,7 +972,19 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   for (const cl of state.collectibles || []) {
     if (cl.taken) continue;
     if (!near(cl.x, cl.y, 1200)) continue;
-    box(OP, cl.x * S, 1.0, cl.y * S, 0.9, 0.9, 0.9, [1.0, 0.8, 0.2], 4);
+    // DEBOX R27b: token = permata berputar (bukan kubus kuning melayang)
+    boxR(OP, cl.x * S, 1.0, cl.y * S, 0.9, 0.9, 0.9, t * 1.5, 0.6, [1.0, 0.8, 0.2], 4);
+  }
+
+  // DEBOX R27b: hydrant merah (silinder + kubah + tutup samping) — dulu tidak digambar di 3D.
+  for (const hd of state.hydrants || []) {
+    if (!near(hd.x, hd.y, 1200)) continue;
+    const hx2 = hd.x * S, hz2 = hd.y * S;
+    const hring = deboxRingCircle(0.32, 8);
+    deboxPoly(OP, hx2, 0, hz2, hring, 0.75, [0.85, 0.28, 0.26], 5);
+    deboxCone(OP, hx2, 0.75, hz2, hring, 0.3, [0.55, 0.17, 0.20], 5);
+    box(OP, hx2 + 0.32, 0.45, hz2, 0.18, 0.18, 0.18, [0.55, 0.17, 0.20], 5);
+    box(OP, hx2 - 0.32, 0.45, hz2, 0.18, 0.18, 0.18, [0.55, 0.17, 0.20], 5);
   }
 
   // Lampu jalan di persimpangan dekat hero.
@@ -840,8 +1002,8 @@ function buildFrame(state, cam, OP, SH, GL, t) {
       // Canvas 2D (render.js:442 drawLamp pt.x+48, pt.y-48; city3d POLEFIX2
       // walkLat 4.8 unit) dan roadSeg trotoar di file ini (hw+1.2 unit).
       const lampNear = (lx, lz) => Math.hypot(lx * S - camX, lz * S - camZ) < 14;
-      if (!lampNear(rx - 48, ry + 48)) lamp(OP, GL, (rx - 48) * S, (ry + 48) * S, tod.lamp);
-      if (!lampNear(rx + 48, ry - 48)) lamp(OP, GL, (rx + 48) * S, (ry - 48) * S, tod.lamp);
+      if (!lampNear(rx - 48, ry + 48)) lamp(OP, GL, (rx - 48) * S, (ry + 48) * S, tod.lamp, 0.7071, -0.7071); // DEBOX: lengan ke pusat persimpangan
+      if (!lampNear(rx + 48, ry - 48)) lamp(OP, GL, (rx + 48) * S, (ry - 48) * S, tod.lamp, -0.7071, 0.7071);
     }
   }
 }

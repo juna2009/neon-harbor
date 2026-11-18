@@ -1,7 +1,7 @@
 import { CAR, PLAYER, STEP, UFO_DURATION, UFO_HOUR, WANTED, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, buildCity, collides, districtAt, moveCircle } from './city.js';
 import { createBullets, fireWeapon, stepBullets } from './combat.js';
-import { BOAT_ACCEL, BOAT_MAX_SPEED, boatHitsObstacle, createBoats, nearestBoat, stepBoats } from './boats.js';
+import { BOAT_ACCEL, BOAT_MAX_SPEED, boatHitsObstacle as hit, createBoats, nearestBoat, stepBoats } from './boats.js';
 import { claimPinkTaxi, completeMission, createArmored, createCollectibles, createMissionState, createPizza, createRace, createTaxi, createWeaponPickups, loadCheckpoint, maxCarHp, repairAtGarage, resprayAtGarage, saveCheckpoint, targetForMission, updateArmored, updateMission, updatePickups, updatePizza, updateRace, updateTaxi } from './missions.js';
 import { addWanted, clearPolice, createPolice, decayWanted, spawnPoliceUnit, stepPolice } from './police.js';
 import { createPedestrians, createTraffic, stepPedestrians, stepTraffic } from './traffic.js';
@@ -252,14 +252,16 @@ export function createWorld(rng, savedMission, sp) {
     const steer = input.moveX();
     if (throttle > 0) boat.speed += BOAT_ACCEL * dt;
     else if (throttle < 0) boat.speed -= BOAT_ACCEL * 0.6 * dt;
-    else boat.speed -= boat.speed * 1.2 * dt;
+    else boat.speed -= boat.speed * 2.5 * dt;
     boat.speed = Math.max(-170, Math.min(BOAT_MAX_SPEED, boat.speed));
     if (Math.abs(boat.speed) > 5) {
       boat.angle += steer * 2.4 * dt * Math.sign(boat.speed) * Math.min(1, Math.abs(boat.speed) / 150);
     }
     let nbx = Math.max(WATER_X + 16, Math.min(WORLD_W - 16, boat.x + Math.cos(boat.angle) * boat.speed * dt));
     let nby = Math.max(16, Math.min(WORLD_H - 16, boat.y + Math.sin(boat.angle) * boat.speed * dt));
-    if (!boatHitsObstacle(nbx, nby, 27)) { boat.x = nbx; boat.y = nby; }
+    if (!hit(nbx, nby, 27)) { boat.x = nbx; boat.y = nby; }
+    else if (!hit(nbx, boat.y, 27)) boat.x = nbx;
+    else if (!hit(boat.x, nby, 27)) boat.y = nby;
     else boat.speed *= -0.25;
     if (Math.abs(boat.speed) > 120) {
       boat.wake.push({

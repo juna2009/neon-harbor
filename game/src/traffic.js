@@ -23,13 +23,13 @@ export function createTraffic(city, rng) {
     let car;
     if (vertical) {
       const rx = rng.pick(city.roadsV);
-      car = makeCar(rx + (rng.chance(0.5) ? 18 : -18), rng.range(40, WORLD_H - 40), rng.chance(0.5) ? PI2 : -PI2, color, 'traffic', body);
+      car = makeCar(rx + (rng.chance(0.5) ? 14 : -14), rng.range(40, WORLD_H - 40), rng.chance(0.5) ? PI2 : -PI2, color, 'traffic', body);
       car.axis = 'v';
       car.road = rx;
       car.dir = car.angle > 0 ? 1 : -1;
     } else {
       const ry = rng.pick(city.roadsH);
-      car = makeCar(rng.range(40, WATER_X - 40), ry + (rng.chance(0.5) ? 18 : -18), rng.chance(0.5) ? 0 : Math.PI, color, 'traffic', body);
+      car = makeCar(rng.range(40, WATER_X - 40), ry + (rng.chance(0.5) ? 14 : -14), rng.chance(0.5) ? 0 : Math.PI, color, 'traffic', body);
       car.axis = 'h';
       car.road = ry;
       car.dir = car.angle === 0 ? 1 : -1;
@@ -92,7 +92,7 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
     if (distToNext < Math.max(6, car.speed * dt + 2)) {
       const noTurn = bridge?.up && car.axis === 'h' && next === 2400 && car.road === 1760;
       if (!noTurn && Math.random() < 0.38) {
-        const lane = Math.random() < 0.5 ? 18 : -18;
+        const lane = Math.random() < 0.5 ? 14 : -14;
         const newDir = Math.random() < 0.5 ? 1 : -1;
         if (car.axis === 'v') {
           car.axis = 'h';
@@ -254,6 +254,7 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
   }
   return flashes;
 }
+
 export function randomRoadPoint(city, rng) {
   if (rng.chance(0.5)) return { x: rng.pick(city.roadsV), y: rng.range(120, WORLD_H - 120) };
   return { x: rng.range(120, WATER_X - 120), y: rng.pick(city.roadsH) };

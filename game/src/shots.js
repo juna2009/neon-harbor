@@ -90,10 +90,10 @@ function stageTrafficCar(world, axis, road, at, dir, speed) {
   car.cruise = speed;
   if (axis === 'h') {
     car.x = at;
-    car.y = road + (dir > 0 ? 18 : -18);
+    car.y = road + (dir > 0 ? 14 : -14);
     car.angle = dir > 0 ? 0 : Math.PI;
   } else {
-    car.x = road + (dir > 0 ? 18 : -18);
+    car.x = road + (dir > 0 ? 14 : -14);
     car.y = at;
     car.angle = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
   }
@@ -166,7 +166,7 @@ export function stageShot(name, world) {
     for (const car of state.traffic.cars) {
       if (car.axis === 'h' && car.road === 1120 && car.x > 700 && car.x < 1750) {
         car.road = 800;
-        car.y = 800 + (car.dir > 0 ? 18 : -18);
+        car.y = 800 + (car.dir > 0 ? 14 : -14);
       }
     }
     startMission(state, 4);
@@ -181,7 +181,7 @@ export function stageShot(name, world) {
       spawnPoliceUnit(state.police, state.player, state.rng, 'car', state.city);
       const unit = state.police.units[state.police.units.length - 1];
       unit.car.x = state.player.x - 460 - i * 140;
-      unit.car.y = 1120 + (i % 2 === 0 ? 18 : -18);
+      unit.car.y = 1120 + (i % 2 === 0 ? 14 : -14);
       unit.car.angle = 0;
       unit.car.speed = 340;
     }
@@ -192,9 +192,9 @@ export function stageShot(name, world) {
       // ahead in the same lane, one oncoming, one traffic car for depth
       const px = state.player.x;
       const u1 = state.police.units[state.police.units.length - 2];
-      if (u1) { u1.car.x = px + 300; u1.car.y = 1120 - 18; u1.car.angle = 0; u1.car.speed = 320; }
+      if (u1) { u1.car.x = px + 300; u1.car.y = 1120 - 14; u1.car.angle = 0; u1.car.speed = 320; }
       const u2 = state.police.units[state.police.units.length - 1];
-      if (u2) { u2.car.x = px + 460; u2.car.y = 1120 + 18; u2.car.angle = Math.PI; u2.car.speed = 300; }
+      if (u2) { u2.car.x = px + 460; u2.car.y = 1120 + 14; u2.car.angle = Math.PI; u2.car.speed = 300; }
       stageTrafficCar(world, 'h', 1120, px + 200, 1, 110);
       // round 21: more traffic ahead for depth + 2 parked cars at the curb
       stageTrafficCar(world, 'h', 1120, px + 520, -1, 110);
@@ -253,7 +253,7 @@ export function stageShot(name, world) {
       spawnPoliceUnit(state.police, state.player, state.rng, 'mtruck', state.city);
       const unit = state.police.units[state.police.units.length - 1];
       unit.car.x = i === 0 ? px + 180 : px - 220;
-      unit.car.y = 800 + (i === 0 ? -18 : 18);
+      unit.car.y = 800 + (i === 0 ? -14 : 14);
       unit.car.angle = 0;
       unit.car.speed = 300;
     }
@@ -261,7 +261,7 @@ export function stageShot(name, world) {
       spawnPoliceUnit(state.police, state.player, state.rng, 'soldier', state.city);
       const unit = state.police.units[state.police.units.length - 1];
       unit.x = px + 240 + i * 30;
-      unit.y = 800 + (i === 0 ? -18 : 18);
+      unit.y = 800 + (i === 0 ? -14 : 14);
     }
     driveEastFor(world, input, 0.2);
     stageHeat(world);
@@ -378,6 +378,16 @@ export function stageShot(name, world) {
       const px = state.player.x, py = state.player.y;
       pursuit.x = px + 35; pursuit.y = py - 220; pursuit.angle = -Math.PI / 2; pursuit.speed = 480;
       state.police.heli.x = px + 60; state.police.heli.y = py - 450;
+      // R27b CLIP-FIX (item 7, merge): perahu ambient #1 (cyan, spawn
+      // 2488,900) duduk 56 px di selatan buritan kapal pesiar (y 810) —
+      // di shot boat3d terbaca MENEMBUS lambung kapal (Juna 05:57 WIB).
+      // Geser khusus staging ke (2488,1080): gap ke buritan jadi 236 px,
+      // tetap di jalur air, tidak bersentuhan hero (52 px) / police-boat
+      // (32 px, tanpa overlap sumbu-x). Kapal pesiar TIDAK digeser
+      // (clearance M11 + SHIP_RECT tetap seperti hitungan worker CRUISE).
+      // Spawn live (createBoats) TIDAK diubah — ranah gameplay/M11-DRIVER.
+      const amb = state.boats[1];
+      if (amb) { amb.x = 2488; amb.y = 1080; }
     }
   } else if (name === 'takeoff') {
     // misi 13: HA-1 di landasan 09 saat sunset, chase-cam 3D

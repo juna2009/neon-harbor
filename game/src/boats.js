@@ -1,11 +1,10 @@
-import { WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
 export const BOAT_MAX_SPEED = 620;
 export const BOAT_ACCEL = 520;
 export function createBoats(city, rng) {
   const spots = [
     { x: WATER_X + 40, y: city.marina.y - 80, angle: -Math.PI / 2 },
-    { x: WATER_X + 40, y: 900, angle: Math.PI / 2 },
+    { x: WATER_X + 40, y: 1050, angle: Math.PI / 2 },
     { x: WATER_X + 40, y: city.docks.y + 140, angle: -Math.PI / 2 },
   ];
   return spots.map((s, i) => ({
@@ -39,9 +38,6 @@ export function stepBoats(state, dt) {
       });
     }
   }
-}
-export function onWater(x, y) {
-  return x > WATER_X + 8 && x < WORLD_W - 8 && y > 8 && y < WORLD_H - 8;
 }
 export const SHIP_RECT = { x: WATER_X + 12, y: 500 - 15, w: 40, h: 30 };
 export const BUOYS = [900, 1200, 1500].map((y) => ({ x: WATER_X + 30, y, r: 8 }));
