@@ -367,14 +367,20 @@ export function drawHud2(c, st, best, ui, view) {
       T(c, 'TIRES POPPED — GARAGE $150 (G)', W2 - 156, H2 - 136, 13, '#fff', 'center', 'bold');
     }
   }
-  // hints pill
-  const hints = p.inCar ? 'E exit · Q weapon · C radio · G repair/respray · M mute'
-    : p.inBoat ? 'E step ashore · C radio · M mute'
-    : 'E enter car / boat · R reload · Q weapon · C radio · M mute';
-  c.font = '13px ' + FONT;
-  const hw = c.measureText(hints).width + 24;
-  drawPill(c, W2 - hw - 16, H2 - 148, hw, 24, '#0e1420b8', 'rgba(238,241,245,0.35)');
-  T(c, hints, W2 - hw / 2 - 16, H2 - 135, 13, '#c8cdd6', 'center');
+  // hints pill — ONE pill, bottom-center (ref. shot: single centred pill
+  // "WASD drive · Shift handbrake · E exit car · F horn"). Contextual per
+  // state, progressive disclosure (bible §6.4): only keys that do something
+  // right now. Hidden in the plane — space.js draws its own flight hint
+  // at the same bottom-center spot.
+  if (!p.inPlane) {
+    const hints = p.inCar ? 'WASD drive · E exit · Q weapon · C radio'
+      : p.inBoat ? 'E step ashore · C radio · M mute'
+      : 'E enter car/boat · R reload · Q weapon · C radio';
+    c.font = '13px ' + FONT;
+    const hw = c.measureText(hints).width + 24;
+    drawPill(c, (W2 - hw) / 2, H2 - 30, hw, 24, '#0e1420b8', 'rgba(238,241,245,0.35)');
+    T(c, hints, W2 / 2, H2 - 17, 13, '#c8cdd6', 'center');
+  }
   // objective bar with counter pill
   const obj = st.objective || '';
   c.font = 'bold 16px ' + FONT;
@@ -389,15 +395,18 @@ export function drawHud2(c, st, best, ui, view) {
   drawPill(c, 24, H2 - 68, 52, 20, C.neonCyan);
   T(c, curMission + '/' + (st.missionTotal || 13), 50, H2 - 57, 12, '#0e1420', 'center', 'bold');
   T(c, obj, 86, H2 - 57, 16, '#ffffff', 'left', 'bold');
-  // dialogue card
+  // dialogue card — FIXED bottom-left, slimmer (was 560 px wide: right
+  // edge x 692 covered the hero car in chase-cam). Text card now ends
+  // x 572; the hero car/boat sits centre-frame (left edge ≥ ~620), so the
+  // dialog never covers it. Portrait + name pill unchanged (bible §6.3).
   if (st.dialogue) {
     drawPanel(c, 16, H2 - 246, 108, 128, C.neonPink);
     if (st.portrait) st.portrait(c, 22, H2 - 240, 96, 116, st.dialogueMood || 'alert');
     drawPill(c, 132, H2 - 246, 168, 22, C.neonPink);
     T(c, 'MARA — HARBOR CREW', 216, H2 - 234, 12, '#fff', 'center', 'bold');
-    c.fillStyle = 'rgba(14,20,32,0.88)'; rr(c, 132, H2 - 218, 560, 100, 10); c.fill();
+    c.fillStyle = 'rgba(14,20,32,0.88)'; rr(c, 132, H2 - 218, 440, 100, 10); c.fill();
     c.fillStyle = C.neonPink; c.fillRect(132, H2 - 218, 4, 100);
-    W(c, st.dialogue, 148, H2 - 196, 528, 16, '#ffffff', 24);
+    W(c, st.dialogue, 148, H2 - 196, 408, 16, '#ffffff', 24);
   }
   if (st.wanted >= 3) { c.fillStyle = 'rgba(239,68,68,0.07)'; c.fillRect(0, 0, W2, H2); }
 }

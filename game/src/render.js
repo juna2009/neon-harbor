@@ -1051,16 +1051,22 @@ export function createRenderer(canvas) {
     if (state.view3d !== undefined) return !!state.view3d;
     return view3dUser === null ? true : view3dUser;
   }
-  function drawModeBadge(state) {
+  // Mode badge — shares ONE row with the radio pill (drawHud2 draws the
+  // radio at x 12..144, y 196): the badge sits right of it at x 152, same
+  // y/height, so radio + mode read as one small status strip under the
+  // stats panel instead of two pills stacked down the left edge. Falls
+  // back to x 12 when no radio pill is drawn (no stationName).
+  function drawModeBadge(state, ui) {
     const on = chaseOn(state);
     const label = on ? '3D CHASE-CAM  ·  V for 2D top-down' : '2D TOP-DOWN  ·  V for 3D chase-cam';
     ctx.font = `bold 13px ${FONT}`;
     const w = ctx.measureText(label).width + 28;
+    const x = (ui && ui.stationName) ? 152 : 12;
     ctx.fillStyle = 'rgba(14,20,32,0.82)';
-    ctx.fillRect(12, 228, w, 24);
+    ctx.fillRect(x, 196, w, 24);
     ctx.fillStyle = on ? COLORS.neonPink : COLORS.neonCyan;
-    ctx.fillRect(12, 228, 4, 24);
-    text(label, 28, 245, 13, '#ffffff', 'left', 'bold');
+    ctx.fillRect(x, 196, 4, 24);
+    text(label, x + 16, 213, 13, '#ffffff', 'left', 'bold');
   }
   function drawTargetCompass(state) {
     const tgt = state.mission && state.mission.target;
@@ -1146,7 +1152,7 @@ export function createRenderer(canvas) {
     cine.drawBars(ctx, view.w, view.h);
     drawHud(state, best, ui);
     if (screen === SCREEN_PLAY) {
-      drawModeBadge(state);
+      drawModeBadge(state, ui);
       if (chaseOn(state)) drawTargetCompass(state);
     }
     if (screen === SCREEN_PAUSED) {
