@@ -269,8 +269,10 @@ export function drawHud2(c, st, best, ui, view) {
   if (st.wanted >= 6) {
     const g = c.createLinearGradient(0, 0, W2, 0);
     g.addColorStop(0, '#ff3b3000'); g.addColorStop(0.5, '#ff3b30'); g.addColorStop(1, '#ff3b3000');
-    c.fillStyle = g; c.fillRect(0, 108, W2, 30);
-    T(c, '⚠  MILITARY RESPONSE  ⚠', W2 / 2, 124, 16, '#fff', 'center', 'bold');
+    // JETFIX: banner sat 10 px under the ROAD TO #1 card — cramped stack,
+    // read as one block. +10 px breathing room (ROAD TO #1 ends y 98).
+    c.fillStyle = g; c.fillRect(0, 118, W2, 30);
+    T(c, '⚠  MILITARY RESPONSE  ⚠', W2 / 2, 134, 16, '#fff', 'center', 'bold');
   }
   // minimap (top-right)
   drawMinimap2(c, st, W2 - 228, 16, 200, 150);
@@ -305,10 +307,12 @@ export function drawHud2(c, st, best, ui, view) {
   const obj = st.objective || '';
   c.font = 'bold 16px ' + FONT;
   const ow = Math.min(W2 - 32, c.measureText(obj).width + 110);
-  drawPanel(c, 16, H2 - 64, ow, 36, C.neonCyan);
-  drawPill(c, 24, H2 - 56, 52, 20, C.neonCyan);
-  T(c, (st.missionDone || 0) + '/' + (st.missionTotal || 12), 50, H2 - 45, 12, '#0e1420', 'center', 'bold');
-  T(c, obj, 86, H2 - 45, 16, '#ffffff', 'left', 'bold');
+  // JETFIX: the space-HUD hint pill (space.js, y H2-34..H2-10) overlapped
+  // this bar's bottom edge (panel ended H2-28). Bar moved up 12 px.
+  drawPanel(c, 16, H2 - 76, ow, 36, C.neonCyan);
+  drawPill(c, 24, H2 - 68, 52, 20, C.neonCyan);
+  T(c, (st.missionDone || 0) + '/' + (st.missionTotal || 12), 50, H2 - 57, 12, '#0e1420', 'center', 'bold');
+  T(c, obj, 86, H2 - 57, 16, '#ffffff', 'left', 'bold');
   // dialogue card
   if (st.dialogue) {
     drawPanel(c, 16, H2 - 246, 108, 128, C.neonPink);

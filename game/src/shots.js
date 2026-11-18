@@ -425,9 +425,19 @@ export function stageShot(name, world) {
     state.wanted = 6;
     state.view3d = true;
     state.camera.x = pl.x; state.camera.y = pl.y;
+    // JETFIX v2: jets staged CLOSER (fwd ~14-17 units instead of ~30-40)
+    // — at 30+ units a jet is ~65 px wide and its fins/wings/nozzles are
+    // 2-3 px: it reads as a dark box. At ~15 units it is ~130 px wide and
+    // the plane shape reads. Geometry is correct for a chase: the jets are
+    // pursuing from behind-below the hero (south of it, nearer the camera).
+    // Both stay above the Mara dialog box (y < 554) and clear of the
+    // "MILITARY JETS INBOUND" pill (y 380-408).
+    // Angle -PI/2 (north, same as the hero): the old PI/2 faced the jets
+    // head-on at the camera, so only a small cross read. From behind, the
+    // swept fins + nozzle rings + nav lights (the plane3d rear work) read.
     state.space.jets.push(
-      { x: pl.x - 50, y: pl.y - 150, angle: Math.PI / 2, speed: 560, fireTimer: 1 },
-      { x: pl.x - 180, y: pl.y - 250, angle: Math.PI / 2, speed: 560, fireTimer: 1 },
+      { x: pl.x - 30, y: pl.y - 20, angle: -Math.PI / 2, speed: 560, fireTimer: 1 },
+      { x: pl.x - 80, y: pl.y + 10, angle: -Math.PI / 2, speed: 560, fireTimer: 1 },
     );
   } else if (name === 'blackout') {
     setLight(world, 0.05);

@@ -111,12 +111,13 @@ function frame(t){
   sign(-1,camZ+40,camZ+120,'NEON HARBOR','#35f0ff');
   sign(1,camZ+100,camZ+160,'CASINO','#ff5ca8');
   sign(-1,camZ+220,camZ+300,'MOTEL','#ffd23e');
-  ops.sort((a,b)=>b.d-a.d);for(const o of ops)o.f();ops.length=0;
-  // sun disc + glow (drawn after 3D so the money shot is never occluded)
+  // JETFIX Bug 5 (title): sun drawn BEFORE the 3D ops so buildings occlude
+  // it (was: after 3D, disc pasted over facades — same bug as chase-cam).
   const sg=x.createRadialGradient(sx,sy,4,sx,sy,150);
   sg.addColorStop(0,'rgba(255,230,160,.95)');sg.addColorStop(.25,'rgba(255,170,90,.55)');sg.addColorStop(1,'rgba(255,140,80,0)');
   x.fillStyle=sg;x.fillRect(sx-150,sy-150,300,300);
   x.fillStyle='#ffe9a8';x.beginPath();x.arc(sx,sy,18,0,7);x.fill();
+  ops.sort((a,b)=>b.d-a.d);for(const o of ops)o.f();ops.length=0;
   // hero taillight glow
   const tp=P(0,1,camZ+17-3.3);if(tp){x.save();x.globalCompositeOperation='lighter';
     for(const gx of[-1.2,1.2]){const gp=P(gx,1,camZ+17-3.3);if(!gp)continue;
@@ -226,15 +227,27 @@ function box3(cx, y0, cz, w, h, d, a, col, fogD, depOff) {
   const f3 = [cor(1, -1, y0), cor(1, -1, y1), cor(1, 1, y1), cor(1, 1, y0)];
   const f4 = [cor(-1, 1, y0), cor(1, 1, y0), cor(1, 1, y1), cor(-1, 1, y1)];
   const f5 = [cor(-1, -1, y0), cor(-1, -1, y1), cor(1, -1, y1), cor(1, -1, y0)];
+  // JETFIX-2 Bug 2: backface culling for the 4 side faces. box3 painted all
+  // faces and sorted by nearest corner, so when the camera sits nearly
+  // head-on to a box (inside its footprint: |g| < hd, |r| < hw) the two
+  // side faces TIED the front face's depth and, pushed later, painted OVER
+  // its edges as dark "wall" strips (probe: bld@2130,210 f5 (460,106)-
+  // (520,771) + f4 (807,106)-(890,771), both backfaces, d=43.9 = f3's
+  // depth — the circled left wall). g/r = camera offset from the box
+  // centre along forward/right; a side face is visible only if the camera
+  // is beyond its plane (|g| > hd for f4/f5, |r| > hw for f2/f3). f1 (top)
+  // is left alone: pushed first, the front face covers it when it is a
+  // backface, and culling it would thin palm fronds / the UFO crown.
+  const g = fx * (ccX - cx) + fz * (ccZ - cz), r = rx * (ccX - cx) + rz * (ccZ - cz);
   QW(f1, sh(c, 1.3 * shadeK, t), dep(f1));
   // round 22: the sunset bounce floor applies to EVERY vertical face, not
   // just the west face — round 21 only warmed f5, but the chase camera
   // looks straight at the long side walls (f2/f3), which stayed pitch
   // black and read as void. Same floor as f5: +0.22 warm bounce.
-  QW(f2, shadeK < 1 ? shW(c, 0.8 * shadeK + 0.22, t) : sh(c, 0.8 * shadeK, t), dep(f2));
-  QW(f3, shadeK < 1 ? shW(c, 0.95 * shadeK + 0.22, t) : sh(c, 0.95 * shadeK, t), dep(f3));
-  QW(f4, shadeK < 1 ? shW(c, 1.05 * shadeK + 0.22, t) : sh(c, 1.05 * shadeK, t), dep(f4));
-  QW(f5, shadeK < 1 ? shW(c, 0.65 * shadeK + 0.22, t) : sh(c, 0.65 * shadeK, t), dep(f5));
+  if (r < -hw) QW(f2, shadeK < 1 ? shW(c, 0.8 * shadeK + 0.22, t) : sh(c, 0.8 * shadeK, t), dep(f2));
+  if (r > hw) QW(f3, shadeK < 1 ? shW(c, 0.95 * shadeK + 0.22, t) : sh(c, 0.95 * shadeK, t), dep(f3));
+  if (g > hd) QW(f4, shadeK < 1 ? shW(c, 1.05 * shadeK + 0.22, t) : sh(c, 1.05 * shadeK, t), dep(f4));
+  if (g < -hd) QW(f5, shadeK < 1 ? shW(c, 0.65 * shadeK + 0.22, t) : sh(c, 0.65 * shadeK, t), dep(f5));
 }
 // vertical quad facing along yaw a, centered fOff forward / rOff right of (cx, cz)
 function vQuad(cx, cz, a, fOff, rOff, w, y0, y1, col, dep) {
@@ -459,8 +472,10 @@ function plane3d(wx, wy, angle, plane, o) {
   const thr = plane.throttle || 0;
   const flick = 0.75 + 0.25 * Math.sin(t * 31 + wx);
   const jet = !!o.jet;
-  const body = jet ? '#3a4a3a' : '#f7fafc';
-  const wingC = jet ? '#2c362c' : '#d5dde4';
+  // JETFIX: jets were too dark against the sunset buildings (olive #3a4a3a
+  // read as a black brick) — brightened ~25% so the silhouette reads.
+  const body = jet ? '#4a5c44' : '#f7fafc';
+  const wingC = jet ? '#39472f' : '#d5dde4';
   // plane-local (f = forward, r = right) -> world [x, y, z]
   const pt = (f, r, y) => [cx + fx * f + rx * r, y, cz + fz * f + rz * r];
   // contact shadow: fades + grows + drifts with altitude (drawPlane formula)
@@ -493,19 +508,38 @@ function plane3d(wx, wy, angle, plane, o) {
     QW([pt(-1.0, s * 0.2, y0 + 0.45), pt(-1.4, s * 3.0, y0 + 0.45), pt(-1.4, s * 3.0, y0 + 0.62), pt(-1.0, s * 0.2, y0 + 0.62)], sh(hx3(wingC), 0.55, hz(dep))); // trailing-edge thickness
     if (rimOn) QW([pt(0.6, s * 0.4, y0 + 0.58), pt(-2.0, s * 3.0, y0 + 0.58), pt(-1.95, s * 3.0, y0 + 0.58), pt(0.55, s * 0.4, y0 + 0.58)], 'rgba(255,200,130,0.5)'); // leading-edge rim
     QW([pt(-2.2, s * 0.5, y0 + 0.7), pt(-3.0, s * 1.7, y0 + 0.7), pt(-2.8, s * 1.7, y0 + 0.7), pt(-2.2, s * 0.5, y0 + 0.7)], sh(hx3(wingC), 0.95, hz(dep))); // stabilizer
-    QW([pt(-2.2, s * 0.55, y0 + 0.7), pt(-3.0, s * 0.55, y0 + 0.7), pt(-3.0, s * 0.55, y0 + 1.9), pt(-2.2, s * 0.55, y0 + 1.9)], jet ? '#2c362c' : '#05d9e8'); // tail fin (cyan)
-    if (rimOn) QW([pt(-2.2, s * 0.55, y0 + 1.88), pt(-3.0, s * 0.55, y0 + 1.88), pt(-3.0, s * 0.55, y0 + 1.96), pt(-2.2, s * 0.55, y0 + 1.96)], 'rgba(255,210,130,0.8)'); // fin top rim
+    // JETFIX: tail fin SWEPT BACK + shorter — the old vertical fin (1.2
+    // tall, straight up) read as a pole from the chase-cam; the swept fin
+    // (top edge 0.5 further back, height 0.85) reads as a jet tail.
+    QW([pt(-2.2, s * 0.55, y0 + 0.7), pt(-3.0, s * 0.55, y0 + 0.7), pt(-3.5, s * 0.55, y0 + 1.55), pt(-2.7, s * 0.55, y0 + 1.55)], jet ? '#39472f' : '#05d9e8'); // tail fin (cyan)
+    if (rimOn) QW([pt(-2.7, s * 0.55, y0 + 1.53), pt(-3.5, s * 0.55, y0 + 1.53), pt(-3.5, s * 0.55, y0 + 1.6), pt(-2.7, s * 0.55, y0 + 1.6)], 'rgba(255,210,130,0.8)'); // fin top rim
+  }
+  // JETFIX: wingtip nav lights (red port / green starboard) + warm rim on
+  // the wing trailing edge + dark cheatline on each fuselage side — from
+  // directly behind, the wings were a thin dark line and the fuselage a
+  // flat white slab; the lights + rim make the span read at a glance.
+  vQuad(cx, cz, angle, -1.7, -3.0, 0.3, y0 + 0.4, y0 + 0.7, '#ff3b30', dep);
+  vQuad(cx, cz, angle, -1.7, 3.0, 0.3, y0 + 0.4, y0 + 0.7, '#37e05a', dep);
+  for (const s of [-1, 1]) {
+    QW([pt(-1.0, s * 0.2, y0 + 0.63), pt(-1.4, s * 3.0, y0 + 0.63), pt(-1.4, s * 3.0, y0 + 0.68), pt(-1.0, s * 0.2, y0 + 0.68)], 'rgba(255,200,130,0.55)', dep); // trailing-edge warm rim
+    QW([pt(2.5, s * 0.78, y0 + 0.45), pt(-2.5, s * 0.78, y0 + 0.45), pt(-2.5, s * 0.78, y0 + 0.62), pt(2.5, s * 0.78, y0 + 0.62)], 'rgba(20,24,32,0.5)', dep); // fuselage side cheatline
   }
   // twin afterburner nozzles (rear face) + flame when throttled
+  // JETFIX: the old nozzles read as orange WINDOWS on the white rear face
+  // (dark ring too thin, orange too big). Ring bigger + darker, orange
+  // core smaller, so each nozzle reads as a dark ring with a hot centre.
   for (const s of [-1, 1]) {
-    vQuad(cx, cz, angle, -L / 2 - 0.06, s * 0.5, 0.7, y0 + 0.25, y0 + 0.75, '#3c3c46');
-    vQuad(cx, cz, angle, -L / 2 - 0.09, s * 0.5, 0.5, y0 + 0.32, y0 + 0.68, '#ff9d4d');
-    vQuad(cx, cz, angle, -L / 2 - 0.12, s * 0.5, 0.28, y0 + 0.4, y0 + 0.6, '#fff0b4');
+    vQuad(cx, cz, angle, -L / 2 - 0.06, s * 0.5, 0.9, y0 + 0.2, y0 + 0.67, '#23232c');
+    vQuad(cx, cz, angle, -L / 2 - 0.09, s * 0.5, 0.42, y0 + 0.3, y0 + 0.57, '#ff9d4d');
+    vQuad(cx, cz, angle, -L / 2 - 0.12, s * 0.5, 0.22, y0 + 0.37, y0 + 0.51, '#fff0b4');
   }
   if (thr > 0.25) {
     const fl = 1.8 * thr * flick;
     for (const s of [-1, 1]) {
       QW([pt(-3.0, s * 0.5 - 0.45, y0 + 0.5), pt(-3.0, s * 0.5 + 0.45, y0 + 0.5), pt(-3.0 - fl, s * 0.5, y0 + 0.5)], 'rgba(255,157,77,' + (0.45 + 0.4 * flick * thr).toFixed(2) + ')');
+      // JETFIX: vertical afterburner glow — the old flame was a horizontal
+      // triangle, edge-on (invisible) from the chase-cam behind.
+      vQuad(cx, cz, angle, -L / 2 - 0.45, s * 0.5, 0.5, y0 + 0.28, y0 + 0.62, 'rgba(255,157,77,0.45)', dep);
     }
   }
   // landing gear when parked/taxiing (alt < 2): nose + 2 main struts
@@ -583,11 +617,22 @@ function bld3(b, nightF, t) {
   // must not be windowless. (Probe: (229.9,58.1) dep 100.3, winN 0.)
   const depNear = dep - Math.max(w, d) / 2;
   if (depNear < 120) {
+    // JETFIX-2 Bug 2 (same root cause as box3): the old gate used the
+    // distance from the BUILDING CENTRE (ccZ - bz etc), so a face counted
+    // as "toward the camera" whenever the camera was past the centre —
+    // even when it was still INSIDE the face's plane, i.e. the face was a
+    // backface. Probe: bld@2130,210 (bx 224, camera x 222.2) drew windows
+    // on its west face (dot bx-ccX = +1.8) although the camera is EAST of
+    // that face's plane (x 213) — the windows compressed to 6 px slivers
+    // on the circled wall strip. Gate on the signed distance from the
+    // camera to the FACE PLANE instead: a face is eligible only if the
+    // camera is beyond its plane. The sort (most head-on first) still
+    // works: dot is now how far beyond the plane the camera sits.
     const faces = [
-      { a: Math.PI / 2, off: d / 2, span: w, dot: ccZ - bz },
-      { a: -Math.PI / 2, off: d / 2, span: w, dot: bz - ccZ },
-      { a: 0, off: w / 2, span: d, dot: ccX - bx },
-      { a: Math.PI, off: w / 2, span: d, dot: bx - ccX },
+      { a: Math.PI / 2, off: d / 2, span: w, dot: ccZ - (bz + d / 2) },
+      { a: -Math.PI / 2, off: d / 2, span: w, dot: (bz - d / 2) - ccZ },
+      { a: 0, off: w / 2, span: d, dot: ccX - (bx + w / 2) },
+      { a: Math.PI, off: w / 2, span: d, dot: (bx - w / 2) - ccX },
     ].sort((p, q) => q.dot - p.dot);
     const nFaces = nightF > 0.15 ? 3 : 2;
     for (let fi = 0; fi < nFaces && faces[fi].dot > 0; fi += 1) {
@@ -620,6 +665,11 @@ function bld3(b, nightF, t) {
         let c;
         if (nightF > 0.3) c = q < 0.4 ? [255, 205, 120] : q < 0.55 ? [120, 215, 255] : q < 0.7 ? [255, 150, 90] : [36, 44, 60];
         else c = q < 0.28 ? [255, 205, 120] : q < 0.46 ? [150, 195, 235] : q < 0.72 ? [42, 54, 74] : [28, 34, 50];
+        // JETFIX: dark frame behind each window — the old bare glass squares
+        // read as coloured stickers pasted on a flat wall; a frame makes
+        // each window read as a real opening. Near/mid faces only
+        // (depNear < 70): far faces are too small for frames to read.
+        if (depNear < 70) vQuad(bx, bz, f.a, f.off + 0.11, rOff, ww + 0.28, y0 - 0.14, y1 + 0.14, 'rgba(12,14,20,0.9)', fDep);
         vQuad(bx, bz, f.a, f.off + 0.12, rOff, ww, y0, y1, mix(c, hz(dep)), fDep);
       }
       // T2: floor lines — one dark line per ~3 floors stops the slab look
@@ -817,6 +867,27 @@ export function drawChase3D(ctx, state) {
   // sun / moon ahead, high when day, low at sunset
   const sunH = dl > 0.7 ? 42 : 10;
   const sunP = cP(ccX + cfX * 280, sunH, ccZ + cfZ * 280);
+  // JETFIX Bug 5 (was: "drawn after 3D so the money shot is never occluded"):
+  // the sun disc + glow + anamorphic streaks were painted AFTER the 3D ops,
+  // so the disc sat on top of building facades and the horizontal streak
+  // cut straight through solid walls (jets-r25.jpg). Drawn here — right
+  // after the sky/smog band, BEFORE the ground tiles and the 3D ops — so
+  // buildings and ground occlude the sun, exactly like the smog band above.
+  // The sun stays visible in the sky gap between buildings (realistic).
+  if (sunP) {
+    const sg = x.createRadialGradient(sunP[0], sunP[1], 4, sunP[0], sunP[1], 150);
+    if (nightF > 0.5) {
+      sg.addColorStop(0, 'rgba(230,235,255,0.9)'); sg.addColorStop(0.3, 'rgba(180,200,255,0.35)'); sg.addColorStop(1, 'rgba(180,200,255,0)');
+      x.fillStyle = sg; x.fillRect(sunP[0] - 150, sunP[1] - 150, 300, 300);
+      x.fillStyle = '#e6ebff'; x.beginPath(); x.arc(sunP[0], sunP[1], 14, 0, 7); x.fill();
+    } else {
+      const sg2 = x.createRadialGradient(sunP[0], sunP[1], 4, sunP[0], sunP[1], 190);
+      sg2.addColorStop(0, 'rgba(255,230,160,0.95)'); sg2.addColorStop(0.25, 'rgba(255,170,90,0.55)'); sg2.addColorStop(1, 'rgba(255,140,80,0)');
+      x.fillStyle = sg2; x.fillRect(sunP[0] - 190, sunP[1] - 190, 380, 380);
+      x.fillStyle = '#ffe9a8'; x.beginPath(); x.arc(sunP[0], sunP[1], 18, 0, 7); x.fill();
+      sunStreaks(sunP[0], sunP[1], 190, true); // G1 soft (round 21)
+    }
+  }
   // ground tiles (segmented so quads never straddle the camera plane)
   for (let gx = -320; gx < WORLD_W + 320; gx += 320) {
     for (let gy = -320; gy < WORLD_H + 320; gy += 320) {
@@ -934,28 +1005,27 @@ export function drawChase3D(ctx, state) {
     QW([[nx + rx * 1.5, 0.12, nz + rz * 1.5], [nx - rx * 1.5, 0.12, nz - rz * 1.5],
       [fx2 - rx * 2.5, 0.12, fz2 - rz * 2.5], [fx2 + rx * 2.5, 0.12, fz2 + rz * 2.5]], 'rgba(255,195,115,0.35)', 'far');
   }
-  // G2 smog clouds: pink/orange slabs high over the skyline
+  // G2 smog clouds: faint pink/orange haze wisps hugging the horizon.
+  // JETFIX-2 Bug 1: the old slabs (26-52 high, 360-420 out, alpha 0.35)
+  // read as solid pink rectangles floating in the sky (probe: bands at
+  // y 300-344, d 362-419, in the circled sky region). Lower + thinner +
+  // fainter + wider so they read as horizon haze, not objects.
   for (let i = 0; i < 5; i += 1) {
     const cLat = -190 + h2(i, 41) * 380, cFwd = 360 + h2(i, 42) * 60;
-    const cy0 = 26 + h2(i, 43) * 26, ch = 9 + h2(i, 44) * 14, cw = 60 + h2(i, 45) * 90;
+    const cy0 = 14 + h2(i, 43) * 10, ch = 5 + h2(i, 44) * 5, cw = 100 + h2(i, 45) * 80;
     const wxp = ccX + (-cfZ) * cLat + cfX * cFwd;
     const wzp = ccZ + cfX * cLat + cfZ * cFwd;
-    QW([[wxp, cy0, wzp], [wxp + (-cfZ) * cw, cy0, wzp + cfX * cw], [wxp + (-cfZ) * cw, cy0 + ch, wzp + cfX * cw], [wxp, cy0 + ch, wzp]], mix(i % 2 ? [255, 120, 90] : [255, 150, 110], 0.35));
+    QW([[wxp, cy0, wzp], [wxp + (-cfZ) * cw, cy0, wzp + cfX * cw], [wxp + (-cfZ) * cw, cy0 + ch, wzp + cfX * cw], [wxp, cy0 + ch, wzp]], mix(i % 2 ? [255, 120, 90] : [255, 150, 110], 0.22));
   }
-  // distant skyline silhouettes, fixed in camera space
-  for (let i = 0; i < 10; i += 1) {
-    const bx = -170 + i * 38 + h2(i, 21) * 14, bh = 40 + h2(i, 22) * 60, bw = 20 + h2(i, 23) * 18;
-    const wxp = ccX + (-cfZ) * bx + cfX * (400 + h2(i, 24) * 30);
-    const wzp = ccZ + cfX * bx + cfZ * (400 + h2(i, 24) * 30);
-    // G3: near-black silhouette, not grey
-    QW([[wxp, 0, wzp], [wxp + (-cfZ) * bw, 0, wzp + cfX * bw], [wxp + (-cfZ) * bw, bh, wzp + cfX * bw], [wxp, bh, wzp]], mix([14, 10, 24], 0.5));
-    // lit windows: tiny dots on the dark slab
-    for (let k = 0; k < 3; k += 1) {
-      const dLat = h2(i * 7 + k, 26) * bw, dH = 4 + h2(i * 7 + k, 27) * (bh - 8);
-      const dxp = wxp + (-cfZ) * dLat - cfX * 0.5, dzp = wzp + cfX * dLat - cfZ * 0.5;
-      QW([[dxp, dH, dzp], [dxp + (-cfZ) * 1.6, dH, dzp + cfX * 1.6], [dxp + (-cfZ) * 1.6, dH + 1.6, dzp + cfX * 1.6], [dxp, dH + 1.6, dzp]], 'rgba(255,205,120,0.9)');
-    }
-  }
+  // JETFIX-2 Bug 1: the distant skyline silhouettes are REMOVED. They were
+  // 10 dark slabs fixed 400-430 units ahead of the camera, standing on
+  // y=0 at z ~ -313 — far beyond the ground tiles (which end at z -32),
+  // so from any eye above ~10 units their bases (screen y ~410) float in
+  // the flat orange horizon fill with no ground beneath them (probe:
+  // slabs (871,321)-(948,412), (919,319)-(981,410), (999,291)-
+  // (1072,410) — the brown blocks in the circled sky region). The real
+  // city already fills the horizon; a distant skyline that cannot be
+  // grounded is worse than none. Re-add only with ground that reaches it.
   // buildings
   for (const b of city.buildings) {
     if (!inRange(b.x + b.w / 2, b.y + b.h / 2, 155, 105)) continue;
@@ -1220,21 +1290,6 @@ export function drawChase3D(ctx, state) {
       n += 1;
     }
     x.restore();
-  }
-  // sun / moon disc + glow (after 3D, like the title frame)
-  if (sunP) {
-    const sg = x.createRadialGradient(sunP[0], sunP[1], 4, sunP[0], sunP[1], 150);
-    if (nightF > 0.5) {
-      sg.addColorStop(0, 'rgba(230,235,255,0.9)'); sg.addColorStop(0.3, 'rgba(180,200,255,0.35)'); sg.addColorStop(1, 'rgba(180,200,255,0)');
-      x.fillStyle = sg; x.fillRect(sunP[0] - 150, sunP[1] - 150, 300, 300);
-      x.fillStyle = '#e6ebff'; x.beginPath(); x.arc(sunP[0], sunP[1], 14, 0, 7); x.fill();
-    } else {
-      const sg2 = x.createRadialGradient(sunP[0], sunP[1], 4, sunP[0], sunP[1], 190);
-      sg2.addColorStop(0, 'rgba(255,230,160,0.95)'); sg2.addColorStop(0.25, 'rgba(255,170,90,0.55)'); sg2.addColorStop(1, 'rgba(255,140,80,0)');
-      x.fillStyle = sg2; x.fillRect(sunP[0] - 190, sunP[1] - 190, 380, 380);
-      x.fillStyle = '#ffe9a8'; x.beginPath(); x.arc(sunP[0], sunP[1], 18, 0, 7); x.fill();
-      sunStreaks(sunP[0], sunP[1], 190, true); // G1 soft (round 21)
-    }
   }
   // hero taillight glow
   if (p.inCar && p.car) {
