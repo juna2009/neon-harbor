@@ -69,6 +69,7 @@ uniform float uWinLit; uniform vec3 uWinTint; uniform float uNeon;
 uniform vec3 uWaterDeep; uniform vec3 uWaterSky; uniform float uExposure;
 uniform vec2 uWinCell; uniform float uWinGlass; uniform float uWinWarm; // SIANG v2: jendela
 uniform float uContrast; uniform float uShadowK; uniform float uRoadTex; uniform float uFogK; // SIANG v2: kontras/bayangan/jalan/kabut
+uniform sampler2D uAtlas; // R39 SPRITE: atlas ped turntable (Quaternius CC0) — material 12
 uniform vec3 uGradeLift; uniform vec3 uGradeGain; uniform float uGradeGamma; uniform vec2 uRes; uniform float uTime; // R36 POSTFX
 float h21(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 // R36 POSTFX: ACES (highlight tidak pecah) + lift/gamma/gain per TOD +
@@ -220,6 +221,17 @@ void main(){
     float side = 1.0 - smoothstep(0.08, 0.5, abs(vU.x - 0.5));
     float a = (1.0 - smoothstep(0.75, 1.0, along)) * side * uShadowK * 0.85; // penuh di sepanjang bayangan, baru memudar di 25% ujung (fade kuadrat ke nol membuat bayangan panjang hilang sebelum sampai kamera)
     gl_FragColor = vec4(0.0, 0.0, 0.0, a);
+    return;
+  }
+  if (vM > 11.5 && vM < 12.5) { // R39 SPRITE: billboard ped bertekstur (atlas turntable, material 12 — BUKAN 11: 11 = groundShadow R36). postfx() seperti jalur lain (ACES/vignette/grain R36).
+    vec4 tex = texture2D(uAtlas, vU);
+    if (tex.a < 0.05) discard;
+    float sh = 0.82 + 0.18 * max(dot(N, uSun), 0.0);
+    vec3 col = tex.rgb * sh * dayK;
+    float f = 1.0 - exp(-dist * 0.011 * uFogK);
+    col = mix(col, uHz, clamp(f, 0.0, 0.85));
+    col *= (1.0 - uDark * 0.75);
+    gl_FragColor = vec4(postfx(col), tex.a);
     return;
   }
   // Half-Lambert (bible §1.2): bayangan tidak pernah hitam pekat (Valorant)
@@ -1122,6 +1134,67 @@ function person(B, x, z, yaw, col, opt) {
   }
 }
 
+// R39 SPRITE — billboard 1 quad/NPC dari atlas turntable (model CC0 Quaternius,
+// render offline 8 sudut x 4 fase jalan; atlas 3072x1920, sel 96x192, 10 varian).
+// col = sudut + fase*8, row = varian. Fallback: person() box bila atlas belum
+// load / gagal load (atlasTex null) — kode box TIDAK dihapus.
+// Sudut: 0 = depan (menghadap kamera), +45deg per sel (arah rel = yaw ped
+// relatif ke arah kamera; diverifikasi vs sel atlas: 0 depan, 2 profil kanan,
+// 4 belakang, 6 profil kiri). rgt = screen-right kamera (-fz, 0, fx).
+// FETCH AWAL: unduh atlas saat modul dimuat (bukan saat renderer dibuat) —
+// mode screenshot (?shot=) hanya paint 2x; tanpa fetch awal, frame ke-2
+// selalu keduluan fallback box. Texture GL tetap dibuat di createRenderer.
+// MATERIAL 12 (bukan 11): material 11 milik R36 groundShadow di HEAD ini;
+// sprite memakai 12 supaya tidak tertelan cabang groundShadow.
+// window.__pa = 1 (R39 shot-mode): flag sinkron "atlas settle" (load/ error)
+// untuk main.js runShot — paint shot menunggu flag ini sebelum __shotReady.
+const PED_ATLAS = { tex: null, ok: false, failed: false, loading: false };
+const PED_ATLAS_SRC = 'assets/ped-atlas.png';
+let _pedAtlasResolve = null;
+if (typeof window !== 'undefined') {
+  window.__pedAtlasReady = new Promise((r) => { _pedAtlasResolve = r; });
+}
+let PED_ATLAS_IMG = null;
+if (typeof Image !== 'undefined') {
+  PED_ATLAS_IMG = new Image();
+  PED_ATLAS_IMG.onload = () => { window.__pa = 1; if (_pedAtlasResolve) _pedAtlasResolve(true); };
+  PED_ATLAS_IMG.onerror = () => { PED_ATLAS.failed = true; window.__pa = 1; if (_pedAtlasResolve) _pedAtlasResolve(false); };
+  PED_ATLAS_IMG.src = PED_ATLAS_SRC;
+}
+const PED_CELL_W = 96, PED_CELL_H = 192, PED_COLS = 32, PED_ROWS = 10;
+const PED_AW = 3072, PED_AH = 1920;
+function personSprite(SP, B, x, z, yaw, col, opt, camFwd, t) {
+  const o = opt || {};
+  if (!PED_ATLAS.ok) { person(B, x, z, yaw, col, opt); return; } // fallback box
+  let variant;
+  if (o.kind === 'player') variant = 6; // JAX (jaket cokelat)
+  else if (o.kind === 'police') variant = 7;
+  else if (o.kind === 'gang') variant = 8;
+  else if (o.kind === 'soldier') variant = 9;
+  else {
+    const hh = hash2(Math.round(col[0] * 255) * 3 + Math.round(col[1] * 255), Math.round(col[2] * 255) + 7);
+    variant = Math.floor(hh * 6) % 6; // sipil: 6 varian (F1-F3, M1-M3)
+  }
+  const fx = camFwd[0], fz = camFwd[1];
+  const af = Math.atan2(Math.sin(yaw), Math.cos(yaw));
+  const ac = Math.atan2(-fx, -fz);
+  let rel = af - ac;
+  while (rel < 0) rel += Math.PI * 2;
+  while (rel >= Math.PI * 2) rel -= Math.PI * 2;
+  const angle = Math.round(rel / (Math.PI / 4)) % 8;
+  // fase jalan: walkPhase maju 8 rad/dtk (traffic.js peds, t*8 polisi); player pakai t
+  const ph = (o.walkPhase !== undefined && o.walkPhase !== 0) ? o.walkPhase : t * 5;
+  const phase = ((Math.floor(ph / (Math.PI * 2) * 4) % 4) + 4) % 4;
+  const cc = angle + phase * 8;
+  const u0 = (cc * PED_CELL_W) / PED_AW, u1 = ((cc + 1) * PED_CELL_W) / PED_AW;
+  const v0 = 1 - ((variant + 1) * PED_CELL_H) / PED_AH, v1 = 1 - (variant * PED_CELL_H) / PED_AH;
+  const n = [-fx, 0, -fz]; // muka ke kamera
+  const rgt = [-fz, 0, fx]; // screen-right kamera
+  const hw = 0.425, hh2 = 0.95, cy = 0.95; // lebar 0.85u, tinggi 1.9u (sama dgn box person: 0..1.94)
+  const P = (sr, sh) => [x + rgt[0] * sr * hw, cy + sh * hh2, z + rgt[2] * sr * hw];
+  quad(SP, P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), n, [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], [1, 1, 1], 12);
+}
+
 // ---- jembatan state: bangun geometri frame dari state game yang hidup ----
 const BRIDGE_POS = { x: 2400, y: 1680, top: 1640, bottom: 1720 }; // dari drawbridge.js
 const WATER_X = 2448;
@@ -1142,7 +1215,7 @@ function heroOf(state) {
 }
 function distPx(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
 
-function buildFrame(state, cam, OP, SH, GL, t) {
+function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // R35-F7: jobs tick — runs once per DRAW (live play + staged shots).
   // The cinematic.update hook CANNOT do this: the shot page only paints
   // twice and never runs the main frame loop, so a cinematic-only tick
@@ -1659,7 +1732,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     const pl = p.plane;
     plane(OP, GL, pl.x * S, pl.y * S, yawOf(pl), (pl.alt || 0) * 0.12, pl.throttle || 0, t, null);
   } else {
-    person(OP, p.x * S, p.y * S, yawOf(p), [0.95, 0.8, 0.2], { kind: 'player' });
+    personSprite(SP, OP, p.x * S, p.y * S, yawOf(p), [0.95, 0.8, 0.2], { kind: 'player' }, cam.fwd, t);
   }
 
   // R35-F9: bullets + muzzle flash (on-foot combat) — BEGIN. Satu blok.
@@ -1728,7 +1801,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
       // soldier olive #5a6b3a — dulu semua biru polisi di 3D).
       const uk = u.kind === 'gunman' ? 'gang' : u.kind === 'soldier' ? 'soldier' : 'police';
       const uc = uk === 'gang' ? [0.64, 0.20, 0.15] : uk === 'soldier' ? [0.35, 0.42, 0.23] : [0.15, 0.30, 0.65];
-      person(OP, u.x * S, u.y * S, yawOf(u), uc, { kind: uk, walkPhase: t * 8 });
+      personSprite(SP, OP, u.x * S, u.y * S, yawOf(u), uc, { kind: uk, walkPhase: t * 8 }, cam.fwd, t);
     }
   }
   const at = state.armored && state.armored.truck;
@@ -1783,8 +1856,8 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   for (const pd of state.peds || []) {
     if (pd.alive === false) continue;
     if (!near(pd.x, pd.y, 1200) || !vis(pd.x, pd.y, 25)) continue;
-    person(OP, pd.x * S, pd.y * S, yawOf(pd), hx(pd.color || '#e8e4d8'),
-      { skin: hx(pd.skin || '#e8b98a'), pants: hx(pd.pants || '#2c3e50'), hat: pd.hat || 0, build: pd.build || 'slim', walkPhase: pd.walkPhase || 0 });
+    personSprite(SP, OP, pd.x * S, pd.y * S, yawOf(pd), hx(pd.color || '#e8e4d8'),
+      { skin: hx(pd.skin || '#e8b98a'), pants: hx(pd.pants || '#2c3e50'), hat: pd.hat || 0, build: pd.build || 'slim', walkPhase: pd.walkPhase || 0 }, cam.fwd, t);
   }
   for (const cl of state.collectibles || []) {
     if (cl.taken) continue;
@@ -1903,7 +1976,43 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     uGradeLift: gl.getUniformLocation(P, 'uGradeLift'), uGradeGain: gl.getUniformLocation(P, 'uGradeGain'),
     uGradeGamma: gl.getUniformLocation(P, 'uGradeGamma'), uRes: gl.getUniformLocation(P, 'uRes'),
     uTime: gl.getUniformLocation(P, 'uTime'), // R36 POSTFX
+    uAtlas: gl.getUniformLocation(P, 'uAtlas'), // R39 SPRITE
   };
+  // R39 SPRITE: muat atlas ped (assets/ped-atlas.png, relatif ke game/index.html).
+  // Gagal load (404/error) -> PED_ATLAS.ok tetap false -> person() box tetap jalan.
+  // Gambar sudah mulai diunduh saat modul dimuat (PED_ATLAS_IMG); di sini
+  // tinggal buat texture GL-nya (butuh konteks gl).
+  // FIX R39 (shot-mode race): bila gambar sudah complete saat loadAtlas jalan,
+  // makeTex() dipanggil sinkron — cabang lama TIDAK PERNAH me-resolve
+  // window.__pedAtlasReady, jadi wait di main.js akan hang selamanya.
+  // Semua titik settle (sukses/gagal, onload/onerror) juga set window.__pa=1.
+  (function loadAtlas() {
+    if (PED_ATLAS.loading || PED_ATLAS.ok || PED_ATLAS.failed) return;
+    PED_ATLAS.loading = true;
+    const img = PED_ATLAS_IMG || new Image();
+    const makeTex = () => {
+      try {
+        PED_ATLAS.tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, PED_ATLAS.tex);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        PED_ATLAS.ok = true;
+        window.__pa = 1;
+        console.log('R39 SPRITE: atlas ped loaded (' + img.width + 'x' + img.height + ')');
+      } catch (e) { PED_ATLAS.failed = true; window.__pa = 1; console.warn('R39 SPRITE: atlas texture failed', e); }
+    };
+    if (img.complete && img.naturalWidth > 0) { makeTex(); if (_pedAtlasResolve) _pedAtlasResolve(PED_ATLAS.ok); }
+    else {
+      img.onload = () => { makeTex(); if (_pedAtlasResolve) _pedAtlasResolve(PED_ATLAS.ok); };
+      img.onerror = () => { PED_ATLAS.failed = true; window.__pa = 1; console.warn('R39 SPRITE: atlas image failed to load — fallback box person()'); if (_pedAtlasResolve) _pedAtlasResolve(false); };
+      if (!PED_ATLAS_IMG) img.src = PED_ATLAS_SRC;
+    }
+  })();
   const skyU = {
     day: gl.getUniformLocation(PS, 'uDay'),
     sky0: gl.getUniformLocation(PS, 'uSky0'), sky1: gl.getUniformLocation(PS, 'uSky1'),
@@ -1918,8 +2027,8 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     gradeGamma: gl.getUniformLocation(PS, 'uGradeGamma'), res: gl.getUniformLocation(PS, 'uRes'),
     time: gl.getUniformLocation(PS, 'uTime'), // R36 POSTFX
   };
-  const OP = newBucket(), SH = newBucket(), GL = newBucket(), GLSH = newBucket(), GL2 = newBucket();
-  const bufOP = makeBufSet(), bufSH = makeBufSet(), bufGL = makeBufSet(), bufGLSH = makeBufSet(), bufGL2 = makeBufSet();
+  const OP = newBucket(), SH = newBucket(), GL = newBucket(), GLSH = newBucket(), GL2 = newBucket(), SP = newBucket();
+  const bufOP = makeBufSet(), bufSH = makeBufSet(), bufGL = makeBufSet(), bufGLSH = makeBufSet(), bufGL2 = makeBufSet(), bufSP = makeBufSet();
   const cam = { yaw: 0, x: 0, z: 0, hx: 0, hy: 0, init: false, eye: [0, 4.4, -8], target: [0, 2.2, 40], fwd: [0, 1] };
   const stats = { ms: 0, tris: 0, calls: 0, mode };
   // R28 IDX32: indeks elemen 32-bit. Bucket OP sudah ~78.588 vertex di HEAD
@@ -1991,9 +2100,10 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     OP.p.length = 0; OP.n.length = 0; OP.u.length = 0; OP.c.length = 0; OP.m.length = 0; OP.i.length = 0;
     SH.p.length = 0; SH.n.length = 0; SH.u.length = 0; SH.c.length = 0; SH.m.length = 0; SH.i.length = 0;
     GL.p.length = 0; GL.n.length = 0; GL.u.length = 0; GL.c.length = 0; GL.m.length = 0; GL.i.length = 0;
-    buildFrame(state, cam, OP, SH, GL, t);
+    SP.p.length = 0; SP.n.length = 0; SP.u.length = 0; SP.c.length = 0; SP.m.length = 0; SP.i.length = 0;
+    buildFrame(state, cam, OP, SH, GL, t, SP);
     splitBucketInto(GL, GLSH, GL2); // R26 §6: material 9 (bayangan kontak) keluar dari G aditif
-    upload(OP, bufOP); upload(SH, bufSH); upload(GLSH, bufGLSH); upload(GL2, bufGL2);
+    upload(OP, bufOP); upload(SH, bufSH); upload(GLSH, bufGLSH); upload(GL2, bufGL2); upload(SP, bufSP);
     gl.viewport(0, 0, glCanvas.width, glCanvas.height);
     gl.clearColor(0.1, 0.05, 0.15, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -2037,6 +2147,15 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
     drawBuf(bufSH);
     drawBuf(bufGLSH);
+    // R39 SPRITE: billboard ped bertekstur (normal blend, depth test tetap jalan
+    // dari pass opaque; depthMask false supaya sprite tidak menelan satu sama lain)
+    if (PED_ATLAS.ok && bufSP.count > 0) {
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, PED_ATLAS.tex);
+      gl.uniform1i(A.uAtlas, 0);
+      drawBuf(bufSP);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+    }
     // glow + smear (additif)
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
     drawBuf(bufGL2);
@@ -2045,8 +2164,9 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     // attribute yang tertinggal menyala + buffer terhapus = INVALID_OPERATION
     for (const loc of [A.p, A.n, A.u, A.c, A.m]) gl.disableVertexAttribArray(loc);
     stats.ms = performance.now() - t0;
-    stats.tris = (OP.i.length + SH.i.length + GL.i.length) / 3;
-    stats.calls = 5; // langit + OP + SH + GLSH + GL
+    stats.tris = (OP.i.length + SH.i.length + GL.i.length + SP.i.length) / 3;
+    stats.calls = 6; // langit + OP + SH + GLSH + SP + GL
+    stats.spriteTris = SP.i.length / 3; // R39: 2 tris/NPC (dulu 96-108 tris box)
     window.__webglFrames = (window.__webglFrames || 0) + 1;
     return stats;
   }

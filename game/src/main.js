@@ -54,7 +54,11 @@ function runShot(name) {
   function paint() {
     renderer.draw(world.state, scene.screen, scene.best, scene.ui || { stationName: RADIO_STATIONS[settings.station].name });
     painted += 1;
-    if (painted < 2) requestAnimationFrame(paint);
+    // R39 SHOT-MODE: atlas ped siap ~7,02 dtk vs paint ke-2 ~7,01 dtk —
+    // paint 2x saja = sprite kalah race, shot juri menampilkan ped box.
+    // Tunggu flag settle atlas (window.__pa, diset loadAtlas + early-fetch,
+    // sukses MAUPUN gagal) sebelum __shotReady; cap 12 paint anti-hang.
+    if (painted < 2 || (!window.__pa && painted < 12)) requestAnimationFrame(paint);
     else window.__shotReady = true;
   }
   requestAnimationFrame(paint);
