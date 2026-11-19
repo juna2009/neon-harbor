@@ -215,40 +215,43 @@ export function stageShot(name, world) {
       // oncoming car can never read as "clearly opposite-lane" — all
       // staged traffic faces away instead.
       const px = state.player.x;
+      // FIX2 (20 Nov, Juna: "mobil numpuk kayak kereta"): the R38 stagger
+      // (±8 px dunia, yaw ±0.03) was one order too small for the chase-cam
+      // optics (fovF 860: ±8 px = ±19 px layar dekat, ±8 px jauh — less
+      // than one car width; the 72 px x-gap U2->T2 was 7 px of screen
+      // height), and the frame actually held SIX cars ahead, not five:
+      // probe (seed 7) found a LIVE orange sedanL at (1909,1106) sitting
+      // 17 px behind U1 — the R33b hide loop spared it because it sits ON
+      // the centreline band (|y-1120|=14). Fix: (1) 5 -> 4 cars ahead,
+      // (2) x-gaps >= 160, (3) traffic eastbound in its CORRECT lane
+      // (road-14 = 1106, like traffic.js createTraffic — stageTrafficCar
+      // puts dir=1 at road+14, the wrong-way lane) while police sit
+      // centreline/south-centre (1126/1128), so consecutive cars differ
+      // ~20-30 px on screen AND in depth — a diagonal, not a column.
+      // All still face east (away): no head-on read (R31 kept).
       const u1 = state.police.units[state.police.units.length - 2];
-      if (u1) { u1.car.x = px + 305; u1.car.y = 1127; u1.car.angle = -0.03; u1.car.speed = 320; }
+      if (u1) { u1.car.x = px + 360; u1.car.y = 1126; u1.car.angle = 0; u1.car.speed = 320; }
       const u2 = state.police.units[state.police.units.length - 1];
-      if (u2) { u2.car.x = px + 448; u2.car.y = 1113; u2.car.angle = 0.025; u2.car.speed = 300; }
+      if (u2) { u2.car.x = px + 700; u2.car.y = 1128; u2.car.angle = 0; u2.car.speed = 300; }
       stageTrafficCar(world, 'h', 1120, px + 200, 1, 110);
-      // round 21: more traffic ahead for depth (center lane only now)
-      stageTrafficCar(world, 'h', 1120, px + 520, 1, 110);
-      stageTrafficCar(world, 'h', 1120, px + 700, 1, 100);
-      // R38 (item 5): STAGGER the convoy. R33 forced all 5 cars to y=1120
-      // exactly and the re-shoot reads as a ruler-straight file — staged,
-      // not traffic. Stagger stays INSIDE the centre lane: |y-1120| <= 8
-      // (R33's "nempel gedung" limit — never back to road+14), uneven x
-      // gaps (113/143/85/155) and a small yaw (±0.03) so each car sits at
-      // its own angle like real traffic. Police units staggered too.
-      const convoy = state.traffic.cars
+      stageTrafficCar(world, 'h', 1120, px + 540, 1, 110);
+      // Lanes, nearest first: both traffic cars in the eastbound lane
+      // (1106). The R38 stagger block is deleted, not tuned — its whole
+      // amplitude was below one car width on screen.
+      const lane = state.traffic.cars
         .filter((c) => c.staged && c.road === 1120)
         .sort((a, b) => a.x - b.x);
-      const stagger = [
-        { dx: -8, dy: -6, a: 0.02 },
-        { dx: 13, dy: 8, a: -0.02 },
-        { dx: -12, dy: -5, a: 0.03 },
-      ];
-      convoy.forEach((c, i) => {
-        const s = stagger[i] || stagger[0];
-        c.x += s.dx; c.y = 1120 + s.dy; c.angle = s.a;
-      });
+      for (const c of lane) { c.y = 1106; c.angle = 0; }
       // R33-MERGE (Juna #5): staged convoy on the CENTRELINE. stageTrafficCar
       // puts dir=1 cars at road+14 (one lane over); at chase distance that
       // reads as hugging the building line. Probe (seed 7): all 3 staged
       // cars + both police units were at y=1134, none at 1120.
-      // R38: clamp to |y-1120| <= 8 instead of forcing =1120 — the clamp
-      // keeps R33's guarantee (no car near the buildings) while preserving
-      // the stagger above.
-      for (const c of state.traffic.cars) if (c.staged && c.road === 1120) c.y = Math.max(1112, Math.min(1128, c.y));
+      // FIX2: clamp band widens to [1106,1128] — the lower bound is now
+      // the correct eastbound lane, not the centreline; the upper bound
+      // (1128) is unchanged, so no car moves back toward the buildings.
+      // The clamp is a safety net only: the lanes above already place
+      // every staged car inside it.
+      for (const c of state.traffic.cars) if (c.staged && c.road === 1120) c.y = Math.max(1106, Math.min(1128, c.y));
       // R33: Juna — "mobil jangan ada di samping situ". The R31 staged
       // parked cars (parkSpots) are DELETED, and every live parked car in
       // the visible stretch is hidden for this shot (alive=false). Only the
@@ -266,8 +269,14 @@ export function stageShot(name, world) {
       // unstaged traffic car off the road-1120 centreline in the visible
       // stretch. Staged traffic + police (all in the centre lane) are
       // untouched (staged cars carry staged=true).
+      // FIX2: also hide unstaged traffic ON the centreline band inside the
+      // staged corridor (x < px+800) — the live orange car (1909,1106)
+      // survived the old rule exactly because |y-1120|=14 <= 30. Beyond
+      // +800 a centreline car stays: it reads as distant traffic at the
+      // vanishing point, not part of the formation.
       for (const c of state.traffic.cars) {
-        if (!c.staged && c.alive && c.x > px - 100 && c.x < px + 1600 && Math.abs(c.y - 1120) > 30) c.alive = false;
+        if (!c.staged && c.alive && c.x > px - 100 && c.x < px + 1600
+          && (Math.abs(c.y - 1120) > 30 || c.x < px + 800)) c.alive = false;
       }
     }
     const cp = world.state.player;
