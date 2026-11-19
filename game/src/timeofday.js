@@ -73,23 +73,25 @@ export const PRESETS = {
   },
   // SORE — sunset yang sudah ada, 18:30. BASELINE — semua nilai di bawah
   // adalah nilai hardcode yang SUDAH ADA di webgl2.js / city3d.js hari ini.
-  // Jangan diubah; preset ini membuktikan patch tidak merusak yang diterima.
+  // FIX1 (20 Nov, Juna: gedung sore coklat-oranye seragam): preset sore
+  // DIUBAH seperlunya supaya fasad tetap bervariasi — lihat tag FIX1 di
+  // bawah; langit/matahari/neon TIDAK diubah, sunset tetap sunset.
   sore: {
     name: 'sore', label: 'Sore — sunset (baseline)', hour: 18.5, daylight: 0.45, nightF: 0.43,
     sky5: [[1.00, 0.72, 0.42], [1.00, 0.50, 0.22], [0.85, 0.28, 0.38], [0.45, 0.14, 0.42], [0.12, 0.05, 0.28]], // = stop SKYF
     sky4: [[30, 11, 51], [107, 35, 85], [255, 179, 92], [255, 150, 110]], // = SKY[1] city3d
-    sun: { y: 0.30, col: [1.00, 0.55, 0.30], disc: [1.00, 0.91, 0.66], glow: [1.00, 0.75, 0.45], pos: [0.55, 0.56] },
+    sun: { y: 0.30, col: [1.00, 0.72, 0.55], disc: [1.00, 0.91, 0.66], glow: [1.00, 0.75, 0.45], pos: [0.55, 0.56] }, // FIX1 v2: sun.col (0.66,0.45 -> 0.72,0.55) — hangat netral; disc/glow TIDAK diubah (piringan matahari tetap sunset)
     moon: 0, moonCol: [0.90, 0.93, 1.00],
-    ambG: [0.35, 0.22, 0.30], ambS: [0.55, 0.30, 0.42], // = amb FS
-    hz: [1.00, 0.55, 0.38], // = HZ FS
-    winLit: 0.58, winTint: [1.00, 1.00, 1.00], // step(0.42) = 1 - 0.58
+    ambG: [0.38, 0.33, 0.46], ambS: [0.55, 0.45, 0.60], // FIX1 v2: ambient lebih dingin lagi (R/B campuran ≈1,0) — v1 hanya 1.94->1.52, kurang; fasad biru harus <1,2
+    hz: [0.95, 0.75, 0.70], // FIX1 v2: kabut dusty-rose pucat, bukan oranye — SKYF TIDAK pakai uHz (langit murni sky5), jadi langit sunset aman; hz hanya fog geometri + kaca + air
+    winLit: 0.58, winTint: [0.88, 0.94, 1.05], // FIX1: jendela menyala sedikit putih-dingin — kontras lawan fasad hangat
     neonGain: 2.2, lamp: 0.70, headlight: 0.50, wet: 0.40, // = base * 2.2 emissive
     waterDeep: [0.05, 0.20, 0.32], waterSky: [1.00, 0.55, 0.35], // = FS air
     stars: 0.10, cloud: [1.00, 0.55, 0.55], cloudK: 0.20, smog: 0.35,
     skyDim: 0.30, exposure: 1.00,
-    facK: 0.55, winCell: [2.2, 2.6], winGlass: 0.7, winWarm: 1, // GEDUNG: sel jendela netral lebih kecil+rapat, kaca gelap di semua waktu
-    contrast: 0, shadowK: 0.5, roadTex: 0, fogK: 1, sunK: 0.9, // R27c SUN: 0.9 = kode sunset di SKYF webgl2.js (disc 0.045->0.032, glow 0.9->0.55, falloff 7->12, streak 0.4->0.22) — perbaikan blown-out VIDEO-REVIEW #2; pagi/siang/malam TIDAK berubah
-    bldShadow: false, heroReal: true, // GEDUNG R2: hero v14 realistis di semua waktu (arah R26, hapus gate),
+    facK: 0.75, winCell: [2.2, 2.6], winGlass: 0.7, winWarm: 1, // FIX1 v2: facK 0.68->0.75 — fasad lebih terang lagi (efektif sore 0.75*dayK 0,64 masih jauh di bawah siang 0.72*1,12)
+    contrast: 0.35, shadowK: 0.5, roadTex: 0, fogK: 0.45, sunK: 0.9, // FIX1 v2: fogK 0.8->0.45 (= siang) — v1 terbukti fog masih mendominasi (clamp 0,85; f≈0,46 di 70u). contrast 0.35 tetap; R27c SUN: sunK 0.9 = kode sunset di SKYF webgl2.js (disc 0.045->0.032, glow 0.9->0.55, falloff 7->12, streak 0.4->0.22) — perbaikan blown-out VIDEO-REVIEW #2
+    bldShadow: true, heroReal: true, // FIX1: bldShadow false->true (siang sudah true) — bayangan kontak gedung terlihat, gedung terpisah dari tanah
   },
   // MALAM — blue hour -> malam, 22:00. Langit biru dalam (bible §2.3) +
   // horizon oranye tipis, bulan, bintang, neon + lampu jalan dominan,
@@ -201,7 +203,7 @@ export function presetForHour(hour) {
 const GRADE = {
   pagi: { lift: [0.01, 0.01, 0.02], gain: [1.02, 1.00, 1.04], gamma: 1.05 },
   siang: { lift: [0.00, 0.00, 0.00], gain: [1.04, 1.03, 1.00], gamma: 0.98 },
-  sore: { lift: [0.015, 0.005, 0.01], gain: [1.06, 1.00, 0.94], gamma: 0.95 },
+  sore: { lift: [0.015, 0.005, 0.01], gain: [1.03, 1.00, 0.97], gamma: 0.95 }, // FIX1: gain [1.06,1.00,0.94]->[1.03,1.00,0.97] — grade hampir netral; langit tetap oranye lewat sky5
   malam: { lift: [0.02, 0.02, 0.035], gain: [0.98, 1.00, 1.06], gamma: 1.08 },
 };
 const _g = (name) => GRADE[name] || { lift: [0, 0, 0], gain: [1, 1, 1], gamma: 1 };
