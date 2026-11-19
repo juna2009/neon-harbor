@@ -4,8 +4,9 @@
 // All content is our own (Neon Harbor / Jax / Mara) — no rival text or art.
 // UI-TOP (batch a, base cb4130f): Bug 7 numbering fix + MILITARY banner slot +
 // stats-panel tidy + ROAD TO #1 1px border. See PATCH-SPEC-UI-TOP.md.
-import { COLORS as C, UPGRADES, WEAPONS, WORLD_H, WORLD_W } from './config.js';
+import { COLORS as C, RADIO_STATIONS, UPGRADES, WEAPON_ORDER, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
+import { drawMinimap } from './minimap.js';
 
 // Touch controls (post-cut wiring, 0 bytes in the dossier text): on touch
 // devices only, load touch.js with a dynamic import — the dossier's static
@@ -172,64 +173,10 @@ function minimapShape() {
   } catch (e) { return 'square'; }
 }
 export function drawMinimap2(c, st, x, y, w, h) {
-  const sx = w / WORLD_W, sy = h / WORLD_H;
-  const round = minimapShape() === 'round';
-  const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2;
-  c.save();
-  if (round) {
-    // dark disc backing so the clipped corners read as panel, not void
-    c.fillStyle = 'rgba(10,15,28,0.85)';
-    c.beginPath(); c.arc(cx, cy, r + 6, 0, 7); c.fill();
-    c.beginPath(); c.arc(cx, cy, r, 0, 7); c.clip();
-  } else {
-    drawPanel(c, x - 6, y - 6, w + 12, h + 30, C.neonCyan);
-  }
-  // ---- world (identical for both shapes — only the clip/frame differs) ----
-  c.fillStyle = '#2e6b3a'; c.fillRect(x, y, w, h);
-  c.fillStyle = '#1d6f9e'; c.fillRect(x + WATER_X * sx, y, (WORLD_W - WATER_X) * sx, h);
-  c.fillStyle = '#4a4f57';
-  for (const rx of st.city.roadsV) c.fillRect(x + rx * sx - 2.5, y, 5, h);
-  for (const ry of st.city.roadsH) c.fillRect(x, y + ry * sy - 2.5, w, 5);
-  c.fillStyle = '#3f8f4f';
-  for (const pk of st.city.parks) c.fillRect(x + pk.x * sx, y + pk.y * sy, Math.max(3, pk.w * sx), Math.max(3, pk.h * sy));
-  c.fillStyle = '#ffd23e';
-  for (const cl of st.collectibles) if (!cl.taken) c.fillRect(x + cl.x * sx - 1.5, y + cl.y * sy - 1.5, 3, 3);
-  if (st.mission.target) drawMapMission2(c, x + st.mission.target.x * sx, y + st.mission.target.y * sy, 13, st.elapsed);
-  const gas = st.gasStation;
-  drawMapGas2(c, x + (gas.x + gas.w / 2) * sx, y + (gas.y + gas.h / 2) * sy, 13);
-  if (st.city.garage) drawMapWrench2(c, x + st.city.garage.x * sx, y + st.city.garage.y * sy, 13);
-  for (const hd of st.hydrants) drawMapHydrant2(c, x + hd.x * sx, y + hd.y * sy, 11);
-  if (st.city.casino) drawMapDot2(c, x + st.city.casino.x * sx, y + st.city.casino.y * sy, 4, '#ffd23e');
-  if (st.city.lighthouse) drawMapDot2(c, x + st.city.lighthouse.x * sx, y + st.city.lighthouse.y * sy, 4, '#ffffff');
-  if (st.bridge) drawMapBridge2(c, x + 2400 * sx, y + 1680 * sy, 13, st.bridge.up);
-  for (const b of st.boats || []) if (b.alive) drawMapDot2(c, x + b.x * sx, y + b.y * sy, 4, '#ffffff', '#37e0e6');
-  for (const u of st.police.units) {
-    const ux = u.kind === 'car' ? u.car.x : u.x, uy = u.kind === 'car' ? u.car.y : u.y;
-    if (u.kind === 'gunman') drawMapDot2(c, x + ux * sx, y + uy * sy, 4, '#ff5a3c');
-    else drawMapPolice2(c, x + ux * sx, y + uy * sy, 9, !!u.roadblock);
-  }
-  if (st.police.heli && st.police.heli.active) drawMapDot2(c, x + st.police.heli.x * sx, y + st.police.heli.y * sy, 5, '#ffffff', '#ff5a3c');
-  const p = st.player;
-  drawMapPlayer2(c, x + p.x * sx, y + p.y * sy, 14, p.angle);
-  c.restore();
-  // ---- frame (shape-specific) ----
-  if (round) {
-    c.save();
-    c.shadowColor = C.neonCyan; c.shadowBlur = 12;
-    c.lineWidth = 2; c.strokeStyle = C.neonCyan;
-    c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke();
-    c.restore();
-    c.lineWidth = 1; c.strokeStyle = 'rgba(238,241,245,0.5)';
-    c.beginPath(); c.arc(cx, cy, r - 3, 0, 7); c.stroke();
-  } else {
-    // 1px inner hairline so the map reads as its own surface (bible §6.5)
-    c.lineWidth = 1; c.strokeStyle = 'rgba(238,241,245,0.35)';
-    c.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-  }
-  // label + north arrow (same strip, both shapes)
-  drawPill(c, x + 2, y + h + 2, 104, 20, '#0e1420e6', C.neonCyan);
-  T(c, 'NEON HARBOR', x + 54, y + h + 13, 11, C.neonCyan, 'center', 'bold');
-  T(c, 'N ↑', x + w - 4, y + h + 13, 11, '#eef1f5', 'right', 'bold');
+  // BEAT-GHK A1b: delegate the world + frame + label to the redrawn
+  // drawMinimap in minimap.js (the live minimap was drawMinimap2 inline;
+  // minimap.js was unimported, so the redraw alone changed nothing).
+  drawMinimap(c, st, x, y, w, h);
   // PD response panel: right column, below the minimap frame (own function,
   // appended at the end of this file). Called here because this batch owns
   // drawMinimap2 only — render.js / drawHud2 are untouched. Panel is 232 px
@@ -305,6 +252,64 @@ function segBar(c, x, y, w, h, frac, color, segs) {
     rr(c, x + i * (sw + 2), y, sw, h, 3); c.fill();
   }
 }
+// ---- HUD-BEAT-GHK: weapon slot bar (own design) ----
+// One slot per weapon in WEAPON_ORDER; owned = ammo+reserve > 0 (world.js
+// p.weapons, Q cycles the owned ones). The active slot gets its weapon
+// colour border + tint + top tick; unowned slots stay dimmed, never hidden,
+// so the full arsenal is always visible. Ammo is per slot ("mag/reserve"),
+// replacing the old single-weapon row + 10 ammo pips (same info, per slot).
+function drawWeaponSlots(c, x, y, w, p) {
+  const ws = (p && p.weapons) || {};
+  WEAPON_ORDER.forEach((key, i) => {
+    const def = WEAPONS[key];
+    const have = ws[key] || { ammo: 0, reserve: 0 };
+    const owned = have.ammo + have.reserve > 0;
+    const active = owned && p.weapon === key;
+    const sx = x + i * (w + 5);
+    c.fillStyle = active ? def.color + '30' : '#0e1420';
+    rr(c, sx, y, w, 32, 6); c.fill();
+    c.lineWidth = active ? 2 : 1.5;
+    c.strokeStyle = active ? def.color : 'rgba(238,241,245,0.25)';
+    rr(c, sx, y, w, 32, 6); c.stroke();
+    if (active) { c.fillStyle = def.color; c.fillRect(sx + 4, y, w - 8, 3); }
+    T(c, String(i + 1), sx + 6, y + 12, 10, owned ? '#c8cdd6' : '#5a6270', 'left', 'bold');
+    T(c, def.name.toUpperCase(), sx + w / 2 + 4, y + 12, 11, owned ? '#ffffff' : '#5a6270', 'center', 'bold');
+    T(c, owned ? have.ammo + '/' + have.reserve : '—', sx + w / 2, y + 25, 12, active ? '#ffd23e' : owned ? '#eef1f5' : '#5a6270', 'center', 'bold');
+  });
+}
+// ---- HUD-BEAT-GHK: RESPECT tiers (display-only) ----
+// No respect field exists in game state (checked main.js / missions.js /
+// world.js): the meter below is a display-only derivation of mission
+// progress — the same source as ROAD TO #1 (done/13) — with a tier label
+// from the done count. No gameplay or logic change.
+function respectTier(done) {
+  if (done >= 12) return 'HARBOR KING';
+  if (done >= 9) return 'HARBOR BOSS';
+  if (done >= 6) return 'STREET BOSS';
+  if (done >= 3) return 'HUSTLER';
+  return 'ROOKIE';
+}
+// ---- HUD-BEAT-GHK: vehicle display names (own labels) ----
+// car.body values come from traffic.js / vehicles.js (sedan, van, taxi,
+// bus, fire, medic, apc, hatchback, sedanL, pickup, police); no import —
+// this map is display-only and a fallback uppercases anything unknown.
+const VEHICLE_LABELS = { sedan: 'SEDAN', sedanL: 'SEDAN', hatch: 'HATCHBACK', hatchback: 'HATCHBACK', van: 'VAN', taxi: 'TAXI', bus: 'CITY BUS', fire: 'FIRE TRUCK', medic: 'AMBULANCE', apc: 'APC', pickup: 'PICKUP', police: 'PD CRUISER' };
+function vehicleLabel(body) {
+  return VEHICLE_LABELS[body] || (body ? String(body).toUpperCase() : 'STREET CAR');
+}
+// ---- HUD-BEAT-GHK: radio mini-panel (station + genre/BPM) ----
+// No song titles exist in state (the radio is generative WebAudio loops in
+// music.js), so line 2 is the station's real tag + BPM from RADIO_STATIONS.
+// Same 132 px slot as the old pill, so the mode badge in render.js (x 152,
+// same row) stays glued to its right edge.
+function drawRadioPanel2(c, x, y, w, stationName) {
+  const stn = RADIO_STATIONS.find((s) => s.name === stationName);
+  const sub = stn ? stn.tag.toUpperCase() + ' · ' + stn.bpm + ' BPM' : 'ON AIR';
+  c.fillStyle = '#0e1420e6'; rr(c, x, y, w, 38, 8); c.fill();
+  c.lineWidth = 1.5; c.strokeStyle = C.neonPink; rr(c, x, y, w, 38, 8); c.stroke();
+  T(c, '♪ ' + stationName.toUpperCase(), x + w / 2, y + 13, 11, C.neonPink, 'center', 'bold');
+  T(c, sub, x + w / 2, y + 28, 10, '#c8cdd6', 'center', 'bold');
+}
 export function drawHud2(c, st, best, ui, view) {
   const p = st.player;
   // R27c HUD fix: all coordinates below are DESIGN coords (1280x800).
@@ -330,20 +335,18 @@ export function drawHud2(c, st, best, ui, view) {
   T(c, Math.round(p.health) + ' HP', 284, 66, 13, '#eef1f5', 'right', 'bold');
   T(c, 'WANTED', 24, 96, 11, '#c8cdd6', 'left', 'bold');
   drawWantedRow2(c, 96, 96, 12, 6, Math.floor(st.wanted));
-  const wp = WEAPONS[p.weapon];
-  T(c, wp.name.toUpperCase(), 24, 122, 13, '#eef1f5', 'left', 'bold');
-  // UI-TOP: 10 ammo pips (was 12) to match the 10-segment HP bar above;
-  // same info, one rhythm. Count is compact ("24/120") + right-aligned.
-  const pips = 10, filled = Math.ceil((p.ammo / wp.mag) * pips);
-  for (let i = 0; i < pips; i++) {
-    c.fillStyle = i < filled ? '#ffd23e' : '#2a3242';
-    rr(c, 96 + i * 13, 115, 8, 14, 2); c.fill();
-  }
-  T(c, p.ammo + '/' + p.reserve, 284, 122, 13, '#eef1f5', 'right', 'bold');
-  T(c, '◆ ' + collected + '/' + st.collectibles.length + ' HARBOR TOKENS', 24, 148, 13, C.neonYellow, 'left', 'bold');
+  // HUD-BEAT-GHK: weapon slot bar + RESPECT meter + tokens (panel unchanged
+  // 284x176 — the slots replace the old weapon row + pips at the same band,
+  // RESPECT takes the tokens row's old slot, tokens shrink to 11 px at the
+  // panel bottom; the radio pill below stays in its 132 px slot).
+  drawWeaponSlots(c, 24, 108, 82, p);
+  const done = st.missionDone || 0, total = st.missionTotal || 13;
+  T(c, 'RESPECT  ·  ' + done + '/' + total, 24, 150, 11, C.neonCyan, 'left', 'bold');
+  T(c, respectTier(done), 284, 150, 11, '#ffd23e', 'right', 'bold');
+  segBar(c, 24, 156, 260, 10, total ? done / total : 0, '#ffd23e', 13);
+  T(c, '◆ ' + collected + '/' + st.collectibles.length + ' HARBOR TOKENS', 24, 180, 11, C.neonYellow, 'left', 'bold');
   if (ui && ui.stationName) {
-    drawPill(c, 12, 196, 132, 24, '#0e1420e6', C.neonPink);
-    T(c, '♪ ' + ui.stationName, 78, 209, 13, C.neonPink, 'center', 'bold');
+    drawRadioPanel2(c, 12, 196, 132, ui.stationName);
   }
   });
   // ---- top-center cluster: day readout + ROAD TO #1 (anchor W2/2,0) ----
@@ -387,39 +390,43 @@ export function drawHud2(c, st, best, ui, view) {
   }
   drawMinimap2(c, st, W2 - 188, 16, 160, 120);
   });
-  // ---- bottom-right cluster: speedo (anchor W2,H2) ----
-  // plain big tabular number, no heavy box (reference "111 MPH" +
-  // "MERIDIAN · 82%"; bible §6.2: real-time numbers tabular so the counter
-  // never wobbles; §6.1: outline + drop shadow carry the contrast, so no
-  // panel is needed). Right-anchored at W2-24: the number grows leftward as
-  // digits change, the right edge never moves.
+  // ---- bottom-right cluster: vehicle panel (anchor W2,H2) ----
+  // HUD-BEAT-GHK: the loose big number + "CAR · 100%" text become a proper
+  // panel (own design): vehicle name + CONDITION bar + big tabular speed +
+  // KM/H + gear chip (cars only — boats have no gears). Same bottom-right
+  // anchor and same on-foot-hidden behaviour as the old speedo; the
+  // tires-popped pill moves 18 px up so it clears the panel top.
   // On foot the whole block stays hidden (no empty box left behind).
   hudCluster(c, W2, H2, SW, SH, s, () => {
   if ((p.inCar && p.car) || (p.inBoat && p.boat)) {
     const veh = p.inCar ? p.car : p.boat;
     const spd = Math.round(Math.abs(veh.speed) * 0.36);
     const hp = Math.max(0, Math.round(veh.hp || 0));
-    const rx = W2 - 24;
+    const px = W2 - 268, py = H2 - 136, pw = 244, ph = 108;
+    drawPanel(c, px, py, pw, ph, C.neonCyan);
+    T(c, p.inCar ? vehicleLabel(p.car.body) : 'SPEEDBOAT', px + 12, py + 20, 13, '#ffffff', 'left', 'bold');
+    T(c, (p.inCar ? 'CAR' : 'BOAT') + ' · ' + hp + '%', px + pw - 12, py + 20, 12, hp > 50 ? '#7be382' : hp > 25 ? '#ffd23e' : '#ff5a3c', 'right', 'bold');
+    T(c, 'CONDITION', px + 12, py + 40, 10, '#c8cdd6', 'left', 'bold');
+    segBar(c, px + 12, py + 46, pw - 24, 10, hp / 100, hp > 50 ? '#4ade80' : hp > 25 ? '#ffd23e' : '#ef4444', 10);
     c.save();
-    c.font = 'bold 64px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
-    c.textAlign = 'right'; c.textBaseline = 'alphabetic';
-    c.lineWidth = 5; c.strokeStyle = 'rgba(8,12,24,0.6)';
-    c.strokeText(String(spd), rx, H2 - 68);
+    c.font = 'bold 46px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+    c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+    c.lineWidth = 4; c.strokeStyle = 'rgba(8,12,24,0.6)';
+    c.strokeText(String(spd), px + 12, py + 96);
     c.shadowColor = 'rgba(5,8,16,0.75)'; c.shadowBlur = 8; c.shadowOffsetY = 2;
     c.fillStyle = '#ffffff';
-    c.fillText(String(spd), rx, H2 - 68);
+    c.fillText(String(spd), px + 12, py + 96);
+    const sw = c.measureText(String(spd)).width;
     c.restore();
-    // unit (+ gear in a car — display-only derivation, 6 gears over 0-540)
-    // then vehicle + condition, both right-aligned, soft shadowed
-    const gear = p.inCar ? Math.min(6, 1 + Math.floor(Math.abs(veh.speed) / 90)) : 0;
-    c.save();
-    c.shadowColor = 'rgba(5,8,16,0.7)'; c.shadowBlur = 6; c.shadowOffsetY = 1;
-    T(c, 'KM/H' + (p.inCar ? ' · GEAR ' + gear : ''), rx, H2 - 48, 14, '#ffd23e', 'right', 'bold');
-    T(c, (p.inCar ? 'CAR' : 'BOAT') + ' · ' + hp + '%', rx, H2 - 28, 12, '#c8cdd6', 'right', 'bold');
-    c.restore();
+    T(c, 'KM/H', px + 12 + sw + 8, py + 96, 13, '#ffd23e', 'left', 'bold');
+    if (p.inCar) {
+      const gear = Math.min(6, 1 + Math.floor(Math.abs(veh.speed) / 90));
+      drawPill(c, px + pw - 56, py + 66, 44, 28, '#ffd23e', '#fff');
+      T(c, 'G' + gear, px + pw - 34, py + 81, 14, '#0e1420', 'center', 'bold');
+    }
     if (p.car && p.car.tiresPopped) {
-      drawPill(c, W2 - 300, H2 - 150, 288, 26, '#ff3b30', '#fff');
-      T(c, 'TIRES POPPED — GARAGE $150 (G)', W2 - 156, H2 - 136, 13, '#fff', 'center', 'bold');
+      drawPill(c, W2 - 300, H2 - 168, 288, 26, '#ff3b30', '#fff');
+      T(c, 'TIRES POPPED — GARAGE $150 (G)', W2 - 156, H2 - 154, 13, '#fff', 'center', 'bold');
     }
   }
   });
@@ -499,6 +506,9 @@ export function drawTitle2(c, view, best, prog, backdrop, live) {
   const W2 = view.w, H2 = view.h;
   if (backdrop) backdrop(c);
   else { c.fillStyle = '#0e1420'; c.fillRect(0, 0, W2, H2); }
+  // TITLE-A6: banner height (46, or 64 when the objective wraps to two
+  // lines) — the BEST CASH pill needs it on short viewports (see below).
+  let titleBannerH = 46;
   // TITLE-FIX (Bug 6): the 3D backdrop (city3d frame) paints a HARDCODED
   // staging HUD — CHAPTER 12/12, $2,150, 4 stars, 142 MPH, GEAR 6 — that
   // contradicts the real progress. city3d.js is out of scope, so the live
@@ -506,21 +516,49 @@ export function drawTitle2(c, view, best, prog, backdrop, live) {
   if (live) {
     const CX = W2 / 2;
     // --- chapter banner (was: CHAPTER 12/12: THE HARBOR KING) ---
+    // TITLE-A6: the banner must never run under the top-right status panel
+    // (at 640x360 the panel covered the banner's right end and the objective
+    // was cut: "STEAL A CAR, THEN DRIVE TO THE I"). Text is centered in the
+    // VISIBLE part of the box, shrunk 15->13->11px, and wrapped to two lines
+    // (taller box) if it still does not fit. At >=1280x720 the old geometry
+    // is unchanged (mission-1 text fits at 15px, box clear of the panel).
     const chLabel = 'CHAPTER ' + live.chapter + '/' + live.total + ': ' + live.chapterTitle.toUpperCase();
     const chSub = live.objective.toUpperCase();
+    const panelX = W2 - 216;
+    let chFont = 15, chLines = [chSub];
     c.font = 'bold 15px ' + FONT;
     const bw = Math.min(W2 - 48, Math.max(400, c.measureText(chSub).width + 56));
     const bx = CX - bw / 2;
+    const visR = Math.min(bx + bw, panelX - 8);
+    const visCX = (bx + visR) / 2;
+    const fitW = visR - bx - 56;
+    for (const f of [15, 13, 11]) {
+      c.font = 'bold ' + f + 'px ' + FONT;
+      if (c.measureText(chSub).width <= fitW) { chFont = f; chLines = [chSub]; break; }
+      chFont = f;
+    }
+    if (c.measureText(chSub).width > fitW) {
+      const words = chSub.split(' ');
+      const half = Math.ceil(words.length / 2);
+      let l1 = words.slice(0, half).join(' '), l2 = words.slice(half).join(' ');
+      while (c.measureText(l1).width > fitW && l1.includes(' ')) {
+        const w = l1.slice(l1.lastIndexOf(' ') + 1);
+        l1 = l1.slice(0, l1.lastIndexOf(' ')); l2 = w + ' ' + l2;
+      }
+      chLines = [l1, l2]; chFont = 11;
+    }
+    const bh = 46 + (chLines.length - 1) * 18;
+    titleBannerH = bh;
     const ux = Math.min(CX - 200, bx), uw = Math.max(CX + 200, bx + bw) - ux;
     c.fillStyle = '#0e081e';
-    rr(c, ux, 16, uw, 46, 8); c.fill();
+    rr(c, ux, 16, uw, bh, 8); c.fill();
     c.fillStyle = 'rgba(8,8,24,0.75)';
-    rr(c, bx, 16, bw, 46, 8); c.fill();
-    c.lineWidth = 1.5; c.strokeStyle = '#c9a227'; rr(c, bx, 16, bw, 46, 8); c.stroke();
+    rr(c, bx, 16, bw, bh, 8); c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = '#c9a227'; rr(c, bx, 16, bw, bh, 8); c.stroke();
     c.fillStyle = '#ffd23e'; c.font = 'bold 11px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'alphabetic';
-    c.fillText(chLabel, CX, 33);
-    c.fillStyle = '#ffffff'; c.font = 'bold 15px ' + FONT;
-    c.fillText(chSub, CX, 52);
+    c.fillText(chLabel, visCX, 33);
+    c.fillStyle = '#ffffff'; c.font = 'bold ' + chFont + 'px ' + FONT;
+    chLines.forEach((ln, i) => c.fillText(ln, visCX, 52 + i * 18));
     // --- top-right status panel (was: 4 stars, $2,150, two bare bars) ---
     const px = W2 - 216, py = 16, pw = 200, ph = 92;
     c.fillStyle = '#0e0a1e';
@@ -536,8 +574,15 @@ export function drawTitle2(c, view, best, prog, backdrop, live) {
     rr(c, px + 28, py + 58, Math.round(106 * Math.max(0, live.health) / 100), 7, 3); c.fill();
     T(c, 'HP ' + Math.round(live.health) + '%', px + 140, py + 62, 10, '#eef1f5', 'left', 'bold');
     T(c, 'JAX MARLOWE', px + 12, py + 82, 10, '#35f0ff', 'left');
-    // --- speed panel: erase with a live copy of the clean road strip left of it ---
+    // --- speed panel (TITLE-A6): the backdrop's hardcoded "142 MPH" must
+    // never show on title. Wide screens: erase with a live copy of the
+    // clean road strip left of it (verified clean at 1280x720). Narrow
+    // screens (<=640: the old `W2 > 640` guard skipped the erase entirely,
+    // and the strip left of the panel is the title card, not road): cover
+    // the panel with an opaque dark rect — the corner road is near-black,
+    // so the cover blends instead of leaving a panel-shaped hole.
     if (W2 > 640) c.drawImage(c.canvas, W2 - 396, H2 - 88, 180, 72, W2 - 196, H2 - 88, 180, 72);
+    else if (W2 > 220) { c.fillStyle = '#241b22'; rr(c, W2 - 196, H2 - 88, 180, 72, 8); c.fill(); }
     // --- clock line (was: DAY 1 · 21:02 · HARBOR · HEAT 30) ---
     const clock = 'DAY ' + live.day + ' · ' + live.time + ' · ' + live.district + ' · HEAT ' + live.heat;
     c.font = 'bold 12px ' + FONT;
@@ -592,8 +637,12 @@ export function drawTitle2(c, view, best, prog, backdrop, live) {
   T(c, 'PRESS ENTER TO START', cx, y + 19, 16, '#ffffff', 'center', 'bold');
   // BEST CASH stays centered on the SCREEN (card is narrow now; cx would
   // collide with the clock pill at bottom-left).
-  drawPill(c, W2 / 2 - 78, H2 - 34, 156, 24, '#0e1420e6', C.cash);
-  T(c, 'BEST CASH $' + best.toLocaleString('en-US'), W2 / 2, H2 - 21, 13, C.cash, 'center', 'bold');
+  // TITLE-A6: on short viewports the 400-tall card overflows the bottom and
+  // the pill lands on the intro paragraph (640x360). There it sits just
+  // below the chapter banner instead; at >=480px tall it stays bottom-center.
+  const bcY = H2 < 480 ? 16 + titleBannerH + 8 : H2 - 34;
+  drawPill(c, W2 / 2 - 78, bcY, 156, 24, '#0e1420e6', C.cash);
+  T(c, 'BEST CASH $' + best.toLocaleString('en-US'), W2 / 2, bcY + 13, 13, C.cash, 'center', 'bold');
 }
 // ---- mission banner v2 ----
 export function drawMissionBanner2(c, view, chapter, total, title) {

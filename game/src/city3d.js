@@ -35,12 +35,17 @@ for(let z=10;z<900;z+=24+R()*10){
 function wins(b){const{x,z:zf,w,h,bi}=b,nc=Math.max(2,w/2.6|0),nr=Math.max(3,h/3.4|0),t=hz(zf-camZ);
   for(let i=0;i<nc;i++)for(let j=0;j<nr;j++){const q=h2(bi*131+i*7,j*3+1),q2=h2(bi*17+i*3,j*11+5);
     const wx=x-w/2+1.2+(w-2.4)*(i+.15)/nc,wy=2+(h-3)*(j+.2)/nr,ww=(w-2.4)/nc*.62*(.75+.5*q2),wh=(h-3)/nr*.6*(.8+.4*q2);
-    const c=q<.3?[255,205,120]:q<.45?[120,215,255]:q<.62?[255,150,90]:q2<.5?[52,66,88]:[34,44,62];
+    const c=q<.4?[255,205,120]:q<.57?[255,190,120]:q<.62?[255,150,90]:q2<.5?[52,66,88]:[34,44,62];
     Q([wx,wy,zf],[wx+ww,wy,zf],[wx+ww,wy+wh,zf],[wx,wy+wh,zf],mix(c,t),zf-camZ);}}
 function bld(b){const{x,z,w,d,h,c}=b,zf=z-d/2,zb=z+d/2,dep=zf-camZ;if(dep<35)return;const sx=x>0?x-w/2:x+w/2;
   Q([x-w/2,0,zf],[x+w/2,0,zf],[x+w/2,h,zf],[x-w/2,h,zf],sh(c,.8,hz(dep)),dep);
   Q([sx,0,zf],[sx,0,zb],[sx,h,zb],[sx,h,zf],sh(c,1.05,hz(dep)),dep);
-  Q([x-w/2,h,zf],[x+w/2,h,zf],[x+w/2,h,zb],[x-w/2,h,zb],sh(c,1.3,hz(dep)),dep);wins(b);}
+  Q([x-w/2,h,zf],[x+w/2,h,zf],[x+w/2,h,zb],[x-w/2,h,zb],sh(c,1.3,hz(dep)),dep);
+  if(b.bi%3){const u=w*.31,v=d*.19,e=3+b.bi%3*2,s2=x>0?x-u:x+u;
+  Q([x-u,h,zf+v],[x+u,h,zf+v],[x+u,h+e,zf+v],[x-u,h+e,zf+v],sh(c,1,hz(dep)),dep);
+  Q([s2,h,zf+v],[s2,h,zb-v],[s2,h+e,zb-v],[s2,h+e,zf+v],sh(c,.9,hz(dep)),dep);
+  Q([x-u,h+e,zf+v],[x+u,h+e,zf+v],[x+u,h+e,zb-v],[x-u,h+e,zb-v],sh(c,1.3,hz(dep)),dep);}
+  wins(b);}
 function car(o){const{x,z,w,h,l,c}=o,zb=z-l/2,zf=z+l/2,dep=zb-camZ,t=hz(dep);
   Q([x-w/2,0,zb],[x+w/2,0,zb],[x+w/2-.5,h,zb],[x-w/2+.5,h,zb],sh(c,.95,t),dep);
   Q([x-w/2+.5,h*.55,zb-.06],[x+w/2-.5,h*.55,zb-.06],[x+w/2-.6,h*.9,zb-.06],[x-w/2+.6,h*.9,zb-.06],mix([70,90,130],t),dep);
@@ -934,6 +939,7 @@ function bld3(b, nightF, t) {
   const bc = hx3(b.color);
   const tint = '#' + bc.map(v => Math.min(255, Math.round(v * tv)).toString(16).padStart(2, '0')).join('');
   box3(bx, 0, bz, w, h3, d, 0, tint, dep);
+  let ch=0,ca=0;if(!b.landmark&&b.roof&&dep<200){ch=2.5+h2(b.x+5,b.y+3)*2+(b.district===2?2:0);ca=b.roof>1?.785:0;const k=b.roof>1?.55:.66;box3(bx,h3,bz,w*k,ch+(b.roof>1?1.5:0),d*k,ca,tint,dep);}
   if (b.landmark === 'lighthouse') {
     vQuad(bx, bz, 0, d / 2 + 0.1, 0, w * 0.8, h3 * 0.3, h3 * 0.42, '#c0392b');
     vQuad(bx, bz, 0, d / 2 + 0.1, 0, w * 0.8, h3 * 0.62, h3 * 0.74, '#c0392b');
@@ -997,8 +1003,8 @@ function bld3(b, nightF, t) {
         // T2: every window is DRAWN (dark glass reads, skipped windows read
         // as holes). Dusk 3-band: warm lit / cool sky / dark glass / deep.
         let c;
-        if (nightF > 0.3) c = q < 0.4 ? [255, 205, 120] : q < 0.55 ? [120, 215, 255] : q < 0.7 ? [255, 150, 90] : [36, 44, 60];
-        else c = q < 0.28 ? [255, 205, 120] : q < 0.46 ? [150, 195, 235] : q < 0.72 ? [42, 54, 74] : [28, 34, 50];
+        if (nightF > 0.3) c = q < 0.5 ? [255, 205, 120] : q < 0.65 ? [255, 190, 120] : q < 0.8 ? [255, 150, 90] : [36, 44, 60];
+        else c = q < 0.42 ? [255, 205, 120] : q < 0.57 ? [255, 180, 110] : q < 0.72 ? [42, 54, 74] : [28, 34, 50];
         // JETFIX: dark frame behind each window — the old bare glass squares
         // read as coloured stickers pasted on a flat wall; a frame makes
         // each window read as a real opening. Near/mid faces only
@@ -1055,7 +1061,7 @@ function bld3(b, nightF, t) {
           }
           // vertical neon sign on ~40% of buildings (deterministic gate)
           if (h2(b.x * 3 + 5, b.y * 7) < 0.4 && dep < 100) {
-            const nc = ['#ff2a6d', '#05d9e8', '#ffd23e'][Math.floor(h2(b.x, b.y * 3) * 3)];
+            const nc = ['#ff2a6d', '#05d9e8', '#ffd23e', '#ff9d4d'][Math.floor(h2(b.x, b.y * 3) * 4)];
             const nOff = -f.span / 2 + f.span * (0.2 + 0.6 * h2(b.x + 9, b.y));
             // WIN-FIX (VB-11): the neon ran 68% of the facade (249 px tall
             // on chase3d) as one solid bar. Segmented like the accent
@@ -1071,7 +1077,7 @@ function bld3(b, nightF, t) {
       }
     }
   }
-  if (dep < 90) {
+  if (dep < 90 && !ch) {
     // ROOFTOP (VB-32): roofMin = sort depth of the roof face (its nearest
     // corner). Props get a depOff that lands them just in front of it;
     // the deck is a QW quad with an explicit dep. Without this the roof
