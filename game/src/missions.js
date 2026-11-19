@@ -769,6 +769,27 @@ export function updatePickups(world) {
 }
 export function currentObjective(world) {
   const mission = world.mission;
+  // B-02: a live story mission outranks side activities — the banner must
+  // agree with the marker (mission targets). Free roam only.
+  if (!mission.done) {
+    const def = MISSION_DEFS[mission.index];
+    const n = `${mission.index + 1}/${MISSION_DEFS.length}`;
+    if (mission.index === 5) {
+      const done = (world.taxiFaresDone || 0) - (mission.count || 0);
+      return `${n} Night Taxi: fares ${Math.min(2, done)}/2 — grab a cab`;
+    }
+    if (mission.index === 6) {
+      return `${n} Vigilante Shift: survive ${Math.max(0, 45 - mission.timer).toFixed(0)}s at 3 stars`;
+    }
+    if (mission.index === 7) {
+      return `${n} Courier Dash: drop ${mission.stage + 1}/3 — ${Math.max(0, (mission.limit || 150) - mission.timer).toFixed(0)}s left`;
+    }
+    if (mission.index === 9) {
+      const got = world.collectibles.filter((c) => c.taken).length - (mission.count || 0);
+      return `${n} Token Hunt: tokens ${Math.min(8, got)}/8`;
+    }
+    return `${n} ${def.title}: ${def.objective}`;
+  }
   if (world.taxi && world.taxi.state === 'pickup') {
     return 'Taxi: pick up the waving fare';
   }
@@ -786,23 +807,6 @@ export function currentObjective(world) {
       ? `NIGHT RACE ($100 bet): checkpoint ${world.race.index + 1}/${world.race.points.length} — ${world.race.timer.toFixed(1)}s`
       : `Street race: checkpoint ${world.race.index + 1}/${world.race.points.length} — ${world.race.timer.toFixed(1)}s`;
   }
-  if (mission.done) return 'Free roam — explore Neon Harbor';
-  const def = MISSION_DEFS[mission.index];
-  const n = `${mission.index + 1}/${MISSION_DEFS.length}`;
-  if (mission.index === 5) {
-    const done = (world.taxiFaresDone || 0) - (mission.count || 0);
-    return `${n} Night Taxi: fares ${Math.min(2, done)}/2 — grab a cab`;
-  }
-  if (mission.index === 6) {
-    return `${n} Vigilante Shift: survive ${Math.max(0, 45 - mission.timer).toFixed(0)}s at 3 stars`;
-  }
-  if (mission.index === 7) {
-    return `${n} Courier Dash: drop ${mission.stage + 1}/3 — ${Math.max(0, (mission.limit || 150) - mission.timer).toFixed(0)}s left`;
-  }
-  if (mission.index === 9) {
-    const got = world.collectibles.filter((c) => c.taken).length - (mission.count || 0);
-    return `${n} Token Hunt: tokens ${Math.min(8, got)}/8`;
-  }
-  return `${n} ${def.title}: ${def.objective}`;
+  return 'Free roam — explore Neon Harbor';
 }
 export { COLLECTIBLE_VALUE, RACE_REWARD };
