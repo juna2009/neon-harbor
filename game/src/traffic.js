@@ -23,10 +23,7 @@ export function createTraffic(city, rng) {
     let car;
     if (vertical) {
       const rx = rng.pick(city.roadsV);
-      // R34: lane matches direction (left-hand traffic) — the old code picked
-      // lane and direction independently at random, so two cars could spawn
-      // head-on in the same lane and deadlock (each stops for the other,
-      // 55u apart: inside blocked()'s 98u but outside the unstick's 52u).
+      // R34: lane matches direction — else two cars spawn head-on.
       const dir = rng.chance(0.5) ? 1 : -1;
       car = makeCar(rx + (dir > 0 ? 14 : -14), rng.range(40, WORLD_H - 40), dir > 0 ? PI2 : -PI2, color, 'traffic', body);
       car.axis = 'v';
@@ -87,6 +84,17 @@ function blocked(car, others, gap) {
   }
   return false;
 }
+// A-01: cross-axis block ahead; A-01b: also a stopped same-axis car parked in the next intersection (box-guard deadlock seed).
+function xBlock(car, others, ix, iy, g) {
+  const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
+  for (const o of others) {
+    if (!o || o === car || o.alive === false || o.kind !== 'traffic') continue;
+    if (o.axis === car.axis && !o.turning && (!g || Math.abs(o.speed) >= 5 || Math.abs(o.x - ix) >= 52 || Math.abs(o.y - iy) >= 52)) continue;
+    const dx = o.x - car.x, dy = o.y - car.y, al = dx * fx + dy * fy;
+    if (al >= 0 && al <= 98 && Math.abs(dx * -fy + dy * fx) < 26) return true;
+  }
+  return false;
+}
 export function stepTraffic(traffic, dt, city, obstacles, bridge) {
   const slow = (obstacles || []).filter((o) => Math.abs(o.speed || 0) < 150);
   const others = traffic.cars.concat(slow);
@@ -95,18 +103,11 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
     const next = nextX(car, city);
     const at = car.axis === 'v' ? car.y : car.x;
     const distToNext = next === null ? Infinity : Math.abs(next - at);
-    // R34: traffic turns were DEAD — the old <6u trigger sat inside nextX's
-    // 8u dead zone, so no traffic car ever turned (0 turns in 30 Node runs
-    // and 30 s of live play; they drove straight until the world edge).
-    // Decide early (140u out, once per intersection), rotate smoothly so
-    // the turn completes at the intersection (rate adapts to distance and
-    // speed, clamped so it never snaps), then settle into the new lane.
+    // R34: decide turns early (140u out) — the old <6u trigger sat inside nextX's 8u dead zone.
     if (!car.turnPlan && car.noTurnAt !== next && distToNext < 140) {
       const noTurn = bridge?.up && car.axis === 'h' && next === 2400 && car.road === 1760;
       if (!noTurn && Math.random() < 0.38) {
-        // R34: lane matches the new direction (left-hand traffic, same rule
-        // as the spawn) — a random lane could put the car head-on into the
-        // oncoming lane and deadlock both cars.
+        // R34: lane matches the new direction — a random lane could deadlock both.
         const newDir = Math.random() < 0.5 ? 1 : -1;
         const newAxis = car.axis === 'v' ? 'h' : 'v';
         const lane = newAxis === 'h' ? (newDir > 0 ? -14 : 14) : (newDir > 0 ? 14 : -14);
@@ -121,9 +122,7 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
       const passed = car.dir > 0 ? along > p.at + 4 : along < p.at - 4;
       if (passed && !car.turning) { car.turnPlan = undefined; car.noTurnAt = p.at; }
       else if (car.turning || (car.speed > 10 && distToPlan < Math.max(24, car.speed * 0.46))) {
-        // R34: yield — do not start the turn if another car is already in
-        // the intersection (else the turning car meets oncoming traffic
-        // head-on mid-turn and both stop forever). Skip the turn instead.
+        // R34: yield — do not start the turn if another car is already in the intersection.
         if (!car.turning) {
           const ix = car.axis === 'v' ? car.road : p.at;
           const iy = car.axis === 'v' ? p.at : car.road;
@@ -135,8 +134,7 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
           if (!clear) { car.turnPlan = undefined; car.noTurnAt = p.at; }
         }
         if (car.turnPlan) {
-          // R34: once turning, keep rotating even if blocked to a stop —
-          // otherwise a car stalled mid-turn blocks the intersection forever.
+          // R34: once turning, keep rotating even if blocked to a stop.
           car.turning = true;
           let diff = p.target - car.angle;
           while (diff > Math.PI) diff -= Math.PI * 2;
@@ -150,6 +148,9 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
         }
       }
     }
+    // A-01c: keep cars on their lane — a car off-lane (e.g. 5u) blocks the oncoming
+    // lane (side 23 < 26) and head-on deadlocks it. Not while turning.
+    if (!car.turning && car.laneTarget === undefined) car.laneTarget = car.road + (car.axis === 'v' ? 14 : -14) * car.dir;
     if (car.laneTarget !== undefined) {
       const coord = car.axis === 'v' ? 'x' : 'y';
       const d = car.laneTarget - car[coord];
@@ -157,12 +158,19 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
       if (Math.abs(d) <= s) { car[coord] = car.laneTarget; car.laneTarget = undefined; }
       else car[coord] += Math.sign(d) * s;
     }
+    const ix = car.axis === 'v' ? car.road : next, iy = car.axis === 'v' ? next : car.road;
+    const g = distToNext < 90 && distToNext >= 52;
     const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
     let desired = car.cruise;
     const d = car.road === 2400 && car.axis === 'v' ? (car.dir < 0 ? car.y - 1720 : 1640 - car.y) : -1;
     if (bridge?.up && d > 0 && d < 200) desired = 0;
     if (blocked(car, others, 98)) desired = 0;
     if (distToNext < 90 && blocked({ ...car, x: car.x + fx * 60, y: car.y + fy * 60 }, others, 60)) desired = 0;
+    // A-01 box guard: don't ENTER an occupied box. Outside only, or both freeze.
+    if (g) {
+      for (const o of others) if (o && o !== car && o.alive !== false && Math.abs(o.x - ix) < 52 && Math.abs(o.y - iy) < 52) { desired = 0; break; }
+    }
+    if (car.back > 0) desired = 0;
     car.speed = desired === 0 ? Math.max(0, car.speed - 420 * dt) : Math.min(desired, car.speed + 240 * dt);
     const step = car.speed * dt;
     car.x += fx * step;
@@ -171,6 +179,17 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
     if (car.x > WORLD_W + 60) car.x = -40;
     if (car.y < -60) car.y = WORLD_H - 40;
     if (car.y > WORLD_H + 60) car.y = -40;
+    // A-01 unstick: only H yields (V never reverses). Reverse runs along the AXIS,
+    // not the angle; a mid-turn car backs out while still rotating. Turn state untouched.
+    if (car.back > 0) {
+      car.back -= dt;
+      car[car.axis === 'v' ? 'y' : 'x'] -= car.dir * 70 * dt;
+    } else if (car.speed < 5 && xBlock(car, others, ix, iy, g)) { // xBlock implies blocked
+      if (car.axis === 'h') {
+        car.stuckT = (car.stuckT || 0) + dt;
+        if (car.stuckT > 3.5) { car.back = 1; car.stuckT = 0; }
+      }
+    } else car.stuckT = 0;
   }
   // BUG 8: unstick same-lane overlaps.
   for (const a of traffic.cars) for (const b of traffic.cars) {
@@ -218,15 +237,10 @@ export function createPedestrians(city, rng) {
       flashTimer: 0,
     });
   }
-  // R27c: hero peds stand on the SIDEWALK beside the spawn road, not on its
-  // centreline. (Before: both stood on road y=480 — Jax 60u straight ahead of
-  // the player spawn (480,480) — and were run over ~5s into every drive,
-  // giving 1 wanted star; see VIDEO-REVIEW-FINDINGS.md item 3.)
-  // NOTE: Jax goes on the NORTH sidewalk (y=440), not the south (y=520):
-  // the player car departs in the south lane (y=504), only 16u from the
-  // south sidewalk — inside the 26u run-over radius — while the north
-  // sidewalk is 64u away, safe at any speed. (First attempt at y=520 left
-  // Jax 19u from the car at spawn, still inside the kill radius.)
+  // R27c: hero peds stand on the SIDEWALK, not the road centreline (before: both
+  // stood on road y=480 and were run over ~5s into every drive). Jax on the NORTH
+  // sidewalk (y=440): the south lane (y=504) is 16u from the south sidewalk —
+  // inside the 26u run-over radius; north is 64u away, safe at any speed.
   peds.push({
     x: 540, y: 440, angle: 0, speed: 40,
     color: '#6b4423', skin: '#d8a077', pants: '#1c1f24', hat: 0, build: 'wide',
@@ -237,10 +251,7 @@ export function createPedestrians(city, rng) {
     color: '#8a1f28', skin: '#e8b98a', pants: '#2a1214', hat: 0, build: 'slim',
     flee: 0, alive: true, walkPhase: 1.6, photo: 0, flashTimer: 0, hero: 'mara',
   });
-  // R27c: spawn-time guard — no pedestrian may ever spawn walking ALONG a
-  // vehicle lane (it would stay in the lane), and the player's departure
-  // corridor on the spawn road stays clear. Crossing a perpendicular road at
-  // an intersection is transient and stays allowed.
+  // R27c: no ped may spawn walking ALONG a vehicle lane; the player's departure corridor stays clear.
   const SIDE = ROAD_W / 2 + 4; // 40 — sidewalk offset, same as random spawns
   const spawnRoad = city.roadsH.find((ry) => Math.abs(ry - city.playerStart.y) < 1)
     ?? city.playerStart.y;
@@ -263,11 +274,8 @@ export function createPedestrians(city, rng) {
         }
       }
     }
-    // Departure corridor: the spawn road ahead of the car. The car leaves in
-    // the south lane (y=504), so anything on the road or the south sidewalk
-    // here is inside the 26u run-over radius while the car accelerates
-    // through 80–250 (flee only starts above 250). Move it to the far
-    // (north) sidewalk, 64u from the car's path — safe at any speed.
+    // Departure corridor: the car leaves in the south lane (y=504), so anything
+    // here is inside the 26u run-over radius; move it to the far (north) sidewalk.
     if (Math.abs(ped.y - spawnRoad) <= SIDE
       && ped.x >= city.playerStart.x - 40 && ped.x <= city.playerStart.x + 420) {
       ped.y = spawnRoad - SIDE;
@@ -279,11 +287,8 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
   const flashes = [];
   for (const ped of peds) {
     if (!ped.alive) continue;
-    // R41: fase jalan maju dari JARAK tempuh sebenarnya (setelah semua gerak
-    // + dorong-keluar gedung + clamp), bukan `dt * 8` (waktu). Ped yang
-    // berdiri memotret (photo > 0 → continue di bawah) fasenya BEKU — kaki
-    // diam, tidak meluncur di tempat. Lari ketakutan (150 px/dtk) otomatis
-    // melangkah lebih cepat daripada stroll (28–52 px/dtk).
+    // R41: walk phase advances by DISTANCE travelled (not dt), so a standing ped's
+    // feet freeze instead of sliding; fleeing (150 px/s) steps faster than strolling.
     const ox = ped.x, oy = ped.y;
     if (chase && ped.flee <= 0) {
       const cdx = ped.x - chase.x;
