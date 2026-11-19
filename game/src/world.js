@@ -396,6 +396,29 @@ export function createWorld(rng, savedMission, sp) {
   function addFloater(x, y, value, color) {
     state.floaters.push({ x, y, value, color: color || '#7be382', life: 1.4 });
   }
+  // R34: oriented-box (SAT) push between two cars. Returns the minimum
+  // translation to apply to `a` to separate the boxes, or null when they do
+  // not touch. The old fixed 40u circle let two sedans (46u long) overlap
+  // by 6u and vans (54u) by 14u — bumpers visibly interpenetrating.
+  function obbPush(a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const aL = (a.length || 46) / 2 + 2, aW = (a.width || 22) / 2 + 2;
+    const bL = (b.length || 46) / 2 + 2, bW = (b.width || 22) / 2 + 2;
+    const ca = Math.cos(a.angle), sa = Math.sin(a.angle);
+    const cb = Math.cos(b.angle), sb = Math.sin(b.angle);
+    const axes = [[ca, sa], [-sa, ca], [cb, sb], [-sb, cb]];
+    let best = null;
+    for (const [ux, uy] of axes) {
+      const eA = aL * Math.abs(ux * ca + uy * sa) + aW * Math.abs(ux * -sa + uy * ca);
+      const eB = bL * Math.abs(ux * cb + uy * sb) + bW * Math.abs(ux * -sb + uy * cb);
+      const d = Math.abs(dx * ux + dy * uy);
+      const ov = eA + eB - d;
+      if (ov <= 0) return null;
+      if (!best || ov < best.ov) best = { ov, ux, uy, s: dx * ux + dy * uy };
+    }
+    const m = best.ov * (best.s >= 0 ? -1 : 1);
+    return [best.ux * m, best.uy * m];
+  }
   function collideCars(car, dt) {
     const armoredTruck = state.armored && state.armored.truck ? [state.armored.truck] : [];
     const others = state.traffic.cars.concat(state.traffic.parked)
@@ -403,20 +426,14 @@ export function createWorld(rng, savedMission, sp) {
       .concat(armoredTruck);
     for (const other of others) {
       if (other === car || !other.alive) continue;
-      const dx = car.x - other.x;
-      const dy = car.y - other.y;
-      const d = Math.hypot(dx, dy);
-      const minD = 40;
-      if (d >= minD || d === 0) continue;
+      const p = obbPush(car, other);
+      if (!p) continue;
       const impact = Math.abs(car.speed);
-      const push = (minD - d) / 2;
-      const nx = dx / d;
-      const ny = dy / d;
-      car.x += nx * push;
-      car.y += ny * push;
+      car.x += p[0] / 2;
+      car.y += p[1] / 2;
       if (other.kind !== 'parked' && !other.roadblock && !other.concrete && other.kind !== 'armored') {
-        other.x -= nx * push * 1.5;
-        other.y -= ny * push * 1.5;
+        other.x -= p[0] / 2 * 1.5;
+        other.y -= p[1] / 2 * 1.5;
         if (other.kind === 'traffic') other.speed = Math.max(other.speed, impact * 0.6);
         else other.speed *= 0.4;
       }
@@ -451,20 +468,38 @@ export function createWorld(rng, savedMission, sp) {
     const tireFactor = car.tiresPopped ? 0.45 : 1;
     const speedFactor = state.upgrades.turbo ? 1.15 : 1;
     const accelFactor = state.upgrades.turbo ? 1.1 : 1;
+    const topSpeed = CAR.maxSpeed * tireFactor * speedFactor;
     const wet = (state.weather && state.weather.heavy)
       || state.wet.some((w) => Math.hypot(car.x - w.x, car.y - w.y) < w.r);
     const steerFactor = (state.upgrades.slicks ? 1.25 : 1) * (wet ? 0.55 : 1);
-    if (throttle > 0) car.speed += CAR.accel * tireFactor * accelFactor * dt;
-    else if (throttle < 0) {
+    // R34: taper acceleration near top speed (was flat to the cap, so the
+    // car surged then sat on the limiter) and soften the coast decay (1.4/s
+    // braked hard on lift-off, making cruise speed yo-yo).
+    if (throttle > 0) {
+      const fwd = Math.min(1, Math.max(0, car.speed) / topSpeed);
+      car.speed += CAR.accel * tireFactor * accelFactor * (1 - 0.55 * fwd) * dt;
+    } else if (throttle < 0) {
       car.speed -= (speedAlong > 10 ? CAR.brake : CAR.accel * 0.6) * dt;
     } else {
-      car.speed -= car.speed * 1.4 * dt;
+      car.speed -= car.speed * 0.85 * dt;
     }
-    car.speed = Math.max(-CAR.maxReverse, Math.min(CAR.maxSpeed * tireFactor * speedFactor, car.speed));
-    if (Math.abs(car.speed) > 5) {
-      car.angle += steer * CAR.turnRate * steerFactor * (car.tiresPopped ? 0.55 : 1) * dt * Math.sign(car.speed) * Math.min(1, Math.abs(car.speed) / 120);
+    car.speed = Math.max(-CAR.maxReverse, Math.min(topSpeed, car.speed));
+    // R34: smooth the steering — binary input went to full lock in one step,
+    // so turns snapped like a robot. car.steerS ramps toward the input; the
+    // turn rate eases off at very low speed (no pivot) and at top speed
+    // (no twitch). car.lean is the body roll into the turn, exposed for the
+    // renderer (R32's cars3d/city car3d) to consume.
+    car.steerS = (car.steerS || 0) + (steer - (car.steerS || 0)) * Math.min(1, 7 * dt);
+    const spd = Math.abs(car.speed);
+    let turnScale = 1;
+    if (spd < 60) turnScale = 0.35 + 0.65 * (spd / 60);
+    else if (spd > 240) turnScale = 1 - 0.45 * Math.min(1, (spd - 240) / 300);
+    if (spd > 5) {
+      car.angle += car.steerS * CAR.turnRate * steerFactor * (car.tiresPopped ? 0.55 : 1) * dt * Math.sign(car.speed) * Math.min(1, spd / 120) * turnScale;
     }
-    car.slide = wet ? (car.slide || 0) * 0.98 + steer * car.speed * dt * 0.7 : (car.slide || 0) * 0.9;
+    const leanT = car.steerS * Math.min(1, spd / 300) * 0.14;
+    car.lean = (car.lean || 0) + (leanT - (car.lean || 0)) * Math.min(1, 6 * dt);
+    car.slide = wet ? (car.slide || 0) * 0.98 + car.steerS * car.speed * dt * 0.7 : (car.slide || 0) * 0.9;
     const nx = car.x + (Math.cos(car.angle) * car.speed - Math.sin(car.angle) * car.slide) * dt;
     const ny = car.y + (Math.sin(car.angle) * car.speed + Math.cos(car.angle) * car.slide) * dt;
     const cr = car.body === 'van' ? 30 : 26;
@@ -484,8 +519,22 @@ export function createWorld(rng, savedMission, sp) {
     car.x = Math.max(cr, Math.min(WORLD_W - cr, car.x));
     car.y = Math.max(cr, Math.min(WORLD_H - cr, car.y));
     hitScenery(car);
+    // R34: gas pumps are solid — the car must not pass through them. (A
+    // hard hit explodes the pump first, via hitScenery above, so this push
+    // only applies while the pump is still alive; the radius matches the
+    // explosion trigger so a fast hit still detonates instead of stopping.)
+    for (const pump of state.gasStation.pumps) {
+      if (!pump.alive) continue;
+      const pdx = car.x - pump.x, pdy = car.y - pump.y;
+      const pdist = Math.hypot(pdx, pdy);
+      if (pdist < cr + 8 && pdist > 0.01) {
+        car.x = pump.x + (pdx / pdist) * (cr + 8);
+        car.y = pump.y + (pdy / pdist) * (cr + 8);
+        car.speed *= 0.5;
+      }
+    }
     collideCars(car, dt);
-    if (Math.abs(car.speed) > 200 && Math.abs(steer) > 0.6) {
+    if (Math.abs(car.speed) > 200 && Math.abs(car.steerS || 0) > 0.6) {
       addSkid(car.x - Math.cos(car.angle) * 18, car.y - Math.sin(car.angle) * 18, car.angle);
       if (state.rng.chance(0.3)) {
         state.particles.push({
@@ -497,12 +546,28 @@ export function createWorld(rng, savedMission, sp) {
     }
     for (const ped of peds) {
       if (!ped.alive) continue;
+      const pdx = ped.x - car.x, pdy = ped.y - car.y;
+      const pd = Math.hypot(pdx, pdy);
       // R27c: run over only peds on the road surface — the 26u radius
       // reaches onto the sidewalk (lane 14-24u, walk line 40u from centre).
-      if (Math.hypot(ped.x - car.x, ped.y - car.y) < 26 && Math.abs(car.speed) > 80 && onRoad(city, ped.x, ped.y)) {
+      if (pd < 26 && Math.abs(car.speed) > 80 && onRoad(city, ped.x, ped.y)) {
         ped.alive = false;
         addWanted(state, 1);
         state.events.pedDown = true;
+      } else {
+        // R34: a living ped is solid — the car must not pass through their
+        // body. At low speed (or off-road, where a run-over is never
+        // scored) the car shoves the ped aside instead; they walk away.
+        const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
+        const along = pdx * fx + pdy * fy, side = -pdx * fy + pdy * fx;
+        const halfL = (car.length || 46) / 2 + 5, halfW = (car.width || 22) / 2 + 5;
+        if (Math.abs(along) < halfL && Math.abs(side) < halfW
+          && (Math.abs(car.speed) <= 80 || !onRoad(city, ped.x, ped.y))) {
+          const nx = pdx / (pd || 1), ny = pdy / (pd || 1);
+          ped.x += nx * (26 - pd); ped.y += ny * (26 - pd);
+          ped.angle = Math.atan2(ny, nx);
+          car.speed *= 0.92;
+        }
       }
     }
     if (car === state.player.car && !car.tiresPopped && !state.upgrades.runflats) {

@@ -23,16 +23,22 @@ export function createTraffic(city, rng) {
     let car;
     if (vertical) {
       const rx = rng.pick(city.roadsV);
-      car = makeCar(rx + (rng.chance(0.5) ? 14 : -14), rng.range(40, WORLD_H - 40), rng.chance(0.5) ? PI2 : -PI2, color, 'traffic', body);
+      // R34: lane matches direction (left-hand traffic) — the old code picked
+      // lane and direction independently at random, so two cars could spawn
+      // head-on in the same lane and deadlock (each stops for the other,
+      // 55u apart: inside blocked()'s 98u but outside the unstick's 52u).
+      const dir = rng.chance(0.5) ? 1 : -1;
+      car = makeCar(rx + (dir > 0 ? 14 : -14), rng.range(40, WORLD_H - 40), dir > 0 ? PI2 : -PI2, color, 'traffic', body);
       car.axis = 'v';
       car.road = rx;
-      car.dir = car.angle > 0 ? 1 : -1;
+      car.dir = dir;
     } else {
       const ry = rng.pick(city.roadsH);
-      car = makeCar(rng.range(40, WATER_X - 40), ry + (rng.chance(0.5) ? 14 : -14), rng.chance(0.5) ? 0 : Math.PI, color, 'traffic', body);
+      const dir = rng.chance(0.5) ? 1 : -1;
+      car = makeCar(rng.range(40, WATER_X - 40), ry + (dir > 0 ? -14 : 14), dir > 0 ? 0 : Math.PI, color, 'traffic', body);
       car.axis = 'h';
       car.road = ry;
-      car.dir = car.angle === 0 ? 1 : -1;
+      car.dir = dir;
     }
     car.speed = rng.range(90, 170);
     car.cruise = car.speed;
@@ -89,25 +95,67 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
     const next = nextX(car, city);
     const at = car.axis === 'v' ? car.y : car.x;
     const distToNext = next === null ? Infinity : Math.abs(next - at);
-    if (distToNext < Math.max(6, car.speed * dt + 2)) {
+    // R34: traffic turns were DEAD — the old <6u trigger sat inside nextX's
+    // 8u dead zone, so no traffic car ever turned (0 turns in 30 Node runs
+    // and 30 s of live play; they drove straight until the world edge).
+    // Decide early (140u out, once per intersection), rotate smoothly so
+    // the turn completes at the intersection (rate adapts to distance and
+    // speed, clamped so it never snaps), then settle into the new lane.
+    if (!car.turnPlan && car.noTurnAt !== next && distToNext < 140) {
       const noTurn = bridge?.up && car.axis === 'h' && next === 2400 && car.road === 1760;
       if (!noTurn && Math.random() < 0.38) {
-        const lane = Math.random() < 0.5 ? 14 : -14;
+        // R34: lane matches the new direction (left-hand traffic, same rule
+        // as the spawn) — a random lane could put the car head-on into the
+        // oncoming lane and deadlock both cars.
         const newDir = Math.random() < 0.5 ? 1 : -1;
-        if (car.axis === 'v') {
-          car.axis = 'h';
-          car.road = next;
-          car.dir = newDir;
-          car.angle = newDir > 0 ? 0 : Math.PI;
-          car.y = next + lane;
-        } else {
-          car.axis = 'v';
-          car.road = next;
-          car.dir = newDir;
-          car.angle = newDir > 0 ? PI2 : -PI2;
-          car.x = next + lane;
+        const newAxis = car.axis === 'v' ? 'h' : 'v';
+        const lane = newAxis === 'h' ? (newDir > 0 ? -14 : 14) : (newDir > 0 ? 14 : -14);
+        car.turnPlan = { at: next, lane, newDir, newAxis,
+          target: car.axis === 'v' ? (newDir > 0 ? 0 : Math.PI) : (newDir > 0 ? PI2 : -PI2) };
+      } else car.noTurnAt = next;
+    }
+    if (car.turnPlan) {
+      const p = car.turnPlan;
+      const along = car.axis === 'v' ? car.y : car.x;
+      const distToPlan = Math.abs(p.at - along);
+      const passed = car.dir > 0 ? along > p.at + 4 : along < p.at - 4;
+      if (passed && !car.turning) { car.turnPlan = undefined; car.noTurnAt = p.at; }
+      else if (car.turning || (car.speed > 10 && distToPlan < Math.max(24, car.speed * 0.46))) {
+        // R34: yield — do not start the turn if another car is already in
+        // the intersection (else the turning car meets oncoming traffic
+        // head-on mid-turn and both stop forever). Skip the turn instead.
+        if (!car.turning) {
+          const ix = car.axis === 'v' ? car.road : p.at;
+          const iy = car.axis === 'v' ? p.at : car.road;
+          let clear = true;
+          for (const o of traffic.cars) {
+            if (o === car || !o.alive) continue;
+            if (Math.hypot(o.x - ix, o.y - iy) < 70) { clear = false; break; }
+          }
+          if (!clear) { car.turnPlan = undefined; car.noTurnAt = p.at; }
+        }
+        if (car.turnPlan) {
+          // R34: once turning, keep rotating even if blocked to a stop —
+          // otherwise a car stalled mid-turn blocks the intersection forever.
+          car.turning = true;
+          let diff = p.target - car.angle;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          const rate = Math.max(0.8, Math.min(5, Math.abs(diff) * car.speed / Math.max(1, distToPlan)));
+          const stepA = rate * dt;
+          if (Math.abs(diff) <= stepA) {
+            car.angle = p.target; car.axis = p.newAxis; car.road = p.at; car.dir = p.newDir;
+            car.laneTarget = p.at + p.lane; car.turnPlan = undefined; car.turning = false;
+          } else car.angle += Math.sign(diff) * stepA;
         }
       }
+    }
+    if (car.laneTarget !== undefined) {
+      const coord = car.axis === 'v' ? 'x' : 'y';
+      const d = car.laneTarget - car[coord];
+      const s = 140 * dt;
+      if (Math.abs(d) <= s) { car[coord] = car.laneTarget; car.laneTarget = undefined; }
+      else car[coord] += Math.sign(d) * s;
     }
     const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
     let desired = car.cruise;
