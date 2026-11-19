@@ -78,13 +78,35 @@ function frame(t){
   g.addColorStop(0,'#1e0b33');g.addColorStop(.45,'#6b2355');g.addColorStop(.75,'#e0545e');g.addColorStop(1,'#ffb35c');
   x.fillStyle=g;x.fillRect(0,0,W,HOR+60);x.fillStyle='#241a20';x.fillRect(0,HOR,W,H-HOR);
   const sx=CX+60,sy=HOR-20;
+  // R31 near apron: the 30-unit road/sidewalk/ground loops start behind the
+  // camera, and Q() drops any quad with a corner at dz<2 — so the strip
+  // nearest the lens (bottom of the frame, dz<24) was never drawn and
+  // showed only the flat #241a20 background fill. Draw it explicitly:
+  // one quad from just past the near plane to where the 30-unit loop's
+  // first visible quad starts (dz=24). Haze is 0 this close, so a single
+  // warm tone is right; the dashes, hero car and glow break it up.
+  Q([-12,0,camZ+2],[12,0,camZ+2],[12,0,camZ+24],[-12,0,camZ+24],shW([58,47,53],1,0),2);
+  Q([-16,.1,camZ+2],[-12,.1,camZ+2],[-12,.1,camZ+24],[-16,.1,camZ+24],sh([80,70,76],1,0),2);
+  Q([12,.1,camZ+2],[16,.1,camZ+2],[16,.1,camZ+24],[12,.1,camZ+24],sh([80,70,76],1,0),2);
+  Q([-64,0,camZ+2],[-16,0,camZ+2],[-16,0,camZ+24],[-64,0,camZ+24],shW([48,38,44],1,0),2);
+  Q([16,0,camZ+2],[64,0,camZ+2],[64,0,camZ+24],[16,0,camZ+24],shW([50,40,46],1,0),2);
   // road + sidewalks (segmented so fog deepens with distance)
   for(let z=Math.floor((camZ-30)/30)*30;z<camZ+430;z+=30){const d=z-camZ;
-    Q([-12,0,z],[12,0,z],[12,0,z+30],[-12,0,z+30],sh([52,42,48],1,hz(d)),d);
+    Q([-12,0,z],[12,0,z],[12,0,z+30],[-12,0,z+30],shW([58,47,53],1,hz(d)),d);
     Q([-16,.1,z],[-12,.1,z],[-12,.1,z+30],[-16,.1,z+30],sh([80,70,76],1,hz(d)),d);
     Q([12,.1,z],[16,.1,z],[16,.1,z+30],[12,.1,z+30],sh([80,70,76],1,hz(d)),d);
     Q([-11.7,.06,z],[-11.4,.06,z],[-11.4,.06,z+30],[-11.7,.06,z+30],mix([220,200,170],hz(d)),d);
     Q([11.4,.06,z],[11.7,.06,z],[11.7,.06,z+30],[11.4,.06,z+30],mix([220,200,170],hz(d)),d);}
+  // R31 title foreground: flanking ground — the frame's lower half was flat
+  // #241a20 void beyond the sidewalks (|x|>16). Warm pavement strips with
+  // per-segment variation + curb lines, haze-faded like the road, so the
+  // foreground reads as a street, not black. Right strip runs to the water
+  // (x=64) as the harbor promenade.
+  for(let z=Math.floor((camZ-30)/30)*30;z<camZ+430;z+=30){const d=z-camZ,v=h2(7,z);
+    Q([-64,0,z],[-16,0,z],[-16,0,z+30],[-64,0,z+30],shW([46+v*8,36+v*6,42+v*6],1,hz(d)),d);
+    Q([16,0,z],[64,0,z],[64,0,z+30],[16,0,z+30],shW([48+v*8,38+v*6,44+v*6],1,hz(d)),d);
+    Q([-16.4,.08,z],[-16,.08,z],[-16,.08,z+30],[-16.4,.08,z+30],mix([150,132,120],hz(d)),d);
+    Q([16,.08,z],[16.4,.08,z],[16.4,.08,z+30],[16,.08,z+30],mix([150,132,120],hz(d)),d);}
   for(let z=Math.floor((camZ+14)/12)*12;z<camZ+420;z+=12){const d=z-camZ;
     Q([-.45,.05,z],[.45,.05,z],[.45,.05,z+3.5],[-.45,.05,z+3.5],mix([255,179,71],hz(d)),d);
     Q([-6.4,.05,z+6],[-6,.05,z+6],[-6,.05,z+11],[-6.4,.05,z+11],mix([200,180,140],hz(d)),d);
@@ -112,13 +134,19 @@ function frame(t){
   // the near boat's cabin + windshield (seen on screen: cabin/windshield
   // invisible until this reorder). Do not "fix" by changing Q() — that
   // would reorder the whole title frame.
-  Q([118,-1,camZ+150],[136,-1,camZ+150],[136,.9,camZ+150],[118,1.8,camZ+150],sh([200,210,220],1,hz(150)),150);
-  Q([118,-1,camZ+150],[136,-1,camZ+150],[136,-.42,camZ+150],[118,-.42,camZ+150],sh([30,40,60],1,hz(150)),150);
-  Q([123,1,camZ+150],[130,1,camZ+150],[130,2.1,camZ+150],[123,2.1,camZ+150],sh([30,40,60],1,hz(150)),150);
-  Q([82,-1,camZ+110],[104,-1,camZ+110],[104,.9,camZ+110],[82,1.9,camZ+110],sh([220,220,230],1,hz(110)),110);
-  Q([82,-1,camZ+110],[104,-1,camZ+110],[104,-.42,camZ+110],[82,-.42,camZ+110],sh([30,40,60],1,hz(110)),110);
-  Q([89,1,camZ+110],[97,1,camZ+110],[97,2.3,camZ+110],[89,2.3,camZ+110],sh([30,40,60],1,hz(110)),110);
-  Q([89,1.5,camZ+110],[92.5,1.5,camZ+110],[92.5,2.3,camZ+110],[89,1.9,camZ+110],sh([140,190,220],1,hz(110)),110);
+  // R31: the two moored boats read as one white bar at 1x (near boat hugged
+  // the frame edge, far boat hid behind it, dark cabins blended into the
+  // night water). Near boat shifted left off the edge (x 82..104 -> 76..98),
+  // far boat moved further out (z+150 -> z+185) so it peeks above-behind as
+  // a distinct second hull; cabins lightened + amber window on the near one.
+  Q([124,-1,camZ+185],[142,-1,camZ+185],[142,.9,camZ+185],[124,1.8,camZ+185],sh([200,210,220],1,hz(185)),185);
+  Q([124,-1,camZ+185],[142,-1,camZ+185],[142,-.42,camZ+185],[124,-.42,camZ+185],sh([30,40,60],1,hz(185)),185);
+  Q([129,1,camZ+185],[136,1,camZ+185],[136,2.1,camZ+185],[129,2.1,camZ+185],sh([70,85,110],1,hz(185)),185);
+  Q([76,-1,camZ+110],[98,-1,camZ+110],[98,.9,camZ+110],[76,1.9,camZ+110],sh([220,220,230],1,hz(110)),110);
+  Q([76,-1,camZ+110],[98,-1,camZ+110],[98,-.42,camZ+110],[76,-.42,camZ+110],sh([30,40,60],1,hz(110)),110);
+  Q([83,1,camZ+110],[91,1,camZ+110],[91,2.3,camZ+110],[83,2.3,camZ+110],sh([70,85,110],1,hz(110)),110);
+  Q([83,1.5,camZ+110],[86.5,1.5,camZ+110],[86.5,2.3,camZ+110],[83,1.9,camZ+110],sh([140,190,220],1,hz(110)),110);
+  Q([87,1.4,camZ+110],[90,1.4,camZ+110],[90,2,camZ+110],[87,2,camZ+110],mix([255,190,110],hz(110)),110);
   // distant skyline silhouettes
   for(let i=0;i<10;i++){const bx=-170+i*38+R()*14,bh=40+R()*60,bw=20+R()*18,bz=camZ+400+R()*30;
     Q([bx,0,bz],[bx+bw,0,bz],[bx+bw,bh,bz],[bx,bh,bz],mix([58,26,58],.7),bz-camZ);}
@@ -127,9 +155,21 @@ function frame(t){
   car({x:-5.5,z:camZ+48,w:3.2,h:1.5,l:6.2,c:[12,12,16],pol:1});
   car({x:6,z:camZ+88,w:3.2,h:1.4,l:6,c:[200,90,30]});
   car({x:-3,z:camZ+150,w:3.2,h:1.4,l:6,c:[40,60,120]});
+  // R31: parked cars at the curbs — foreground interest on both sides of
+  // the road, clear of the hero (x=0) and the title card (left edge).
+  // (An earlier revision also hand-placed two low storefronts here; the
+  // left one hid entirely behind the title card and the right one covered
+  // the harbor boats, so both were removed — the foreground is carried by
+  // the warmed road + pavement, parked cars and lamp pools instead.)
+  car({x:-9,z:camZ+40,w:3.2,h:1.4,l:6,c:[120,32,44]});
+  car({x:9,z:camZ+34,w:3.2,h:1.4,l:6,c:[30,60,110]});
   // street lamps
   for(let z=camZ+20;z<camZ+420;z+=45)for(const lx of[-14,14]){const pb=P(lx,0,z),pt=P(lx,7,z);if(!pb||!pt)continue;
-    ops.push({d:pb[2],f(){x.strokeStyle='#3a3040';x.lineWidth=cl(500/pb[2],1,5);x.beginPath();x.moveTo(pb[0],pb[1]);x.lineTo(pt[0],pt[1]);x.stroke();
+    ops.push({d:pb[2],f(){x.save();x.globalCompositeOperation='lighter';
+      const gr=x.createRadialGradient(pb[0],pb[1],2,pb[0],pb[1],cl(900/pb[2],20,90));
+      gr.addColorStop(0,'rgba(255,180,100,.16)');gr.addColorStop(1,'rgba(255,180,100,0)');
+      x.fillStyle=gr;x.beginPath();x.ellipse(pb[0],pb[1],cl(900/pb[2],20,90),cl(300/pb[2],8,30),0,0,7);x.fill();x.restore();
+      x.strokeStyle='#3a3040';x.lineWidth=cl(500/pb[2],1,5);x.beginPath();x.moveTo(pb[0],pb[1]);x.lineTo(pt[0],pt[1]);x.stroke();
       x.fillStyle='rgba(255,217,160,.25)';x.beginPath();x.arc(pt[0],pt[1],cl(700/pb[2],3,22),0,7);x.fill();
       x.fillStyle='#ffd9a0';x.beginPath();x.arc(pt[0],pt[1],cl(220/pb[2],1.5,7),0,7);x.fill();}});}
   sign(-1,camZ+40,camZ+120,'NEON HARBOR','#35f0ff');
@@ -142,6 +182,13 @@ function frame(t){
   x.fillStyle=sg;x.fillRect(sx-150,sy-150,300,300);
   x.fillStyle='#ffe9a8';x.beginPath();x.arc(sx,sy,18,0,7);x.fill();
   ops.sort((a,b)=>b.d-a.d);for(const o of ops)o.f();ops.length=0;
+  // R31: warm sunset bounce on the road — the asphalt near the camera was
+  // pitch black; a faint warm glow keeps it readable without washing out
+  // the hero (peak alpha .15, 'lighter').
+  x.save();x.globalCompositeOperation='lighter';
+  const wg=x.createRadialGradient(CX,HOR+130,10,CX,HOR+130,560);
+  wg.addColorStop(0,'rgba(255,150,80,.15)');wg.addColorStop(1,'rgba(255,150,80,0)');
+  x.fillStyle=wg;x.fillRect(0,HOR-60,W,H-HOR+60);x.restore();
   // hero taillight glow
   const tp=P(0,1,camZ+17-3.3);if(tp){x.save();x.globalCompositeOperation='lighter';
     for(const gx of[-1.2,1.2]){const gp=P(gx,1,camZ+17-3.3);if(!gp)continue;
@@ -164,10 +211,9 @@ function frame(t){
   x.fillStyle='#333';x.fillRect(W-204,74,176,7);x.fillStyle='#ff5c8a';x.fillRect(W-204,74,132,7);
   x.fillStyle='#333';x.fillRect(W-204,86,176,7);x.fillStyle='#4d9fff';x.fillRect(W-204,86,106,7);
   x.fillStyle='#35f0ff';x.font='10px sans-serif';x.fillText('JAX MARLOWE',W-204,102);
-  rr(W-196,H-88,180,72,8);x.fillStyle='rgba(8,8,24,.75)';x.fill();
-  x.fillStyle='#35f0ff';x.font='bold 40px sans-serif';x.fillText('142',W-182,H-44);
-  x.font='13px sans-serif';x.fillText('MPH',W-104,H-50);
-  x.fillStyle='#ffd23e';x.font='11px sans-serif';x.fillText('GEAR 6 · NEON GT',W-182,H-26);
+  // R31: no speedo on title — the backdrop used to paint a hardcoded "142
+  // MPH" here that drawTitle2 had to cover with a pasted road strip (the
+  // faint rectangle at bottom-right). The cover in ui2.js is removed too.
   x.fillStyle='#fff';x.font='12px sans-serif';x.fillText('DAY 1 · 21:02 · HARBOR · HEAT 30',16,H-24);
   const vg=x.createRadialGradient(CX,H/2,H*.35,CX,H/2,H*.85);
   vg.addColorStop(0,'rgba(10,5,15,0)');vg.addColorStop(1,'rgba(10,5,15,.35)');

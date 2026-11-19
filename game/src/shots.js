@@ -188,16 +188,22 @@ export function stageShot(name, world) {
     driveEastFor(world, input, name === 'chase3d' ? 0.05 : 0.3);
     stageHeat(world);
     if (name === 'chase3d') {
-      // chase-cam looks forward: the pursuit must be IN frame — one unit
-      // ahead in the same lane, one oncoming, one traffic car for depth
+      // chase-cam looks forward: the pursuit must be IN frame — both units
+      // ahead in the hero's (south) lane, every car facing away. R31: the
+      // old layout put u1 eastbound in the north lane and u2 oncoming in
+      // the hero's lane, and the dir=-1 traffic car read as a head-on taxi
+      // (yellow cab 120 px ahead in the A4 crowd shot, pink cab at +520).
+      // On this 72 px road the lanes sit 14 px off the centreline, so an
+      // oncoming car can never read as "clearly opposite-lane" — all
+      // staged traffic faces away instead.
       const px = state.player.x;
       const u1 = state.police.units[state.police.units.length - 2];
-      if (u1) { u1.car.x = px + 300; u1.car.y = 1120 - 14; u1.car.angle = 0; u1.car.speed = 320; }
+      if (u1) { u1.car.x = px + 300; u1.car.y = 1120 + 14; u1.car.angle = 0; u1.car.speed = 320; }
       const u2 = state.police.units[state.police.units.length - 1];
-      if (u2) { u2.car.x = px + 460; u2.car.y = 1120 + 14; u2.car.angle = Math.PI; u2.car.speed = 300; }
+      if (u2) { u2.car.x = px + 460; u2.car.y = 1120 + 14; u2.car.angle = 0; u2.car.speed = 300; }
       stageTrafficCar(world, 'h', 1120, px + 200, 1, 110);
       // round 21: more traffic ahead for depth + 2 parked cars at the curb
-      stageTrafficCar(world, 'h', 1120, px + 520, -1, 110);
+      stageTrafficCar(world, 'h', 1120, px + 520, 1, 110);
       stageTrafficCar(world, 'h', 1120, px + 700, 1, 100);
       // JF4: parked at ±36, not ±44 — a 22-wide car centred at ±44 sinks
       // 5px into the building face (face at ±50, probe: chase3d seed 7).

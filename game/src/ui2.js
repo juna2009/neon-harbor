@@ -574,15 +574,8 @@ export function drawTitle2(c, view, best, prog, backdrop, live) {
     rr(c, px + 28, py + 58, Math.round(106 * Math.max(0, live.health) / 100), 7, 3); c.fill();
     T(c, 'HP ' + Math.round(live.health) + '%', px + 140, py + 62, 10, '#eef1f5', 'left', 'bold');
     T(c, 'JAX MARLOWE', px + 12, py + 82, 10, '#35f0ff', 'left');
-    // --- speed panel (TITLE-A6): the backdrop's hardcoded "142 MPH" must
-    // never show on title. Wide screens: erase with a live copy of the
-    // clean road strip left of it (verified clean at 1280x720). Narrow
-    // screens (<=640: the old `W2 > 640` guard skipped the erase entirely,
-    // and the strip left of the panel is the title card, not road): cover
-    // the panel with an opaque dark rect — the corner road is near-black,
-    // so the cover blends instead of leaving a panel-shaped hole.
-    if (W2 > 640) c.drawImage(c.canvas, W2 - 396, H2 - 88, 180, 72, W2 - 196, H2 - 88, 180, 72);
-    else if (W2 > 220) { c.fillStyle = '#241b22'; rr(c, W2 - 196, H2 - 88, 180, 72, 8); c.fill(); }
+    // R31: the backdrop no longer paints a speedo on title, so no cover
+    // is needed here (the old cover left a faint pasted rectangle).
     // --- clock line (was: DAY 1 · 21:02 · HARBOR · HEAT 30) ---
     const clock = 'DAY ' + live.day + ' · ' + live.time + ' · ' + live.district + ' · HEAT ' + live.heat;
     c.font = 'bold 12px ' + FONT;

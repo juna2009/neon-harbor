@@ -1022,6 +1022,11 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     if (cl.taken) continue;
     if (!near(cl.x, cl.y, 1200) || !vis(cl.x, cl.y, 25)) continue;
     // DEBOX R27b: token = permata berputar (bukan kubus kuning melayang)
+    // R31-ANCHOR: permata saja tidak cukup — tanpa alas ia tetap terbaca
+    // sebagai diamond kuning ngambang di samping gedung (chase3d R30).
+    // Alas silinder emas + tiang tipis menambatkannya ke tanah.
+    deboxPoly(OP, cl.x * S, 0, cl.y * S, deboxRingCircle(1.0, 10), 0.14, [0.72, 0.55, 0.1], 4);
+    deboxBeam(OP, cl.x * S, 0.1, cl.y * S, cl.x * S, 1.0, cl.y * S, 0.1, [1.0, 0.8, 0.2], 4);
     boxR(OP, cl.x * S, 1.0, cl.y * S, 0.9, 0.9, 0.9, t * 1.5, 0.6, [1.0, 0.8, 0.2], 4);
   }
 
