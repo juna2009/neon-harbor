@@ -250,7 +250,7 @@ void main(){
     float f = 1.0 - exp(-dist * 0.011 * uFogK);
     col = mix(col, uHz, clamp(f, 0.0, 0.85));
     col *= (1.0 - uDark * 0.75);
-    gl_FragColor = vec4(postfx(col), tex.a);
+    gl_FragColor = vec4(postfx(col), tex.a * vC.r);
     return;
   }
   // R40: trotoar (14) + pasir (15) — UV SUDAH skala dunia dari emitter
@@ -1140,9 +1140,15 @@ function person(B, x, z, yaw, col, opt) {
   // kanan maju saat sw > 0 — lift mengikuti kaki yang MAJU, bukan yang
   // mundur (versi pertama sempat terbalik; diperbaiki setelah cek kode +
   // frame). Kalau frame cek nanti menunjukkan sebaliknya, tukar lagi.
-  const liftL = Math.max(0, -Math.sin(ph)) * 0.14;
-  const liftR = Math.max(0, Math.sin(ph)) * 0.14;
-  const bob = -Math.abs(Math.sin(ph)) * 0.04;
+  // SMOOTH-WALK: lift + bob di-ease (smoothstep) — half-sine lama punya
+  // diskontinuitas kecepatan saat lepas landas/mendarat, bob |sin| punya cusp
+  // di tiap batas langkah. s^2(3-2s) + sin^2 = turunan 0 di kedua ujung;
+  // puncak sama (lift 0,14, bob 0,04). Hanya jalur fallback box; sprite live
+  // pakai atlas (lift sudah di-bake di pose).
+  const sL = Math.max(0, -Math.sin(ph)), sR = Math.max(0, Math.sin(ph));
+  const liftL = sL * sL * (3 - 2 * sL) * 0.14;
+  const liftR = sR * sR * (3 - 2 * sR) * 0.14;
+  const bob = -Math.sin(ph) * Math.sin(ph) * 0.04;
   const p = (lx, ly, lz, w, h, d, c, m, rx) => {
     const q = rotY(lx, lz, yaw);
     boxR(B, x + q[0], ly, z + q[1], w, h, d, yaw, rx || 0, c, m);
@@ -1214,6 +1220,9 @@ if (typeof Image !== 'undefined') {
 }
 const PED_CELL_W = 96, PED_CELL_H = 192, PED_COLS = 32, PED_ROWS = 10;
 const PED_AW = 3072, PED_AH = 1920;
+// SMOOTH-WALK: fase walkPhase Jax di render sebelumnya — untuk crossfade
+// pose sprite (personSprite, kind player). null = belum pernah render.
+let _playerLastPhase = null;
 function personSprite(SP, B, x, z, yaw, col, opt, camFwd, t) {
   const o = opt || {};
   if (!PED_ATLAS.ok) { person(B, x, z, yaw, col, opt); return; } // fallback box
@@ -1247,7 +1256,29 @@ function personSprite(SP, B, x, z, yaw, col, opt, camFwd, t) {
   const rgt = [-fz, 0, fx]; // screen-right kamera
   const hw = 0.425, hh2 = 0.95, cy = 0.95; // lebar 0.85u, tinggi 1.9u (sama dgn box person: 0..1.94)
   const P = (sr, sh) => [x + rgt[0] * sr * hw, cy + sh * hh2, z + rgt[2] * sr * hw];
-  quad(SP, P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), n, [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], [1, 1, 1], 12);
+  // SMOOTH-WALK (crossfade pose Jax): 4 pose diskrit = kaki "snap" tiap ganti
+  // frame (terukur atlas: lompat s.d. 14 px sel ~19 px layar @1280x800, 5,6 Hz).
+  // Paruh pertama tiap frame (u<0,5): gambar pose SEBELUMNYA sebagai ghost
+  // yang memudar + pose sekarang yang muncul — dissolve ~0,1 dtk, bukan snap.
+  // Hanya Jax (kind player): ped kecil di layar, pop-nya tak terbaca. Ghost
+  // HANYA saat fase maju (Jax jalan); kalau diam fase beku -> tanpa ghost
+  // (kalau tidak, double-image beku saat berhenti di tengah blend). Alpha
+  // dibawa lewat warna quad (vC.r) — FS material 12 mengalikan tex.a dgn
+  // vC.r; quad biasa vC=[1,1,1] jadi perilaku lama byte-identik.
+  let curCol = [1, 1, 1];
+  if (o.kind === 'player') {
+    const u = (((ph % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2)) / (Math.PI / 2);
+    const advanced = _playerLastPhase !== null && ph !== _playerLastPhase;
+    _playerLastPhase = ph;
+    if (advanced && u < 0.5) {
+      const ccPrev = angle + ((phase + 3) % 4) * 8;
+      const pu0 = (ccPrev * PED_CELL_W) / PED_AW, pu1 = ((ccPrev + 1) * PED_CELL_W) / PED_AW;
+      const g = 1 - u * 2;
+      quad(SP, P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), n, [[pu0, v0], [pu1, v0], [pu1, v1], [pu0, v1]], [g, g, g], 12);
+      curCol = [u * 2, u * 2, u * 2];
+    }
+  }
+  quad(SP, P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), n, [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], curCol, 12);
 }
 
 // ---- jembatan state: bangun geometri frame dari state game yang hidup ----
