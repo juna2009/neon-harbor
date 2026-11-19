@@ -7,6 +7,14 @@
 import { COLORS as C, UPGRADES, WEAPONS, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
 
+// Touch controls (post-cut wiring, 0 bytes in the dossier text): on touch
+// devices only, load touch.js with a dynamic import — the dossier's static
+// import walk skips dynamic import(), so this adds nothing to the dossier.
+// Desktop stays completely clean: no elements, no listeners, no import.
+if (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window) {
+  import('./touch.js').catch(() => {});
+}
+
 const FONT = 'system-ui';
 function T(c, s, x, y, z, k, a, w) {
   c.font = (w || '') + ' ' + z + 'px ' + FONT;
