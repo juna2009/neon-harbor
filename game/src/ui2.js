@@ -273,6 +273,31 @@ export function drawRoadTo1(c, x, y, w, done, total, next, big) {
   }
 }
 // ---- HUD v2 ----
+// ---- HUD layout: scale-aware clusters (R27c HUD fix) ----
+// Design space is 1280x800 — the size every HUD panel was measured for.
+// Live-play video is recorded at a 640x360 viewport (upscaled to 1280x720),
+// where the fixed-pixel HUD is ~2x too big for the screen: the day pill
+// runs under the minimap, the ROAD TO #1 card collides with the stats panel
+// and the minimap, the target compass lands on the stats panel (covering
+// PISTOL / HARBOR TOKENS), the mission bar covers the speedo's KM/H, and
+// the Mara dialogue covers ~40% of the screen. Each HUD cluster is
+// therefore drawn in design coords under a uniform scale
+// s = clamp(min(w/1280, h/800), 0.5, 1), anchored at its screen corner, so
+// clusters keep their relative layout at ANY viewport and can never overlap
+// each other. At 1280x800 s = 1 (pixel-identical to the sealed R27b HUD).
+export const HUD_DESIGN_W = 1280;
+export const HUD_DESIGN_H = 800;
+export function hudScaleFor(view) {
+  return Math.max(0.5, Math.min(1, view.w / HUD_DESIGN_W, view.h / HUD_DESIGN_H));
+}
+// Draw fn() in design coords, with design point (ax,ay) pinned to screen
+// point (sx,sy), uniformly scaled by k.
+export function hudCluster(c, ax, ay, sx, sy, k, fn) {
+  c.save();
+  c.translate(sx, sy); c.scale(k, k); c.translate(-ax, -ay);
+  fn();
+  c.restore();
+}
 function segBar(c, x, y, w, h, frac, color, segs) {
   const sw = (w - (segs - 1) * 2) / segs, n = Math.round(frac * segs);
   for (let i = 0; i < segs; i++) {
@@ -281,9 +306,18 @@ function segBar(c, x, y, w, h, frac, color, segs) {
   }
 }
 export function drawHud2(c, st, best, ui, view) {
-  const p = st.player, W2 = view.w, H2 = view.h;
+  const p = st.player;
+  // R27c HUD fix: all coordinates below are DESIGN coords (1280x800).
+  // Each cluster is drawn under a uniform scale anchored at its screen
+  // corner (see hudCluster above), so the layout is identical at 1280x800
+  // and overlap-free at any smaller viewport (640x360 live-play recording,
+  // 1280x720 re-record). SW/SH are the real screen size.
+  const W2 = HUD_DESIGN_W, H2 = HUD_DESIGN_H;
+  const SW = view.w, SH = view.h;
+  const s = hudScaleFor(view);
   const collected = st.collectibles.filter((k) => k.taken).length;
-  // top-left cluster
+  // ---- top-left cluster: stats panel + radio pill (anchor 0,0) ----
+  hudCluster(c, 0, 0, 0, 0, s, () => {
   drawPanel(c, 12, 12, 284, 176, C.neonCyan);
   drawCashIcon2(c, 32, 36, 13);
   T(c, '$' + st.cash.toLocaleString('en-US'), 50, 36, 28, C.cash, 'left', 'bold');
@@ -311,7 +345,9 @@ export function drawHud2(c, st, best, ui, view) {
     drawPill(c, 12, 196, 132, 24, '#0e1420e6', C.neonPink);
     T(c, '♪ ' + ui.stationName, 78, 209, 13, C.neonPink, 'center', 'bold');
   }
-  // top-center readout + ROAD TO #1
+  });
+  // ---- top-center cluster: day readout + ROAD TO #1 (anchor W2/2,0) ----
+  hudCluster(c, W2 / 2, 0, SW / 2, 0, s, () => {
   const total = st.clock ? st.clock.total : 0;
   const day = 1 + Math.floor(total / 1440);
   const hh = String(Math.floor(total / 60) % 24).padStart(2, '0');
@@ -325,7 +361,16 @@ export function drawHud2(c, st, best, ui, view) {
   drawPill(c, (W2 - rw) / 2, 12, rw, 30, '#0e1420e6', hot ? '#ff8a7a' : C.neonCyan);
   T(c, readout, W2 / 2, 28, 15, hot ? '#ff8a7a' : '#ffffff', 'center', 'bold');
   drawRoadTo1(c, (W2 - 360) / 2, 52, 360, st.missionDone || 0, st.missionTotal || 12, st.nextMission || '');
-  // R25h: the PD panel (drawn by drawMinimap2 below) starts at y200 and
+  });
+  // ---- top-right cluster: military pill + minimap (anchor W2,0) ----
+  // R27c (g): minimap 200x150 -> 160x120, moved right (x W2-188) so its
+  // frame keeps the same 22 px right margin — Juna (08:15 WIB): "layar
+  // penuh banget, gameplay nggak kelihatan". Markers/roads inside are
+  // untouched (drawMinimap2 draws icons at fixed px sizes, so hero + markers
+  // stay just as legible on the smaller map). The smaller + righter minimap
+  // also clears the day pill / ROAD TO #1 card at every viewport (a).
+  hudCluster(c, W2, 0, SW, 0, s, () => {
+  // R25h: the PD panel (drawn by drawMinimap2 below) starts at y170 and
   // covers this slot, so the fixed pill is drawn ONLY when the panel
   // will not show (no responding unit/heli). When the panel shows, the
   // pill is drawn below it by drawPdPanel2 instead — never twice, never hidden.
@@ -340,14 +385,16 @@ export function drawHud2(c, st, best, ui, view) {
     drawPill(c, W2 - 234, 198, 212, 30, '#ff3b30', '#ffffff');
     T(c, '⚠  MILITARY RESPONSE  ⚠', W2 - 128, 213, 13, '#ffffff', 'center', 'bold');
   }
-  // minimap (top-right)
-  drawMinimap2(c, st, W2 - 228, 16, 200, 150);
-  // speed cluster (bottom-right) — plain big tabular number, no heavy box
-  // (reference "111 MPH" + "MERIDIAN · 82%"; bible §6.2: real-time numbers
-  // tabular so the counter never wobbles; §6.1: outline + drop shadow carry
-  // the contrast, so no panel is needed). Right-anchored at W2-24: the
-  // number grows leftward as digits change, the right edge never moves.
+  drawMinimap2(c, st, W2 - 188, 16, 160, 120);
+  });
+  // ---- bottom-right cluster: speedo (anchor W2,H2) ----
+  // plain big tabular number, no heavy box (reference "111 MPH" +
+  // "MERIDIAN · 82%"; bible §6.2: real-time numbers tabular so the counter
+  // never wobbles; §6.1: outline + drop shadow carry the contrast, so no
+  // panel is needed). Right-anchored at W2-24: the number grows leftward as
+  // digits change, the right edge never moves.
   // On foot the whole block stays hidden (no empty box left behind).
+  hudCluster(c, W2, H2, SW, SH, s, () => {
   if ((p.inCar && p.car) || (p.inBoat && p.boat)) {
     const veh = p.inCar ? p.car : p.boat;
     const spd = Math.round(Math.abs(veh.speed) * 0.36);
@@ -375,11 +422,14 @@ export function drawHud2(c, st, best, ui, view) {
       T(c, 'TIRES POPPED — GARAGE $150 (G)', W2 - 156, H2 - 136, 13, '#fff', 'center', 'bold');
     }
   }
-  // hints pill — ONE pill, bottom-center (ref. shot: single centred pill
+  });
+  // ---- bottom-center cluster: hints pill (anchor W2/2,H2) ----
+  // ONE pill, bottom-center (ref. shot: single centred pill
   // "WASD drive · Shift handbrake · E exit car · F horn"). Contextual per
   // state, progressive disclosure (bible §6.4): only keys that do something
   // right now. Hidden in the plane — space.js draws its own flight hint
   // at the same bottom-center spot.
+  hudCluster(c, W2 / 2, H2, SW / 2, SH, s, () => {
   if (!p.inPlane) {
     const hints = p.inCar ? 'WASD drive · E exit · Q weapon · C radio'
       : p.inBoat ? 'E step ashore · C radio · M mute'
@@ -389,6 +439,9 @@ export function drawHud2(c, st, best, ui, view) {
     drawPill(c, (W2 - hw) / 2, H2 - 30, hw, 24, '#0e1420b8', 'rgba(238,241,245,0.35)');
     T(c, hints, W2 / 2, H2 - 17, 13, '#c8cdd6', 'center');
   }
+  });
+  // ---- bottom-left cluster: objective bar + Mara dialogue (anchor 0,H2) ----
+  hudCluster(c, 0, H2, 0, SH, s, () => {
   // objective bar with counter pill
   const obj = st.objective || '';
   c.font = 'bold 16px ' + FONT;
@@ -403,11 +456,16 @@ export function drawHud2(c, st, best, ui, view) {
   drawPill(c, 24, H2 - 68, 52, 20, C.neonCyan);
   T(c, curMission + '/' + (st.missionTotal || 13), 50, H2 - 57, 12, '#0e1420', 'center', 'bold');
   T(c, obj, 86, H2 - 57, 16, '#ffffff', 'left', 'bold');
-  // dialogue card — FIXED bottom-left, slimmer (was 560 px wide: right
-  // edge x 692 covered the hero car in chase-cam). Text card now ends
-  // x 572; the hero car/boat sits centre-frame (left edge ≥ ~620), so the
-  // dialog never covers it. Portrait + name pill unchanged (bible §6.3).
+  // dialogue card — R27c HUD fix (e)/(f): the card was 556 px wide and
+  // 128 tall in design coords, i.e. 89% of the width at a 640x360 viewport,
+  // covering the road ahead at every mission/race start. It is now drawn
+  // at 0.8x about its bottom-left corner (same text, same portrait, same
+  // wrap — only rendered smaller), and the global cluster scale shrinks it
+  // further on small viewports. The hero car/boat sits centre-frame (left
+  // edge ≥ ~620 design px), so the dialog never covers it or the road.
   if (st.dialogue) {
+    c.save();
+    c.translate(16, H2 - 118); c.scale(0.8, 0.8); c.translate(-16, -(H2 - 118));
     drawPanel(c, 16, H2 - 246, 108, 128, C.neonPink);
     if (st.portrait) st.portrait(c, 22, H2 - 240, 96, 116, st.dialogueMood || 'alert');
     drawPill(c, 132, H2 - 246, 168, 22, C.neonPink);
@@ -415,8 +473,10 @@ export function drawHud2(c, st, best, ui, view) {
     c.fillStyle = 'rgba(14,20,32,0.88)'; rr(c, 132, H2 - 218, 440, 100, 10); c.fill();
     c.fillStyle = C.neonPink; c.fillRect(132, H2 - 218, 4, 100);
     W(c, st.dialogue, 148, H2 - 196, 408, 16, '#ffffff', 24);
+    c.restore();
   }
-  if (st.wanted >= 3) { c.fillStyle = 'rgba(239,68,68,0.07)'; c.fillRect(0, 0, W2, H2); }
+  });
+  if (st.wanted >= 3) { c.fillStyle = 'rgba(239,68,68,0.07)'; c.fillRect(0, 0, SW, SH); }
 }
 
 // ---- title screen v2: compact card, measured text (no overflow), no faces ----

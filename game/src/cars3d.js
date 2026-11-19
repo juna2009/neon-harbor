@@ -194,6 +194,7 @@ export const CAR_SPECS = {
   fire:      { label: 'Pemadam',      kind: 'fire',   len: 8.4, wid: 2.6, bodyH: 1.50, cabFrac: 0.50, cabW: 0.90, wheels: 4, wheelD: 0.70, paint: '#c0392b', spoiler: false, lightbar: true },
   medic:     { label: 'Ambulans',     kind: 'medic',  len: 6.2, wid: 2.4, bodyH: 1.40, cabFrac: 0.60, cabW: 0.90, wheels: 4, wheelD: 0.66, paint: '#f5f5f5', spoiler: false, lightbar: true },
   apc:       { label: 'APC Tentara',  kind: 'apc',    len: 6.8, wid: 2.6, bodyH: 1.30, cabFrac: 0.40, cabW: 0.70, wheels: 6, wheelD: 0.45, paint: '#4a5a2a', spoiler: false, lightbar: false },
+  armored:   { label: 'Truk Lapis Baja', kind: 'armored', len: 5.4, wid: 2.4, bodyH: 1.50, cabFrac: 0.30, cabW: 0.92, wheels: 6, wheelD: 0.70, paint: '#4a5240', spoiler: false, lightbar: false },
   hatchback: { label: 'Hatchback',    kind: 'hatch',  len: 4.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.62, cabW: 0.80, wheels: 4, wheelD: 0.68, paint: '#2e8b9e', spoiler: true,  lightbar: true },
   sedanL:    { label: 'Sedan Panjang',kind: 'sedan',  len: 5.4, wid: 2.2, bodyH: 0.80, cabFrac: 0.45, cabW: 0.78, wheels: 4, wheelD: 0.70, paint: '#7d8ea3', spoiler: false, lightbar: true },
   pickup:    { label: 'Pickup',       kind: 'pickup', len: 5.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.42, cabW: 0.80, wheels: 4, wheelD: 0.70, paint: '#d97b2b', spoiler: false, lightbar: true },
@@ -503,6 +504,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   if (spec.kind === 'fire') return drawFire();
   if (spec.kind === 'medic') return drawMedic();
   if (spec.kind === 'apc') return drawApc();
+  if (spec.kind === 'armored') return drawArmored();
   return drawSedanFamily();
 
   // ================= BUS =================
@@ -622,6 +624,53 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     for (const s of [-1, 1]) {
       p(s * (W / 2 + 0.01), 0.75, 0, 0.05, 0.25, L * 0.85, [0.20, 0.22, 0.12], 1); // band gelap
     }
+    drawRearLights();
+    drawFrontLights();
+    return finish();
+  }
+
+  // ================= TRUK LAPIS BAJA (R27c de-box) =================
+  // Cash-in-transit: kabin depan + bak kargo lapis baja tinggi di belakang
+  // (bukan sedan — dulu digambar car() lama = slab + kaca + spoiler).
+  // Dari chase-cam (belakang): pintu ganda + lampu marker atap + lampu rem;
+  // dari samping: bak bertingkat (lambung atas menyempit = pelat miring)
+  // + strip amber + sambungan pelat; dari depan: kaca kabin + grill.
+  // Semua shell ada di semua LOD (bentuk tak boleh berubah dengan jarak).
+  function drawArmored() {
+    const AMBER = [0.72, 0.55, 0.15]; // strip identitas truk kas
+    const ARMOR = col.map((v) => v * 0.8); // pelat atas lebih gelap
+    const cargoZ = -L * 0.16, cargoL = L * 0.68; // bak: z -L/2 .. +L*0.18
+    const cabZ = L * 0.34, cabL = L * 0.32; // kabin: z +L*0.18 .. +L/2
+    // Bak kargo: bawah penuh + atas menyempit (pelat miring lapis baja)
+    p(0, 0.95, cargoZ, W, 1.0, cargoL, col, 1);                            // bak bawah (0,45–1,45)
+    p(0, 1.70, cargoZ, W * 0.90, 0.5, cargoL * 0.94, ARMOR, 1);            // bak atas (1,45–1,95)
+    p(0, 1.99, cargoZ, W * 0.88, 0.08, cargoL * 0.92, paintLight, 1);       // atap bak
+    p(0, 2.06, cargoZ - cargoL * 0.24, W * 0.42, 0.08, 0.8, paintDark, 1);  // palka atap
+    p(0, 2.05, cargoZ + cargoL * 0.34, 0.5, 0.1, 0.5, [0.6, 0.62, 0.65], 5); // ventilasi atap
+    // Kabin: badan + atap + kaca depan/samping
+    p(0, 1.02, cabZ, W * 0.96, 1.14, cabL, col, 1);                         // kabin (0,45–1,59)
+    p(0, 1.63, cabZ, W * 0.94, 0.08, cabL, paintLight, 1);                  // atap kabin
+    for (const s of [-1, 1]) p(s * (W / 2 + 0.01), 1.30, cabZ, 0.05, 0.5, cabL * 0.64, GLASS, 1); // kaca samping kabin
+    flatGlass(0, 1.30, L / 2 + 0.01, W * 0.80, 0.55, 1);                    // kaca depan + bingkai + streak
+    // Flank: pita bawah gelap + strip amber + trim terang + sambungan pelat
+    for (const s of [-1, 1]) {
+      qS(s * (W / 2 + 0.01), 0.72, cargoZ, cargoL * 0.85, 0.28, paintDark, 1);
+      qS(s * (W / 2 + 0.01), 1.08, cargoZ, cargoL * 0.82, 0.16, AMBER, 1);
+      qS(s * (W / 2 + 0.01), 1.45, cargoZ, cargoL * 0.85, 0.05, paintLight, 1);
+      qS(s * (W / 2 + 0.02), 1.20, cargoZ - cargoL * 0.28, 0.05, 1.15, DARK, 5); // sambungan pelat 1
+      qS(s * (W / 2 + 0.02), 1.20, cargoZ + cargoL * 0.22, 0.05, 1.15, DARK, 5); // sambungan pelat 2
+      qS(s * (W / 2 + 0.02), 1.0, cabZ - cabL * 0.45, 0.05, 1.0, DARK, 5);  // garis pintu kabin
+      qS(s * (W / 2 + 0.02), 1.05, cabZ + cabL * 0.22, 0.25, 0.06, CHROME, 1); // gagang pintu
+    }
+    // Muka belakang: pintu ganda (sambungan tengah + engsel + gagang) +
+    // 3 lampu marker amber di tepi atas atap
+    qB(0, 1.20, -L / 2 - 0.03, 0.06, 1.3, DARK, 5);                         // sambungan pintu ganda
+    for (const s of [-1, 1]) qB(s * W * 0.38, 1.20, -L / 2 - 0.03, 0.06, 1.3, DARK, 5); // engsel
+    for (const s of [-1, 1]) qB(s * 0.22, 1.10, -L / 2 - 0.04, 0.08, 0.28, CHROME, 1); // gagang pintu
+    for (const lx of [-0.6, 0, 0.6]) qB(lx, 1.98, -L / 2 - 0.02, 0.14, 0.08, [1.0, 0.7, 0.2], 4); // marker atap
+    // Marker amber di tepi depan atap kabin (terbaca saat berpapasan)
+    for (const s of [-1, 1]) qF(s * 0.6, 1.66, L / 2 + 0.03, 0.14, 0.08, [1.0, 0.7, 0.2], 4);
+    rearBevel(1.95, W * 0.8);
     drawRearLights();
     drawFrontLights();
     return finish();

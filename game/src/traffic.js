@@ -49,10 +49,10 @@ export function createTraffic(city, rng) {
     const color = body === 'taxi' ? '#f7c948' : rng.pick(city.carColors);
     if (vertical) {
       const rx = rng.pick(city.roadsV);
-      parked.push(makeCar(rx + 24, rng.range(200, WORLD_H - 200), PI2, color, 'parked', body));
+      parked.push(makeCar(rx + 16, rng.range(200, WORLD_H - 200), PI2, color, 'parked', body));
     } else {
       const ry = rng.pick(city.roadsH);
-      parked.push(makeCar(rng.range(200, WATER_X - 200), ry + 24, 0, color, 'parked', body));
+      parked.push(makeCar(rng.range(200, WATER_X - 200), ry + 16, 0, color, 'parked', body));
     }
   }
   return { cars, parked };
@@ -170,16 +170,61 @@ export function createPedestrians(city, rng) {
       flashTimer: 0,
     });
   }
+  // R27c: hero peds stand on the SIDEWALK beside the spawn road, not on its
+  // centreline. (Before: both stood on road y=480 — Jax 60u straight ahead of
+  // the player spawn (480,480) — and were run over ~5s into every drive,
+  // giving 1 wanted star; see VIDEO-REVIEW-FINDINGS.md item 3.)
+  // NOTE: Jax goes on the NORTH sidewalk (y=440), not the south (y=520):
+  // the player car departs in the south lane (y=504), only 16u from the
+  // south sidewalk — inside the 26u run-over radius — while the north
+  // sidewalk is 64u away, safe at any speed. (First attempt at y=520 left
+  // Jax 19u from the car at spawn, still inside the kill radius.)
   peds.push({
-    x: 540, y: 480, angle: 0, speed: 40,
+    x: 540, y: 440, angle: 0, speed: 40,
     color: '#6b4423', skin: '#d8a077', pants: '#1c1f24', hat: 0, build: 'wide',
     flee: 0, alive: true, walkPhase: 0, photo: 0, flashTimer: 0, hero: 'jax',
   });
   peds.push({
-    x: 420, y: 480, angle: Math.PI, speed: 38,
+    x: 420, y: 440, angle: Math.PI, speed: 38,
     color: '#8a1f28', skin: '#e8b98a', pants: '#2a1214', hat: 0, build: 'slim',
     flee: 0, alive: true, walkPhase: 1.6, photo: 0, flashTimer: 0, hero: 'mara',
   });
+  // R27c: spawn-time guard — no pedestrian may ever spawn walking ALONG a
+  // vehicle lane (it would stay in the lane), and the player's departure
+  // corridor on the spawn road stays clear. Crossing a perpendicular road at
+  // an intersection is transient and stays allowed.
+  const SIDE = ROAD_W / 2 + 4; // 40 — sidewalk offset, same as random spawns
+  const spawnRoad = city.roadsH.find((ry) => Math.abs(ry - city.playerStart.y) < 1)
+    ?? city.playerStart.y;
+  for (const ped of peds) {
+    const ca = Math.abs(Math.cos(ped.angle));
+    const sa = Math.abs(Math.sin(ped.angle));
+    let moved = false;
+    for (const ry of city.roadsH) {
+      if (Math.abs(ped.y - ry) < ROAD_W / 2 && ca > 0.7) {
+        ped.y = ry + (ped.y >= ry ? SIDE : -SIDE);
+        moved = true;
+        break;
+      }
+    }
+    if (!moved) {
+      for (const rx of city.roadsV) {
+        if (Math.abs(ped.x - rx) < ROAD_W / 2 && sa > 0.7) {
+          ped.x = rx + (ped.x >= rx ? SIDE : -SIDE);
+          break;
+        }
+      }
+    }
+    // Departure corridor: the spawn road ahead of the car. The car leaves in
+    // the south lane (y=504), so anything on the road or the south sidewalk
+    // here is inside the 26u run-over radius while the car accelerates
+    // through 80–250 (flee only starts above 250). Move it to the far
+    // (north) sidewalk, 64u from the car's path — safe at any speed.
+    if (Math.abs(ped.y - spawnRoad) <= SIDE
+      && ped.x >= city.playerStart.x - 40 && ped.x <= city.playerStart.x + 420) {
+      ped.y = spawnRoad - SIDE;
+    }
+  }
   return peds;
 }
 export function stepPedestrians(peds, dt, city, danger, chase) {

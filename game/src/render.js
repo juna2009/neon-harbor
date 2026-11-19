@@ -5,10 +5,10 @@ import { createCinematic } from './cinematic.js';
 import { drawBuildingShadow, drawDayTint, drawLightPool, drawLightning, drawWetReflection } from './lighting.js';
 import { drawBuoy, drawBuilding, drawCargoShip, drawContainer, drawCrane, drawCrosswalk, drawHydrant, drawLamp, drawPier, drawSign, drawTree } from './props.js';
 import { drawDirectionArrow, drawMenuFrame, drawTargetRing } from './ui-art.js';
-import { drawBoatWake, drawCarShape, drawExplosionSprite, drawHarborSkyline, drawPedPhone, drawPedestrian, drawPerson, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet, rr } from './assets.js';
+import { drawArmoredTruck, drawBoatWake, drawCarShape, drawExplosionSprite, drawHarborSkyline, drawPedPhone, drawPedestrian, drawPerson, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet, rr } from './assets.js';
 import { drawJaxPortrait, drawMaraPortrait } from './portraits.js';
 import { drawBridge } from './drawbridge.js';
-import { drawHud2, drawPause2, drawShop2, drawTitle2 } from './ui2.js';
+import { drawHud2, drawPause2, drawShop2, drawTitle2, hudCluster, hudScaleFor } from './ui2.js';
 import * as space from './space.js';
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
@@ -35,6 +35,7 @@ function drawTrafficCar(ctx, car, night) {
   ctx.ellipse(car.x + 2, car.y + 3, car.length / 2 + 2, car.width / 2 + 2, 0, 0, Math.PI * 2);
   ctx.fill();
   if (car.pink) drawPinkTaxi(ctx, car.x, car.y, car.angle);
+  else if (car.kind === 'armored') drawArmoredTruck(ctx, car.x, car.y, car.angle, car.color); // R27c: truk lapis baja bukan van
   else if (car.body === 'van') drawVan(ctx, car.x, car.y, car.angle, car.color);
   else if (car.body === 'sedan' || car.body === 'hatch') drawSportCar(ctx, car.x, car.y, car.angle, car.color);
   else drawCarShape(ctx, car, night);
@@ -1056,7 +1057,12 @@ export function createRenderer(canvas) {
   // y/height, so radio + mode read as one small status strip under the
   // stats panel instead of two pills stacked down the left edge. Falls
   // back to x 12 when no radio pill is drawn (no stationName).
+  // R27c HUD fix: same top-left cluster transform as drawHud2's radio
+  // pill (ui2.js hudCluster, anchor 0,0) — the badge is drawn in design
+  // coords (x 152, y 196) so it stays glued to the radio pill's right edge
+  // at every viewport instead of drifting off it.
   function drawModeBadge(state, ui) {
+    hudCluster(ctx, 0, 0, 0, 0, hudScaleFor(view), () => {
     const on = chaseOn(state);
     const label = on ? '3D CHASE-CAM  ·  V for 2D top-down' : '2D TOP-DOWN  ·  V for 3D chase-cam';
     ctx.font = `bold 13px ${FONT}`;
@@ -1067,6 +1073,7 @@ export function createRenderer(canvas) {
     ctx.fillStyle = on ? COLORS.neonPink : COLORS.neonCyan;
     ctx.fillRect(x, 196, 4, 24);
     text(label, x + 16, 213, 13, '#ffffff', 'left', 'bold');
+    });
   }
   // VB-22: the old compass pinned its arrow + "Label — 1000m" at fixed
   // top-centre (view.w/2, 104) whatever the target was doing — at 1000 m
@@ -1120,19 +1127,31 @@ export function createRenderer(canvas) {
     // measured off the 1280x800 shots: left panel, ROAD TO #1, minimap,
     // dialogue, speedo, mission banner). Without this the marker lands on
     // the minimap (chase3d) or under ROAD TO #1 (boat3d).
-    // R25l REBASE (Integrator): right edge was [0.26, 0.79] — measured when
-    // the HUD had NO PD panel. R25h added BAY PD RESPONSE under the minimap
-    // (top ~190, bottom ~360; MILITARY pill below it to ~398 at wanted 6),
-    // so a right-edge marker at y~208 painted its pill OVER the panel
-    // header ("BAY PD RESPONSE" / "5 UNITS" covered — seen in the R25l
-    // re-shoot of chase3d + boat3d). Floor moved to 0.52 (y 416) so the
-    // marker + pill clear both the panel and the military pill; the arrow
-    // keeps its exact bearing, only the anchor moves (same rule as the
-    // top-edge fallback above).
-    const free = { top: [0.25, 0.78], right: [0.52, 0.79], bottom: [0.65, 0.81], left: [0.34, 0.65] }[edge];
+    // R27c HUD fix: the free intervals are re-derived from the SCALED HUD
+    // (ui2.js clusters, s = clamp(min(w/1280, h/800), 0.5, 1)):
+    //  - left floor 0.60 (was 0.65): at 640x360 the old floor put the pill
+    //    on the Mara dialogue (dialogue top y 237); 0.60 keeps the pill
+    //    clear of it, and clear of the stats panel above (y 94) and the
+    //    radio/mode strip (y 98..110).
+    //  - right floor 0.56 (was 0.52): at 640x360 the old floor put the pill
+    //    on the MILITARY RESPONSE pill below the PD panel (ends y ~185);
+    //    0.56 clears it at every size, and still clears the PD panel
+    //    (ends y ~332 design) at 1280x800.
+    // Bottom/top are unchanged fractions of W (the bottom pill clamp below
+    // is now also a fraction of W, so it works at 640 wide — the old
+    // hardcoded [810, 1065] pinned the pill off-screen there).
+    const free = { top: [0.25, 0.78], right: [0.56, 0.79], bottom: [0.65, 0.81], left: [0.34, 0.60] }[edge];
     const span = (edge === 'top' || edge === 'bottom') ? W : H;
     if (edge === 'top' || edge === 'bottom') ax = Math.min(Math.max(ax, free[0] * span), free[1] * span);
     else ay = Math.min(Math.max(ay, free[0] * span), free[1] * span);
+    // R27c HUD fix: the marker itself is drawn at the HUD scale about its
+    // anchor (ax,ay), so at 640x360 it stays proportional to the scaled HUD
+    // instead of looming 2x too big over the panels. The anchor and the
+    // free-interval slide above stay in screen coords — only the drawing
+    // scales, so the bearing is exact.
+    const hs = hudScaleFor(view);
+    ctx.save();
+    ctx.translate(ax, ay); ctx.scale(hs, hs); ctx.translate(-ax, -ay);
     // arrow, pointing along the ray (it points up at rotate(0))
     const rot = Math.atan2(rx, -ry);
     ctx.save();
@@ -1154,7 +1173,9 @@ export function createRenderer(canvas) {
     let px = ax;
     if (edge === 'bottom') {
       const half = tw / 2 + 10;
-      px = Math.min(Math.max(ax, 810 + half), 1065 - half);
+      // R27c HUD fix: fraction of W (was hardcoded [810, 1065], which pinned
+      // the pill off-screen at a 640-wide viewport). Same values at 1280.
+      px = Math.min(Math.max(ax, 0.633 * W + half), 0.832 * W - half);
       ctx.fillStyle = 'rgba(14,20,32,0.82)';
       rr(ctx, px - half, ay - 40, tw + 20, 24, 7);
       ctx.fill();
@@ -1167,6 +1188,7 @@ export function createRenderer(canvas) {
       ctx.fill();
       text(label, px, ay + 5, 13, '#ffd23e', 'center', 'bold');
     }
+    ctx.restore(); // R27c HUD fix: end marker scale-about-anchor
   }
   function draw(state, screen, best, ui) {
     if (!viewInit) {

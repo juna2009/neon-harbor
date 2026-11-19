@@ -1,5 +1,5 @@
 import { CAR, PLAYER, STEP, UFO_DURATION, UFO_HOUR, WANTED, WEAPONS, WORLD_H, WORLD_W } from './config.js';
-import { WATER_X, buildCity, collides, districtAt, moveCircle } from './city.js';
+import { WATER_X, buildCity, collides, districtAt, moveCircle, onRoad } from './city.js';
 import { createBullets, fireWeapon, stepBullets } from './combat.js';
 import { BOAT_ACCEL, BOAT_MAX_SPEED, boatHitsObstacle as hit, createBoats, nearestBoat, stepBoats } from './boats.js';
 import { claimPinkTaxi, completeMission, createArmored, createCollectibles, createMissionState, createPizza, createRace, createTaxi, createWeaponPickups, loadCheckpoint, maxCarHp, repairAtGarage, resprayAtGarage, saveCheckpoint, targetForMission, updateArmored, updateMission, updatePickups, updatePizza, updateRace, updateTaxi } from './missions.js';
@@ -497,7 +497,9 @@ export function createWorld(rng, savedMission, sp) {
     }
     for (const ped of peds) {
       if (!ped.alive) continue;
-      if (Math.hypot(ped.x - car.x, ped.y - car.y) < 26 && Math.abs(car.speed) > 80) {
+      // R27c: run over only peds on the road surface — the 26u radius
+      // reaches onto the sidewalk (lane 14-24u, walk line 40u from centre).
+      if (Math.hypot(ped.x - car.x, ped.y - car.y) < 26 && Math.abs(car.speed) > 80 && onRoad(city, ped.x, ped.y)) {
         ped.alive = false;
         addWanted(state, 1);
         state.events.pedDown = true;

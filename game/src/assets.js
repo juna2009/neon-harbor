@@ -8,6 +8,20 @@ function C(c,x,y,r,k){c.fillStyle=k;c.beginPath();c.arc(x,y,r,0,7);c.fill()}
 function W(c){R(c,-20,-12,40,24,'#111')}
 export function drawSportCar(c,x,y,a,k){k=k||'#f43';T(c,x,y,a);W(c);R(c,-24,-10,48,20,k);R(c,-6,-7,14,14,'#9df');R(c,-26,-9,3,18,'#222');E(c)}
 export function drawVan(c,x,y,a,k){k=k||'#39d';T(c,x,y,a);R(c,-27,-12,54,24,k);R(c,15,-10,10,20,'#bdf');E(c)}
+// R27c: truk lapis baja top-down — kabin + bak kargo + 6 roda (bukan van polos).
+export function drawArmoredTruck(c,x,y,a,k){k=k||'#4a5240';T(c,x,y,a);
+  c.fillStyle='#0a0a0e';for(const fx of[-21,0,21]){c.fillRect(fx-4,-14,8,4);c.fillRect(fx-4,10,8,4)}
+  c.fillStyle='#8a8f98';for(const fx of[-21,0,21]){c.fillRect(fx-1,-13,2,2);c.fillRect(fx-1,11,2,2)}
+  R(c,-28,-13,56,26,'#14181f');R(c,-27,-12,54,24,k);
+  R(c,-27,-12,36,24,'#3d422f'); // bak kargo (belakang 2/3, lebih gelap)
+  R(c,-26,-11,34,2,'#b78a24');R(c,-26,9,34,2,'#b78a24'); // strip amber flank bak
+  R(c,-15,-12,2,24,'rgba(0,0,0,0.35)');R(c,-3,-12,2,24,'rgba(0,0,0,0.35)'); // sambungan pelat bak
+  R(c,-20,-5,8,10,'#2f3324'); // palka atap bak
+  R(c,9,-12,2,24,'rgba(0,0,0,0.35)'); // sekat kabin/bak
+  R(c,15,-10,10,20,'#bfe6ff'); // kaca depan kabin
+  R(c,-28,-10,2,4,'#ff3b30');R(c,-28,6,2,4,'#ff3b30'); // lampu rem
+  R(c,25,-10,2,4,'#fff6c8');R(c,25,6,2,4,'#fff6c8'); // lampu depan
+  E(c)}
 export function drawPinkTaxi(c,x,y,a){T(c,x,y,a);W(c);R(c,-23,-11,46,22,'#f7c');R(c,-5,-14,10,4,'#fff');for(let i=6;i--;)R(c,-18+i*6,-2,3,4,i%2?'#111':'#fff');E(c)}
 export function drawPoliceCar(c,x,y,a){T(c,x,y,a);W(c);R(c,-23,-11,46,22,'#111');R(c,0,-11,23,22,'#fff');R(c,-8,-14,8,4,'#f00');R(c,0,-14,8,4,'#00f');E(c)}
 export function drawSpeedboat(c,x,y,a,k){k=k||'#f5f5f5';T(c,x,y,a);R(c,-27,-10,44,20,k);c.fillStyle=k;c.beginPath();c.moveTo(17,-10);c.lineTo(27,0);c.lineTo(17,10);c.closePath();c.fill();R(c,0,-7,10,14,'#9df');R(c,-31,-4,5,8,'#333');E(c)}

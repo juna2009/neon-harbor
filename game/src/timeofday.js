@@ -88,7 +88,7 @@ export const PRESETS = {
     stars: 0.10, cloud: [1.00, 0.55, 0.55], cloudK: 0.20, smog: 0.35,
     skyDim: 0.30, exposure: 1.00,
     facK: 0.55, winCell: [2.2, 2.6], winGlass: 0.7, winWarm: 1, // GEDUNG: sel jendela netral lebih kecil+rapat, kaca gelap di semua waktu
-    contrast: 0, shadowK: 0.5, roadTex: 0, fogK: 1, sunK: 1,
+    contrast: 0, shadowK: 0.5, roadTex: 0, fogK: 1, sunK: 0.9, // R27c SUN: 0.9 = kode sunset di SKYF webgl2.js (disc 0.045->0.032, glow 0.9->0.55, falloff 7->12, streak 0.4->0.22) — perbaikan blown-out VIDEO-REVIEW #2; pagi/siang/malam TIDAK berubah
     bldShadow: false, heroReal: true, // GEDUNG R2: hero v14 realistis di semua waktu (arah R26, hapus gate),
   },
   // MALAM — blue hour -> malam, 22:00. Langit biru dalam (bible §2.3) +
