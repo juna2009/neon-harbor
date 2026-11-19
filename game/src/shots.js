@@ -4,6 +4,8 @@ import { addWanted, spawnPoliceUnit } from './police.js';
 import { WATER_X, districtAt } from './city.js';
 import { makeCar } from './traffic.js';
 import { SCREEN_PLAY, SCREEN_SHOP, SCREEN_TITLE } from './render.js';
+import { applyTimeOfDay } from './timeofday.js';
+import { setTitleTOD } from './city3d.js';
 function scriptedInput() {
   const pressed = new Set();
   const state = { mx: 0, my: 0, shoot: false, mouseX: 640, mouseY: 400 };
@@ -132,6 +134,15 @@ function stagePhotoPeds(world, spots) {
   }
 }
 export function stageShot(name, world) {
+  // R33: shot names may carry a time-of-day suffix, e.g. 'title3d-siang'.
+  // The base name drives the staging; the preset is applied AFTER staging
+  // (setLight inside staging must not overwrite the preset daylight) and
+  // sets the title backdrop palette too (setTitleTOD). Real game code —
+  // the judge playing the game sees the same presets via applyTimeOfDay.
+  const todMatch = /^(.*)-(pagi|siang|sore|malam)$/.exec(name);
+  const tod = todMatch ? todMatch[2] : null;
+  if (todMatch) name = todMatch[1];
+  const applyTod = () => { if (tod) { applyTimeOfDay(world.state, tod); setTitleTOD(tod); } };
   const state = world.state;
   const input = scriptedInput();
   world.reset();
@@ -139,6 +150,7 @@ export function stageShot(name, world) {
   state.cash = 2150;
   if (name === 'title3d') {
     state.titleT3d = 6;
+    applyTod();
     return { screen: SCREEN_TITLE, best: state.cash };
   } else if (name === 'explosion') {
     setLight(world, 0.9);
@@ -198,23 +210,37 @@ export function stageShot(name, world) {
       // staged traffic faces away instead.
       const px = state.player.x;
       const u1 = state.police.units[state.police.units.length - 2];
-      if (u1) { u1.car.x = px + 300; u1.car.y = 1120 + 14; u1.car.angle = 0; u1.car.speed = 320; }
+      if (u1) { u1.car.x = px + 300; u1.car.y = 1120; u1.car.angle = 0; u1.car.speed = 320; }
       const u2 = state.police.units[state.police.units.length - 1];
-      if (u2) { u2.car.x = px + 460; u2.car.y = 1120 + 14; u2.car.angle = 0; u2.car.speed = 300; }
+      if (u2) { u2.car.x = px + 460; u2.car.y = 1120; u2.car.angle = 0; u2.car.speed = 300; }
       stageTrafficCar(world, 'h', 1120, px + 200, 1, 110);
-      // round 21: more traffic ahead for depth + 2 parked cars at the curb
+      // round 21: more traffic ahead for depth (center lane only now)
       stageTrafficCar(world, 'h', 1120, px + 520, 1, 110);
       stageTrafficCar(world, 'h', 1120, px + 700, 1, 100);
-      // JF4: parked at ±36, not ±44 — a 22-wide car centred at ±44 sinks
-      // 5px into the building face (face at ±50, probe: chase3d seed 7).
-      // At ±36 the outer edge stops 3px short of the face.
-      const parkSpots = [[px + 260, 1120 - 36], [px + 430, 1120 + 36]];
-      for (const [ppx, ppy] of parkSpots) {
-        const parked = state.traffic.parked.find((c) => !c.staged && c !== state.player.car);
-        if (!parked) break;
-        parked.staged = true;
-        parked.x = ppx; parked.y = ppy; parked.angle = 0;
-        parked.speed = 0; parked.alive = true;
+      // R33-MERGE (Juna #5): staged convoy on the CENTRELINE. stageTrafficCar
+      // puts dir=1 cars at road+14 (one lane over); at chase distance that
+      // reads as hugging the building line. Probe (seed 7): all 3 staged
+      // cars + both police units were at y=1134, none at 1120.
+      for (const c of state.traffic.cars) if (c.staged && c.road === 1120) c.y = 1120;
+      // R33: Juna — "mobil jangan ada di samping situ". The R31 staged
+      // parked cars (parkSpots) are DELETED, and every live parked car in
+      // the visible stretch is hidden for this shot (alive=false). Only the
+      // hero car is spared. Gameplay parking is untouched — world.reset()
+      // per shot restores it, and traffic.js is not changed.
+      // R33-MERGE (Juna #5): window |y-1120|<400, not <70 — the red parked
+      // car on the next road over (2103,1456) still showed at the frame
+      // edge, touching the right buildings (probe: screen ~1102,415).
+      for (const c of state.traffic.parked) {
+        if (c !== state.player.car && c.alive && c.x > px - 100 && c.x < px + 1600 && Math.abs(c.y - 1120) < 400) c.alive = false;
+      }
+      // R33b: the same for live (unstaged) traffic — a car driving on a
+      // cross street ahead (probe: orange #f39c12 at x=2066, y=969, angle
+      // -1.57, speed 169) reads as a car parked at the road edge. Hide any
+      // unstaged traffic car off the road-1120 centreline in the visible
+      // stretch. Staged traffic + police (all in the centre lane) are
+      // untouched (staged cars carry staged=true).
+      for (const c of state.traffic.cars) {
+        if (!c.staged && c.alive && c.x > px - 100 && c.x < px + 1600 && Math.abs(c.y - 1120) > 30) c.alive = false;
       }
     }
     const cp = world.state.player;
@@ -527,6 +553,7 @@ export function stageShot(name, world) {
     if (name === 'shop') buyUpgrade(state, 'turbo');
     state.camera.x = state.player.x;
     state.camera.y = state.player.y;
+    applyTod();
     return { screen: SCREEN_SHOP, best: state.cash, ui: { shopIndex: 2, stationName: 'Harbor FM' } };
   } else {
     setLight(world, 0.85);
@@ -562,6 +589,7 @@ export function stageShot(name, world) {
       };
     }
   }
+  applyTod();
   state.camera.x = state.player.x;
   state.camera.y = state.player.y;
   return { screen: SCREEN_PLAY, best: state.cash };

@@ -873,7 +873,12 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   const roadCol = [0.10, 0.09, 0.11], walkCol = [0.22, 0.20, 0.24];
   const roadSeg = (x0, y0, x1, y1, vertical) => {
     const len = Math.hypot(x1 - x0, y1 - y0) * S;
-    const hw = 36 * S;
+    // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44
+    // (same +22% as the Canvas fallback in city3d.js). VISUAL ONLY: this
+    // is paint (roadSeg); ROAD_W/gameplay/collision untouched. Sidewalk
+    // strips sit at hw+1.2, so they shift out with the asphalt; lamps at
+    // +-48 stay clear of the asphalt (edge 44, facades at 50).
+    const hw = 44 * S;
     if (vertical) {
       const X = x0 * S, z0 = y0 * S, z1 = y1 * S;
       quad(OP, [X - hw, -0.05, z0], [X + hw, -0.05, z0], [X + hw, -0.05, z1], [X - hw, -0.05, z1],
@@ -1102,7 +1107,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
       // (kasus nyata: shot pagi v1, tiang 3,2 unit dari kamera jadi bar hitam).
       // POLE-FIX R26: tiang HARUS di sudut trotoar (±48). (±48,±20) salah
       // thd jalan menyilang: 20 < ROAD_W/2 (36) = tiang di atas aspal,
-      // di tengah jalur mobil. 48 = tengah trotoar (aspal 36+12; fasad di 50).
+      // di tengah jalur mobil. 48 = di trotoar (aspal 44, fasad di 50).
       const lampNear = (lx, lz) => Math.hypot(lx * S - camX, lz * S - camZ) < 14;
       if (!lampNear(rx - 48, ry + 48)) lamp(OP, GL, (rx - 48) * S, (ry + 48) * S, tod.lamp, 0.7071, -0.7071); // DEBOX: lengan ke pusat persimpangan
       if (!lampNear(rx + 48, ry - 48)) lamp(OP, GL, (rx + 48) * S, (ry - 48) * S, tod.lamp, -0.7071, 0.7071);
