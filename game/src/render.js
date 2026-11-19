@@ -1066,7 +1066,10 @@ export function createRenderer(canvas) {
   function drawModeBadge(state, ui) {
     hudCluster(ctx, 0, 0, 0, 0, hudScaleFor(view), () => {
     const on = chaseOn(state);
-    const label = on ? '3D CHASE-CAM  ·  V for 2D top-down' : '2D TOP-DOWN  ·  V for 3D chase-cam';
+    const of = state.onfoot;
+    const label = of && of.active
+      ? `ON FOOT · ${['POV', 'BEHIND', 'FRONT'][of.mode || 0]} CAM  ·  F to cycle, V for 2D`
+      : on ? '3D CHASE-CAM  ·  V for 2D top-down' : '2D TOP-DOWN  ·  V for 3D chase-cam';
     ctx.font = `bold 13px ${FONT}`;
     const w = ctx.measureText(label).width + 28;
     const x = (ui && ui.stationName) ? 152 : 12;

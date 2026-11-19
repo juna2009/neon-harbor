@@ -12,7 +12,7 @@ const TOUCH = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' i
 if (TOUCH) initTouch();
 
 function initTouch() {
-  const KEY = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ShiftLeft: 'Shift', KeyE: 'e', KeyQ: 'q', KeyC: 'c', KeyP: 'p' };
+  const KEY = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ShiftLeft: 'Shift', KeyE: 'e', KeyQ: 'q', KeyC: 'c', KeyP: 'p', KeyF: 'f' };
   const held = new Set();
 
   function down(code) {
@@ -56,7 +56,8 @@ function initTouch() {
     '<button type="button" class="nh-btn nh-shift" data-code="ShiftLeft">SHIFT</button>' +
     '<button type="button" class="nh-btn nh-small" data-code="KeyP">II</button></div>' +
     '<div class="nh-row"><button type="button" class="nh-btn" data-code="KeyQ">Q</button>' +
-    '<button type="button" class="nh-btn nh-big" data-code="KeyE">E</button></div>' +
+    '<button type="button" class="nh-btn nh-big" data-code="KeyE">E</button>' +
+    '<button type="button" class="nh-btn nh-small" data-code="KeyF">CAM</button></div>' +
     '</div>';
   document.body.appendChild(root);
   root.addEventListener('contextmenu', (e) => e.preventDefault());

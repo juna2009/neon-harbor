@@ -1,4 +1,4 @@
-import { WANTED, WORLD_H, WORLD_W } from './config.js';
+import { WALK_PHASE_PER_PX, WANTED, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, collides, districtAt, moveCircle, nearestIntersection, pathBlocked } from './city.js';
 import { makeCar } from './traffic.js';
 import { boatHitsObstacle } from './boats.js';
@@ -349,9 +349,14 @@ export function stepPolice(police, state, dt, rng, events) {
       const dist = Math.hypot(dx, dy) || 1;
       unit.angle = Math.atan2(dy, dx);
       const holdGround = unit.kind === 'gunman' && dist < 200;
+      // R41: fase jalan unit jalan kaki (gunman/soldier/foot) maju dari JARAK
+      // tempuh sebenarnya — diam menembak (holdGround) = kaki diam.
+      const ox = unit.x, oy = unit.y;
       if (!holdGround) {
         moveCircle(state.city, unit, Math.cos(unit.angle) * unit.speed * dt, Math.sin(unit.angle) * unit.speed * dt, 12);
       }
+      const moved = Math.hypot(unit.x - ox, unit.y - oy);
+      if (moved > 0) unit.walkPhase = (unit.walkPhase || 0) + moved * WALK_PHASE_PER_PX;
       if (unit.kind === 'gunman' || unit.kind === 'soldier') {
         if (unit.burstLeft > 0) {
           unit.burstTimer -= dt;

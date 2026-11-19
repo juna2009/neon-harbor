@@ -1,4 +1,4 @@
-import { ROAD_W, WORLD_H, WORLD_W } from './config.js';
+import { ROAD_W, WALK_PHASE_PER_PX, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X, buildingAt, onRoad } from './city.js';
 export const CAR_BODIES = {
   sedan: { length: 46, width: 22 },
@@ -279,7 +279,12 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
   const flashes = [];
   for (const ped of peds) {
     if (!ped.alive) continue;
-    ped.walkPhase += dt * 8;
+    // R41: fase jalan maju dari JARAK tempuh sebenarnya (setelah semua gerak
+    // + dorong-keluar gedung + clamp), bukan `dt * 8` (waktu). Ped yang
+    // berdiri memotret (photo > 0 → continue di bawah) fasenya BEKU — kaki
+    // diam, tidak meluncur di tempat. Lari ketakutan (150 px/dtk) otomatis
+    // melangkah lebih cepat daripada stroll (28–52 px/dtk).
+    const ox = ped.x, oy = ped.y;
     if (chase && ped.flee <= 0) {
       const cdx = ped.x - chase.x;
       const cdy = ped.y - chase.y;
@@ -344,6 +349,8 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
     }
     ped.x = Math.max(20, Math.min(WATER_X - 20, ped.x));
     ped.y = Math.max(20, Math.min(WORLD_H - 20, ped.y));
+    const moved = Math.hypot(ped.x - ox, ped.y - oy);
+    if (moved > 0) ped.walkPhase = (ped.walkPhase || 0) + moved * WALK_PHASE_PER_PX;
   }
   return flashes;
 }

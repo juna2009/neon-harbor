@@ -31,6 +31,8 @@ export function buildingAt(city, x, y, r) {
 export function collides(city, x, y, r) {
   if (x < r || y < r || x > WORLD_W - r || y > WORLD_H - r) return true;
   if (x > WATER_X - r) return true;
+  // R41: celah pintu/interior (globalThis = aman di Node tanpa window).
+  if (globalThis.__INT) { const v = globalThis.__INT.collide(city, x, y, r); if (v !== null) return v; }
   if (buildingAt(city, x, y, r) !== null) return true;
   for (const t of city.trees || []) {
     const dx = x - t.x, dy = y - t.y;

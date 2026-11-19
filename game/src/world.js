@@ -65,6 +65,7 @@ export function createWorld(rng, savedMission, sp) {
       boat: null,
       inPlane: false, plane: null,
       runPhase: 0,
+      walkPhase: 0, // R41: fase jalan Jax (radian, maju per jarak tempuh)
     },
     cash: 0,
     wanted: 0,
@@ -95,6 +96,7 @@ export function createWorld(rng, savedMission, sp) {
       shotgun: { ammo: 0, reserve: 0 },
     };
     state.player.fireTimer = 0;
+    state.player.walkPhase = 0; // R41
     state.player.inCar = false;
     state.player.car = null;
     state.player.inBoat = false;

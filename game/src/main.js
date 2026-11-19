@@ -65,6 +65,12 @@ function runShot(name) {
 }
 function runGame() {
   const input = createInput(canvas);
+  // R41 on-foot: modul dimuat via dynamic import (pola post-cut seperti
+  // touch.js di ui2.js) — static-import walk dossier tidak mengikutinya,
+  // jadi 0 byte dossier. Gagal dimuat = game tetap jalan, mode jalan kaki
+  // nonaktif (chase-cam biasa).
+  let onfoot = null;
+  import('./onfoot.js').then((m) => { onfoot = m; }).catch(() => { onfoot = null; });
   if (settings.bindings) input.setBindings(settings.bindings);
   audio.setVolume(settings.volume);
   audio.setStation(settings.station);
@@ -273,6 +279,10 @@ function runGame() {
     if (screen === SCREEN_TITLE) return;
     const events = world.step(STEP * ts, input, { w: renderer.view.w, h: renderer.view.h });
     const state = world.state;
+    if (onfoot) { // R41: mode jalan kaki (kamera F + tabrakan mobil jalan kaki)
+      const msg = onfoot.updateOnFoot(state, input, STEP * ts);
+      if (msg) announce(msg);
+    }
     fx = renderer.updateCinematic(STEP, state);
     ts = fx.ts;
     if (events & EVENT_OVER) endGame(state.overKind);

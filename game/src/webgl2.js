@@ -1,17 +1,17 @@
-// Neon Harbor — WebGL2 game-state renderer (raw WebGL2, tanpa library/network).
-// render(state, dt) membaca state dunia 2D yang HIDUP tiap frame (hero,
-// traffic, polisi, heli, perahu, drawbridge, gedung, jalan, waktu, wanted)
-// lalu menggambar chase-cam 3D. Skala S = 0.1 (1 px game = 0.1 unit WebGL).
-// Warna dari state.timeOfDay (fallback PRESETS.sore); matahari mengikuti
-// arah kamera (golden hour selalu di depan). Konteks: webgl2 dulu, fallback
-// webgl, lalu null (pemanggil kembali ke Canvas 2D city3d.js). Batching:
-// 1 program, 5 draw call/frame (langit + opaque + shadow + glow-split).
+// WebGL2 renderer (raw, tanpa library/network): render(state,dt) gambar
+// chase-cam 3D dari state 2D hidup (hero/traffic/polisi/heli/perahu/jalan);
+// S=0.1 px->unit; TOD fallback sore, matahari ikut kamera; konteks
+// webgl2->webgl->null (fallback city3d.js); 1 program, 5 draw call/frame.
 
 import { PRESETS, webglUniforms } from './timeofday.js';
 import { drawCarRealistic } from './cars3d.js'; // R26: cars3d v15d di game/src/
 import { drawCruiseShips } from './ships3d.js'; // R27b: kapal pesiar + yacht (statis, visual saja)
 import { marketSite, marketStalls } from './market.js'; // R35-F9: night market (Pasar Malam) — geometri dari market.js
 import { STUNT_RAMPS, activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
+// R41 Worker C (pintu+interior): dynamic import — 0 byte dossier (scanner
+// hanya baca static import). INT=null sampai modul termuat; semua hook di
+// bawah guard `if(INT)`, jadi game jalan normal sebelum/saat gagal muat.
+let INT=null;import('./interiors.js').then(m=>{INT=m;window.__INT=m;}).catch(()=>{});
 
 const S = 0.1; // game px -> unit WebGL
 const W = 1280, H = 800;
@@ -47,9 +47,7 @@ function lookAt(e, t, up) {
   return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, e), -dot(y, e), -dot(z, e), 1];
 }
 
-// ---- shaders (GLSL ES 1.00 — jalan di konteks webgl DAN webgl2) ----
-// Material: 0 gedung(jendela) 1 cat 2 kaca 3 jalan 4 emissive 5 matte
-//           6 trotoar 7 glow(additif) 8 smear(additif) 9 contact shadow 10 air 11 bayangan tanah lunak berarah (R36 POSTFX)
+// ---- shaders (GLSL ES 1.00 — webgl DAN webgl2); material: 0 gedung 1 cat 2 kaca 3 jalan 4 emissive 5 matte 6 trotoar 7 glow 8 smear 9 shadow 10 air 11 groundShadow ----
 const VS = `
 attribute vec3 aP; attribute vec3 aN; attribute vec2 aU; attribute vec3 aC; attribute float aM;
 uniform mat4 uP, uV;
@@ -351,14 +349,10 @@ function makeGL(gl) {
   return { sh, prog };
 }
 
-// ---- geometri: bucket OP (opaque) / SH (shadow) / GL (glow+smear) ----
-// Bucket dipakai ulang tiap frame (length = 0), buffer DYNAMIC_DRAW.
+// Geometri: bucket OP/SH/GL dipakai ulang tiap frame (length=0), buffer DYNAMIC_DRAW.
 function newBucket() { return { p: [], n: [], u: [], c: [], m: [], i: [] }; }
-// Belah bucket G per material (INTEGRATION.md §6 — WAJIB R26): G digambar
-// aditif, jadi elips bayangan kontak material 9 (hitam) tidak terlihat
-// kalau tetap di G. Material 9 -> bucket bayangan (blending normal),
-// sisanya (glow 7 / smear 8) tetap aditif. Algoritma = splitBucket di
-// demo.js; di sini bucket tujuan dipakai ulang (tanpa alokasi per frame).
+// Belah bucket G per material (R26, WAJIB): G aditif -> elips bayangan kontak
+// (mat 9, hitam) harus ke bucket bayangan (blending normal).
 function splitBucketInto(src, sh, gl) {
   sh.p.length = 0; sh.n.length = 0; sh.u.length = 0; sh.c.length = 0; sh.m.length = 0; sh.i.length = 0;
   gl.p.length = 0; gl.n.length = 0; gl.u.length = 0; gl.c.length = 0; gl.m.length = 0; gl.i.length = 0;
@@ -1108,29 +1102,43 @@ function person(B, x, z, yaw, col, opt) {
   const hair = HAIR[Math.floor(hh * 5) % 5];
   const wide = o.build === 'wide';
   const wT = wide ? 0.68 : 0.55; // lebar badan
-  const sw = Math.sin(o.walkPhase || 0) * 0.45; // ayunan kaki/lengan
+  const ph = o.walkPhase || 0;
+  const sw = Math.sin(ph) * 0.45; // ayunan kaki/lengan
+  // R41 (Juna: "kakinya geraknya perlahan kaya orang nyata", berlaku SEMUA
+  // karakter): kaki yang mengayun ke depan NAIK dari tanah (bukan cuma
+  // miring — dulu telapak nyaris tak bergerak sehingga terbaca meluncur),
+  // kaki lawan menapak; badan merunduk sedikit saat kaki terbelah, kembali
+  // saat kaki rapat — 0 saat diam (walkPhase beku = berdiri diam).
+  // Arah ayun (dibuktikan dari boxR): rx > 0 menggeser telapak ke lokal -z
+  // = ke BELAKANG; jadi kaki kiri maju saat sw < 0 (sin(ph) < 0) dan kaki
+  // kanan maju saat sw > 0 — lift mengikuti kaki yang MAJU, bukan yang
+  // mundur (versi pertama sempat terbalik; diperbaiki setelah cek kode +
+  // frame). Kalau frame cek nanti menunjukkan sebaliknya, tukar lagi.
+  const liftL = Math.max(0, -Math.sin(ph)) * 0.14;
+  const liftR = Math.max(0, Math.sin(ph)) * 0.14;
+  const bob = -Math.abs(Math.sin(ph)) * 0.04;
   const p = (lx, ly, lz, w, h, d, c, m, rx) => {
     const q = rotY(lx, lz, yaw);
     boxR(B, x + q[0], ly, z + q[1], w, h, d, yaw, rx || 0, c, m);
   };
-  p(-0.11, 0.40, 0, 0.17, 0.80, 0.22, pants, 5, sw); // kaki kiri, menapak (0..0.8)
-  p(0.11, 0.40, 0, 0.17, 0.80, 0.22, pants, 5, -sw); // kaki kanan
-  p(0, 1.15, 0, wT, 0.70, 0.36, col, 5); // badan
-  p(-wT / 2 - 0.08, 1.12, 0, 0.13, 0.62, 0.16, col, 5, -sw * 0.7); // lengan kiri
-  p(wT / 2 + 0.08, 1.12, 0, 0.13, 0.62, 0.16, col, 5, sw * 0.7); // lengan kanan
-  p(0, 1.68, 0, 0.36, 0.36, 0.36, skin, 5); // kepala
-  p(0, 1.88, -0.02, 0.38, 0.12, 0.38, hair, 5); // rambut
+  p(-0.11, 0.40 + liftL, 0, 0.17, 0.80, 0.22, pants, 5, sw); // kaki kiri, menapak (0..0.8)
+  p(0.11, 0.40 + liftR, 0, 0.17, 0.80, 0.22, pants, 5, -sw); // kaki kanan
+  p(0, 1.15 + bob, 0, wT, 0.70, 0.36, col, 5); // badan
+  p(-wT / 2 - 0.08, 1.12 + bob, 0, 0.13, 0.62, 0.16, col, 5, -sw * 0.7); // lengan kiri
+  p(wT / 2 + 0.08, 1.12 + bob, 0, 0.13, 0.62, 0.16, col, 5, sw * 0.7); // lengan kanan
+  p(0, 1.68 + bob, 0, 0.36, 0.36, 0.36, skin, 5); // kepala
+  p(0, 1.88 + bob, -0.02, 0.38, 0.12, 0.38, hair, 5); // rambut
   if (o.kind === 'police') {
-    p(0, 1.92, 0, 0.40, 0.09, 0.40, [0.08, 0.12, 0.25], 5); // topi dinas
-    p(0, 1.88, 0.24, 0.42, 0.04, 0.14, [0.05, 0.07, 0.15], 5); // klep depan
+    p(0, 1.92 + bob, 0, 0.40, 0.09, 0.40, [0.08, 0.12, 0.25], 5); // topi dinas
+    p(0, 1.88 + bob, 0.24, 0.42, 0.04, 0.14, [0.05, 0.07, 0.15], 5); // klep depan
   } else if (o.kind === 'gang') {
-    p(0, 1.89, -0.02, 0.40, 0.12, 0.40, [0.55, 0.10, 0.12], 5); // bandana merah
+    p(0, 1.89 + bob, -0.02, 0.40, 0.12, 0.40, [0.55, 0.10, 0.12], 5); // bandana merah
   } else if (o.kind === 'soldier') {
-    p(0, 1.92, 0, 0.40, 0.09, 0.40, [0.30, 0.33, 0.18], 5); // topi olive
+    p(0, 1.92 + bob, 0, 0.40, 0.09, 0.40, [0.30, 0.33, 0.18], 5); // topi olive
   } else if (o.hat === 1) {
-    p(0, 1.92, 0, 0.40, 0.09, 0.40, [0.55, 0.15, 0.15], 5); // topi baseball
+    p(0, 1.92 + bob, 0, 0.40, 0.09, 0.40, [0.55, 0.15, 0.15], 5); // topi baseball
   } else if (o.hat === 2) {
-    p(0, 1.90, 0, 0.40, 0.14, 0.40, [0.25, 0.25, 0.30], 5); // beanie
+    p(0, 1.90 + bob, 0, 0.40, 0.14, 0.40, [0.25, 0.25, 0.30], 5); // beanie
   }
 }
 
@@ -1182,8 +1190,12 @@ function personSprite(SP, B, x, z, yaw, col, opt, camFwd, t) {
   while (rel < 0) rel += Math.PI * 2;
   while (rel >= Math.PI * 2) rel -= Math.PI * 2;
   const angle = Math.round(rel / (Math.PI / 4)) % 8;
-  // fase jalan: walkPhase maju 8 rad/dtk (traffic.js peds, t*8 polisi); player pakai t
-  const ph = (o.walkPhase !== undefined && o.walkPhase !== 0) ? o.walkPhase : t * 5;
+  // fase jalan R41 (rebase dari R39): walkPhase maju per JARAK tempuh
+  // (onfoot.js/traffic.js/police.js, WALK_PHASE_PER_PX=0.05) — BUKAN waktu.
+  // Fallback t*5 R39 DICABUT: walkPhase 0 = berdiri diam (frame 0), kalau
+  // pakai t*5 sprite melangkah di tempat saat Jax/ped diam (treadmill).
+  // Frame sprite 4 fase = floor(walkPhase/(π/2))%4 (sama dgn rumus R39).
+  const ph = o.walkPhase || 0;
   const phase = ((Math.floor(ph / (Math.PI * 2) * 4) % 4) + 4) % 4;
   const cc = angle + phase * 8;
   const u0 = (cc * PED_CELL_W) / PED_AW, u1 = ((cc + 1) * PED_CELL_W) / PED_AW;
@@ -1487,10 +1499,12 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     const ddx = Math.max(bMinX - camX, 0, camX - bMaxX);
     const ddz = Math.max(bMinZ - camZ, 0, camZ - bMaxZ);
     if (Math.hypot(ddx, ddz) < 12) { bi++; continue; }
+    if(INT&&INT.hideShell(state,b)){bi++;continue;} // R41: Jax di dalam -> cangkang sembunyi (interior terlihat)
     bld(OP, GL, b, bi, tod.facK);
     if (DIRSH) groundShadow(cx * S, cy * S, b.w * S, b.h * S, (b.height || 2) * 6.5); // R36 POSTFX: bayangan gedung sore/pagi juga (dulu cuma siang)
     bi++;
   }
+  if(INT)INT.draw(state,OP,GL,t,{boxR,box,flat}); // R41: pintu + interior
   for (const pk of city.parks || []) {
     if (!near(pk.x + pk.w / 2, pk.y + pk.h / 2, R)) continue;
     flat(OP, (pk.x + pk.w / 2) * S, 0.03, (pk.y + pk.h / 2) * S, pk.w * S, pk.h * S, [0.12, 0.30, 0.16], 5);
@@ -1731,8 +1745,10 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   } else if (p.inPlane && p.plane) { // JET R36: HA-1 (dulu: person jalan kaki)
     const pl = p.plane;
     plane(OP, GL, pl.x * S, pl.y * S, yawOf(pl), (pl.alt || 0) * 0.12, pl.throttle || 0, t, null);
-  } else {
-    personSprite(SP, OP, p.x * S, p.y * S, yawOf(p), [0.95, 0.8, 0.2], { kind: 'player' }, cam.fwd, t);
+  } else if (!(state.onfoot && state.onfoot.active && state.onfoot.mode === 0)) {
+    // R41: POV (mode 0) — badan Jax sendiri disembunyikan, kamera di matanya.
+    // walkPhase Jax maju per jarak tempuh (onfoot.js), bukan waktu.
+    personSprite(SP, OP, p.x * S, p.y * S, yawOf(p), [0.95, 0.8, 0.2], { kind: 'player', walkPhase: p.walkPhase || 0 }, cam.fwd, t);
   }
 
   // R35-F9: bullets + muzzle flash (on-foot combat) — BEGIN. Satu blok.
@@ -1801,7 +1817,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       // soldier olive #5a6b3a — dulu semua biru polisi di 3D).
       const uk = u.kind === 'gunman' ? 'gang' : u.kind === 'soldier' ? 'soldier' : 'police';
       const uc = uk === 'gang' ? [0.64, 0.20, 0.15] : uk === 'soldier' ? [0.35, 0.42, 0.23] : [0.15, 0.30, 0.65];
-      personSprite(SP, OP, u.x * S, u.y * S, yawOf(u), uc, { kind: uk, walkPhase: t * 8 }, cam.fwd, t);
+      personSprite(SP, OP, u.x * S, u.y * S, yawOf(u), uc, { kind: uk, walkPhase: u.walkPhase || 0 }, cam.fwd, t); // R41: fase dari jarak tempuh (police.js), bukan t*8
     }
   }
   const at = state.armored && state.armored.truck;
@@ -1916,6 +1932,41 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
 // ---- kamera chase-cam (smoothing seperti city3d.js round 22) ----
 function updateCamera(state, dt, cam) {
   const hero = heroOf(state);
+  const p = state.player;
+  const of = state.onfoot;
+  if (of && of.active && !p.inCar && !p.inBoat) {
+    // R41 on-foot: 3 kamera (mode 0 POV / 1 belakang / 2 depan, ganti dgn F,
+    // seperti Minecraft F5). Yaw ikut arah Jax dgn lerp (dt*4, seperti
+    // chase); posisi mata di-lerp (dt*8) supaya ganti mode / belok tidak
+    // lompat. cam.fwd = arah pandang (dipakai culling + matahari).
+    const a = hero.angle || 0;
+    const snap = !cam.init || Math.hypot(hero.x - cam.hx, hero.y - cam.hy) > 600;
+    if (snap) cam.yaw = a;
+    else cam.yaw += angDiff(a, cam.yaw) * Math.min(1, dt * 4.0);
+    const yx = Math.cos(cam.yaw), yz = Math.sin(cam.yaw);
+    const hx = hero.x * S, hz = hero.y * S;
+    let ex, ey, ez, tx, ty, tz, fx, fz;
+    if (of.mode === 0) { // POV: mata Jax (1,7), pandang jauh ke depan
+      ex = hx + yx * 0.3; ey = 1.7; ez = hz + yz * 0.3;
+      tx = hx + yx * 20; ty = 1.7; tz = hz + yz * 20; fx = yx; fz = yz;
+    } else if (of.mode === 2) { // depan: kamera di depan Jax, menatap balik
+      ex = hx + yx * 6.5; ey = 2.6; ez = hz + yz * 6.5;
+      tx = hx; ty = 1.4; tz = hz; fx = -yx; fz = -yz;
+    } else { // belakang (default): 6,5 di belakang, 2,6 tinggi
+      ex = hx - yx * 6.5; ey = 2.6; ez = hz - yz * 6.5;
+      tx = hx + yx * 8; ty = 1.4; tz = hz + yz * 8; fx = yx; fz = yz;
+    }
+    if (snap || !cam.init) { cam.x = ex; cam.z = ez; cam.ey = ey; cam.init = true; }
+    else {
+      const k = Math.min(1, dt * 8);
+      cam.x += (ex - cam.x) * k; cam.z += (ez - cam.z) * k; cam.ey += (ey - cam.ey) * k;
+    }
+    cam.hx = hero.x; cam.hy = hero.y;
+    cam.eye = [cam.x, cam.ey, cam.z];
+    cam.target = [tx, ty, tz];
+    cam.fwd = [fx, fz];
+    return;
+  }
   const a = hero.angle || 0;
   const speed = Math.abs(hero.speed || 0);
   const dist = 13 + Math.min(1, speed / 540) * 3;
@@ -1947,7 +1998,7 @@ function updateCamera(state, dt, cam) {
 
 
 // ---- factory: webgl2 dulu, fallback webgl, lalu null (2D hidup) ----
-export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli dari ui2.js (canvas 2D)
+export function createRenderer(glCanvas) { // R26: tanpa HUD demo (HUD asli ui2.js)
   let gl = null, mode = null;
   try { gl = glCanvas.getContext('webgl2', { antialias: true, preserveDrawingBuffer: true }); if (gl) mode = 'webgl2'; } catch (e) { /* lanjut fallback */ }
   if (!gl) {
@@ -2029,13 +2080,11 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
   };
   const OP = newBucket(), SH = newBucket(), GL = newBucket(), GLSH = newBucket(), GL2 = newBucket(), SP = newBucket();
   const bufOP = makeBufSet(), bufSH = makeBufSet(), bufGL = makeBufSet(), bufGLSH = makeBufSet(), bufGL2 = makeBufSet(), bufSP = makeBufSet();
-  const cam = { yaw: 0, x: 0, z: 0, hx: 0, hy: 0, init: false, eye: [0, 4.4, -8], target: [0, 2.2, 40], fwd: [0, 1] };
+  const cam = { yaw: 0, x: 0, z: 0, ey: 4.4, hx: 0, hy: 0, init: false, eye: [0, 4.4, -8], target: [0, 2.2, 40], fwd: [0, 1] };
   const stats = { ms: 0, tris: 0, calls: 0, mode };
-  // R28 IDX32: indeks elemen 32-bit. Bucket OP sudah ~78.588 vertex di HEAD
-  // (di atas batas Uint16 65.535) — indeks Uint16 membungkus (wrap) sehingga
-  // segitiga korup jadi sky-beam di scene padat. WebGL2 mendukung UNSIGNED_INT
-  // secara native; fallback WebGL1 butuh ekstensi OES_element_index_uint.
-  // Tanpa keduanya, tetap Uint16 + peringatan sekali (geometri bisa korup).
+  // R28 IDX32: bucket OP ~78.588 vertex > batas Uint16 — indeks Uint16
+  // membungkus jadi sky-beam; WebGL2 pakai UNSIGNED_INT native, WebGL1
+  // butuh OES_element_index_uint, kalau tidak ada tetap Uint16 + warning.
   const IDX32 = mode === 'webgl2' || !!gl.getExtension('OES_element_index_uint');
 
   function makeBufSet() {
@@ -2101,6 +2150,7 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     SH.p.length = 0; SH.n.length = 0; SH.u.length = 0; SH.c.length = 0; SH.m.length = 0; SH.i.length = 0;
     GL.p.length = 0; GL.n.length = 0; GL.u.length = 0; GL.c.length = 0; GL.m.length = 0; GL.i.length = 0;
     SP.p.length = 0; SP.n.length = 0; SP.u.length = 0; SP.c.length = 0; SP.m.length = 0; SP.i.length = 0;
+    if(INT)INT.update(state,dt); // R41: ayun pintu (target dari posisi Jax)
     buildFrame(state, cam, OP, SH, GL, t, SP);
     splitBucketInto(GL, GLSH, GL2); // R26 §6: material 9 (bayangan kontak) keluar dari G aditif
     upload(OP, bufOP); upload(SH, bufSH); upload(GLSH, bufGLSH); upload(GL2, bufGL2); upload(SP, bufSP);

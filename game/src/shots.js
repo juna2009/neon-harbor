@@ -325,6 +325,41 @@ export function stageShot(name, world) {
       }
     }
     if (name === 'chase3d') state.view3d = true;
+  } else if (name === 'onfoot' || name === 'onfoot-pov' || name === 'onfoot-front') {
+    // R41 (Worker B): dossier shot #2 — Jax jalan kaki di trotoar, kamera
+    // on-foot WebGL2. 'onfoot' = behind (mode 1, default dossier); varian
+    // -pov (mode 0) dan -front (mode 2) hanya untuk verifikasi kamera,
+    // bukan shot dossier. Shot mode tidak menjalankan loop main.js, jadi
+    // updateOnFoot tidak pernah dipanggil: state.onfoot + state.view3d
+    // di-set langsung di sini. Jax di-stage di trotoar y=440 (scout Worker
+    // A v4: bersih x=100..1790) lalu jalan ke timur 0,6 dtk. walkPlayer
+    // mengarahkan p.angle ke mouse scripted (640,400) — begitu Jax lewat
+    // titik itu angle berbalik π — jadi angle di-set eksplisit 0 (timur,
+    // arah jalan) sesudah walkFor, kalau tidak kamera behind malah jadi
+    // kamera depan. walkPhase di-set π/2 supaya pose mid-stride terbaca di
+    // still frame (di shot mode fase tidak maju sendiri: walkPlayer tidak
+    // mengubahnya, onfoot.js tidak jalan). Dossier: shots.js TIDAK masuk
+    // teks dossier (terpotong di render.js), jadi branch ini 0 byte.
+    const mode = name === 'onfoot-pov' ? 0 : name === 'onfoot-front' ? 2 : 1;
+    setLight(world, 0.9);
+    state.view3d = true;
+    placePlayerOnFoot(world, 1000, 440);
+    stagePed(world, 1250, 440);
+    stagePed(world, 1400, 432);
+    stagePed(world, 850, 440);
+    stagePed(world, 760, 448);
+    // Ped yang di-stage menghadap arah spawn acak — tanpa ini ped #2 jalan
+    // ke utara selama walkFor dan masuk ke blok gedung (probe: 432→406).
+    // Semua ped di-stage menghadap timur supaya tetap di trotoar.
+    for (const q of state.peds) if (q.staged) q.angle = 0;
+    stageTrafficCar(world, 'h', 480, 1330, 1, 110);
+    stageTrafficCar(world, 'h', 480, 1560, -1, 100);
+    stageTrafficCar(world, 'h', 480, 820, 1, 100);
+    walkFor(world, input, 0.6, 1, 0);
+    const p = state.player;
+    p.angle = 0;
+    p.walkPhase = Math.PI / 2;
+    state.onfoot = { active: true, mode };
   } else if (name === 'mission') {
     setLight(world, 0.9);
     state.zoom = 1.5;
