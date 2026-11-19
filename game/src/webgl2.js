@@ -712,14 +712,49 @@ function heli(B,G,x,z,rotor,t,v){
  p(0,-0.95,1.2,0.5,0.3,0.5,[0.1,0.1,0.12],5);
  if(Math.sin(t*6)>0)p(0,1.2,0,0.5,0.25,0.5,[1,0.1,0.1],4);
 }
-// Orang jalan kaki: badan + kepala.
-function person(B, x, z, yaw, col) {
-  const p = (lx, ly, lz, w, h, d, c, m) => {
+// Orang jalan kaki: kaki melangkah + badan + lengan + kepala + rambut/topi.
+// opt: {skin, pants, hat, build, walkPhase, kind} — kind: 'police' (seragam +
+// topi dinas), 'gang' (merah gelap + bandana), 'soldier' (olive), 'player'.
+// Murah: 8-9 box = 96-108 tris per figur (dulu 2 box = 24 tris); tanpa tekstur.
+// Variasi (rambut/kulit/celana) diturunkan dari warna baju via hash — stabil
+// per figur, tidak berkedip saat figur berjalan.
+function person(B, x, z, yaw, col, opt) {
+  const o = opt || {};
+  const hh = hash2(Math.round(col[0] * 255) * 3 + Math.round(col[1] * 255), Math.round(col[2] * 255) + 7);
+  const HAIR = [[0.10, 0.07, 0.05], [0.16, 0.11, 0.06], [0.05, 0.05, 0.05], [0.35, 0.22, 0.12], [0.55, 0.55, 0.55]];
+  const SKIN = [[0.85, 0.65, 0.50], [0.95, 0.78, 0.60], [0.72, 0.50, 0.33], [0.55, 0.38, 0.26]];
+  const PANTS = [[0.17, 0.24, 0.31], [0.36, 0.25, 0.22], [0.22, 0.28, 0.31], [0.29, 0.14, 0.35], [0.10, 0.10, 0.12]];
+  const skin = o.skin || SKIN[Math.floor(hh * 4) % 4];
+  const pants = o.pants || (o.kind === 'police' ? [0.10, 0.14, 0.28]
+    : o.kind === 'soldier' ? [0.25, 0.28, 0.15]
+    : PANTS[Math.floor(hash2(Math.round(col[0] * 255), Math.round(col[1] * 255) * 5 + Math.round(col[2] * 255)) * 5) % 5]);
+  const hair = HAIR[Math.floor(hh * 5) % 5];
+  const wide = o.build === 'wide';
+  const wT = wide ? 0.68 : 0.55; // lebar badan
+  const sw = Math.sin(o.walkPhase || 0) * 0.45; // ayunan kaki/lengan
+  const p = (lx, ly, lz, w, h, d, c, m, rx) => {
     const q = rotY(lx, lz, yaw);
-    boxR(B, x + q[0], ly, z + q[1], w, h, d, yaw, 0, c, m);
+    boxR(B, x + q[0], ly, z + q[1], w, h, d, yaw, rx || 0, c, m);
   };
-  p(0, 0.85, 0, 0.55, 1.1, 0.35, col, 5);
-  p(0, 1.65, 0, 0.4, 0.4, 0.4, [0.85, 0.65, 0.5], 5);
+  p(-0.11, 0.40, 0, 0.17, 0.80, 0.22, pants, 5, sw); // kaki kiri, menapak (0..0.8)
+  p(0.11, 0.40, 0, 0.17, 0.80, 0.22, pants, 5, -sw); // kaki kanan
+  p(0, 1.15, 0, wT, 0.70, 0.36, col, 5); // badan
+  p(-wT / 2 - 0.08, 1.12, 0, 0.13, 0.62, 0.16, col, 5, -sw * 0.7); // lengan kiri
+  p(wT / 2 + 0.08, 1.12, 0, 0.13, 0.62, 0.16, col, 5, sw * 0.7); // lengan kanan
+  p(0, 1.68, 0, 0.36, 0.36, 0.36, skin, 5); // kepala
+  p(0, 1.88, -0.02, 0.38, 0.12, 0.38, hair, 5); // rambut
+  if (o.kind === 'police') {
+    p(0, 1.92, 0, 0.40, 0.09, 0.40, [0.08, 0.12, 0.25], 5); // topi dinas
+    p(0, 1.88, 0.24, 0.42, 0.04, 0.14, [0.05, 0.07, 0.15], 5); // klep depan
+  } else if (o.kind === 'gang') {
+    p(0, 1.89, -0.02, 0.40, 0.12, 0.40, [0.55, 0.10, 0.12], 5); // bandana merah
+  } else if (o.kind === 'soldier') {
+    p(0, 1.92, 0, 0.40, 0.09, 0.40, [0.30, 0.33, 0.18], 5); // topi olive
+  } else if (o.hat === 1) {
+    p(0, 1.92, 0, 0.40, 0.09, 0.40, [0.55, 0.15, 0.15], 5); // topi baseball
+  } else if (o.hat === 2) {
+    p(0, 1.90, 0, 0.40, 0.14, 0.40, [0.25, 0.25, 0.30], 5); // beanie
+  }
 }
 
 // ---- jembatan state: bangun geometri frame dari state game yang hidup ----
@@ -902,7 +937,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     const b = p.boat;
     boat(OP, GL, b.x * S, b.y * S, yawOf(b), (b.length || 54) * S, (b.width || 20) * S, hx(b.color || '#e8e4d8'), { driver: true });
   } else {
-    person(OP, p.x * S, p.y * S, yawOf(p), [0.95, 0.8, 0.2]);
+    person(OP, p.x * S, p.y * S, yawOf(p), [0.95, 0.8, 0.2], { kind: 'player' });
   }
 
   // Traffic + parkir — cars3d v14 (INTEGRATION.md §6 OPSI A) + LOD WAJIB:
@@ -939,7 +974,11 @@ function buildFrame(state, cam, OP, SH, GL, t) {
       if (!near(u.x, u.y, R) || !vis(u.x, u.y, 100)) continue;
       boat(OP, GL, u.x * S, u.y * S, yawOf(u), 54 * S, 20 * S, [0.18, 0.44, 0.82], { pol: true });
     } else if (u.x !== undefined && near(u.x, u.y, 1200) && vis(u.x, u.y, 25)) {
-      person(OP, u.x * S, u.y * S, yawOf(u), [0.15, 0.30, 0.65]);
+      // PEOPLE: bedakan polisi / geng / tentara (2D: gunman merah #a33327,
+      // soldier olive #5a6b3a — dulu semua biru polisi di 3D).
+      const uk = u.kind === 'gunman' ? 'gang' : u.kind === 'soldier' ? 'soldier' : 'police';
+      const uc = uk === 'gang' ? [0.64, 0.20, 0.15] : uk === 'soldier' ? [0.35, 0.42, 0.23] : [0.15, 0.30, 0.65];
+      person(OP, u.x * S, u.y * S, yawOf(u), uc, { kind: uk, walkPhase: t * 8 });
     }
   }
   const at = state.armored && state.armored.truck;
@@ -976,7 +1015,8 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   for (const pd of state.peds || []) {
     if (pd.alive === false) continue;
     if (!near(pd.x, pd.y, 1200) || !vis(pd.x, pd.y, 25)) continue;
-    person(OP, pd.x * S, pd.y * S, yawOf(pd), hx(pd.color || '#e8e4d8'));
+    person(OP, pd.x * S, pd.y * S, yawOf(pd), hx(pd.color || '#e8e4d8'),
+      { skin: hx(pd.skin || '#e8b98a'), pants: hx(pd.pants || '#2c3e50'), hat: pd.hat || 0, build: pd.build || 'slim', walkPhase: pd.walkPhase || 0 });
   }
   for (const cl of state.collectibles || []) {
     if (cl.taken) continue;
@@ -1082,6 +1122,12 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
   const bufOP = makeBufSet(), bufSH = makeBufSet(), bufGL = makeBufSet(), bufGLSH = makeBufSet(), bufGL2 = makeBufSet();
   const cam = { yaw: 0, x: 0, z: 0, hx: 0, hy: 0, init: false, eye: [0, 4.4, -8], target: [0, 2.2, 40], fwd: [0, 1] };
   const stats = { ms: 0, tris: 0, calls: 0, mode };
+  // R28 IDX32: indeks elemen 32-bit. Bucket OP sudah ~78.588 vertex di HEAD
+  // (di atas batas Uint16 65.535) — indeks Uint16 membungkus (wrap) sehingga
+  // segitiga korup jadi sky-beam di scene padat. WebGL2 mendukung UNSIGNED_INT
+  // secara native; fallback WebGL1 butuh ekstensi OES_element_index_uint.
+  // Tanpa keduanya, tetap Uint16 + peringatan sekali (geometri bisa korup).
+  const IDX32 = mode === 'webgl2' || !!gl.getExtension('OES_element_index_uint');
 
   function makeBufSet() {
     const mk = () => gl.createBuffer();
@@ -1093,7 +1139,8 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     gl.bindBuffer(gl.ARRAY_BUFFER, b.u); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(B.u), gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, b.c); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(B.c), gl.DYNAMIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, b.m); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(B.m), gl.DYNAMIC_DRAW);
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.i); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(B.i), gl.DYNAMIC_DRAW);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.i); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, IDX32 ? new Uint32Array(B.i) : new Uint16Array(B.i), gl.DYNAMIC_DRAW);
+    if (!IDX32 && !b.warned16 && B.p.length / 3 > 65535) { b.warned16 = true; console.warn('WEBGL IDX16 OVERFLOW: ' + (B.p.length / 3) + ' vertex > 65535 — segitiga bisa korup (butuh Uint32)'); }
     b.count = B.i.length;
   }
   function drawBuf(b) {
@@ -1103,7 +1150,7 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     gl.bindBuffer(gl.ARRAY_BUFFER, b.c); gl.vertexAttribPointer(A.c, 3, gl.FLOAT, false, 0, 0); gl.enableVertexAttribArray(A.c);
     gl.bindBuffer(gl.ARRAY_BUFFER, b.m); gl.vertexAttribPointer(A.m, 1, gl.FLOAT, false, 0, 0); gl.enableVertexAttribArray(A.m);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.i);
-    gl.drawElements(gl.TRIANGLES, b.count, gl.UNSIGNED_SHORT, 0);
+    gl.drawElements(gl.TRIANGLES, b.count, IDX32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, 0);
   }
   const skyBuf = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf);
