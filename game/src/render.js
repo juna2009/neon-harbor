@@ -1050,6 +1050,14 @@ export function createRenderer(canvas) {
   let lastScreen3d = SCREEN_TITLE;
   let lastState3d = null;
   let viewInit = false;
+  // E-05 (sev 2): jobs tick in 2D. tickJobs lives in post-cut jobs.js and
+  // only ran from the 3D draw path (webgl2.js buildFrame + city3d.js
+  // drawChase3D), so district jobs never completed in 2D top-down and the
+  // toast timer froze. Loaded via dynamic import (same post-cut pattern as
+  // onfoot.js in main.js / touch.js in ui2.js): the static-import walk
+  // skips it, 0 byte dossier. Declared + loaded down here (past the
+  // dossier cut inside this file) so no byte lands before the cut.
+  let jobsMod = null;
   function chaseOn(state) {
     if (state.view3d !== undefined) return !!state.view3d;
     return view3dUser === null ? true : view3dUser;
@@ -1202,6 +1210,9 @@ export function createRenderer(canvas) {
   function draw(state, screen, best, ui) {
     if (!viewInit) {
       viewInit = true;
+      // E-05: start loading jobs.js on the first draw (title screen), so
+      // it is resolved long before the player can reach 2D gameplay.
+      import('./jobs.js').then((m) => { jobsMod = m; }).catch(() => {});
       window.addEventListener('keydown', (e) => {
         if (e.repeat || e.code !== 'KeyV' || lastScreen3d !== SCREEN_PLAY || !lastState3d) return;
         const next = !chaseOn(lastState3d);
@@ -1241,8 +1252,13 @@ export function createRenderer(canvas) {
       drawTitle2(ctx, view, best, prog, (c) => cine.title3D(c, t), live);
       return;
     }
+    // E-05: 2D top-down ticks jobs once per draw, with the REAL state and
+    // dt 1/60 — the same call the 3D path makes (webgl2.js buildFrame /
+    // city3d.js drawChase3D). The branches are exclusive, so exactly one
+    // tickJobs runs per frame in either mode: no double-tick, no double
+    // cash. The toast timer runs here too, so it no longer freezes in 2D.
     if (chaseOn(state)) cine.chase3D(ctx, state);
-    else drawWorld(state);
+    else { if (jobsMod) jobsMod.tickJobs(state, 1 / 60); drawWorld(state); }
     cine.drawBars(ctx, view.w, view.h);
     drawHud(state, best, ui);
     if (screen === SCREEN_PLAY) {
