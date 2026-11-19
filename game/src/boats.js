@@ -40,7 +40,7 @@ export function stepBoats(state, dt) {
   }
 }
 export const SHIP_RECT = { x: WATER_X + 12, y: 500 - 15, w: 40, h: 30 };
-export const BUOYS = [900, 1200, 1500].map((y) => ({ x: WATER_X + 30, y, r: 8 }));
+export const BUOYS = [900, 1200, 1500].map((y) => ({ x: WATER_X + 90, y, r: 8 }));
 export function boatHitsObstacle(x, y, r) {
   const qx = Math.max(SHIP_RECT.x, Math.min(x, SHIP_RECT.x + SHIP_RECT.w));
   const qy = Math.max(SHIP_RECT.y, Math.min(y, SHIP_RECT.y + SHIP_RECT.h));

@@ -260,7 +260,7 @@ export function createRenderer(canvas) {
     if (inView(WATER_X + 60, 500, 140)) drawCargoShip(ctx, WATER_X + 12, 500, 40, 30, 0);
     for (let i = 0; i < 3; i += 1) {
       const by = 900 + i * 300 + Math.sin(state.elapsed * 1.5 + i) * 4;
-      if (inView(WATER_X + 30, by, 20)) drawBuoy(ctx, WATER_X + 30, by, 8);
+      if (inView(WATER_X + 90, by, 20)) drawBuoy(ctx, WATER_X + 90, by, 8);
     }
     for (const w of state.wet) {
       ctx.globalAlpha = Math.min(1, w.life / 3);
