@@ -47,7 +47,7 @@ function lookAt(e, t, up) {
   return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, e), -dot(y, e), -dot(z, e), 1];
 }
 
-// ---- shaders (GLSL ES 1.00 — webgl DAN webgl2); material: 0 gedung 1 cat 2 kaca 3 jalan 4 emissive 5 matte 6 trotoar 7 glow 8 smear 9 shadow 10 air 11 groundShadow ----
+// ---- shaders (GLSL ES 1.00 — webgl DAN webgl2); material: 0 gedung 1 cat 2 kaca 3 jalan 4 emissive 5 matte 6 trotoar 7 glow 8 smear 9 shadow 10 air 11 groundShadow 12 sprite | R40: 13 aspal 14 trotoar 15 pasir ----
 const VS = `
 attribute vec3 aP; attribute vec3 aN; attribute vec2 aU; attribute vec3 aC; attribute float aM;
 uniform mat4 uP, uV;
@@ -68,6 +68,10 @@ uniform vec3 uWaterDeep; uniform vec3 uWaterSky; uniform float uExposure;
 uniform vec2 uWinCell; uniform float uWinGlass; uniform float uWinWarm; // SIANG v2: jendela
 uniform float uContrast; uniform float uShadowK; uniform float uRoadTex; uniform float uFogK; // SIANG v2: kontras/bayangan/jalan/kabut
 uniform sampler2D uAtlas; // R39 SPRITE: atlas ped turntable (Quaternius CC0) — material 12
+uniform sampler2D uTexRoad; uniform sampler2D uTexWalk; uniform sampler2D uTexSand; uniform sampler2D uTexFac; // R40: tekstur permukaan (unit 1-4, REPEAT + mipmap) — material 13/14/15 + fasad 0
+uniform float uTexK; // R40: 1.0 = tekstur aktif di SEMUA preset TOD (bukan uRoadTex yang 0 di sore)
+const float R40T = 2.2; // R40: 1 tile = 2.2 unit dunia (rekomendasi Worker B) — diuji vs T=4.0 di shots-r40-k3-t22 (lihat REPORT.md)
+const float R40K = 3.0; // R40: gain kontras tekstur — K=2 terlalu halus di crop on-foot (hpSD +0.3); K=3 diuji di shots-r40-k3 (lihat REPORT.md)
 uniform vec3 uGradeLift; uniform vec3 uGradeGain; uniform float uGradeGamma; uniform vec2 uRes; uniform float uTime; // R36 POSTFX
 float h21(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 // R36 POSTFX: ACES (highlight tidak pecah) + lift/gamma/gain per TOD +
@@ -83,6 +87,13 @@ vec3 postfx(vec3 c){
   c += (h21(gl_FragCoord.xy+fract(uTime)*61.7)-0.5)*0.02;
   return clamp(c,0.0,1.0);
 }
+// R40: multiplier tekstur permukaan — PNG grayscale Worker A: piksel = 128 x
+// multiplier, jadi tex.r (0..1) x 255/128 = multiplier; clamp 0.85-1.15
+// (ekstrem retak/bintik di luar itu dijepit, bulk 0.86-1.14 tak tersentuh).
+// uTexK=1: tekstur aktif; placeholder GL 1x1 abu-128 = multiplier 1.0 persis,
+// jadi sebelum PNG tiba frame tetap tampil polos-lama (bukan hitam) — tanpa
+// race, tanpa flag baru di main.js (0 byte dossier).
+float r40tx(sampler2D s, vec2 uv){ float m = clamp(texture2D(s, uv).r * 1.9922, 0.85, 1.15); return mix(1.0, 1.0 + (m - 1.0) * R40K, uTexK); }
 void main(){
   vec3 N = normalize(vN);
   vec3 V = normalize(uCam - vW);
@@ -91,6 +102,7 @@ void main(){
   float emit = 0.0, spec = 0.0, shin = 30.0;
   float dayK = (0.35 + 0.65 * uDay) * uExposure;
   if (vM < 0.5 && abs(N.y) < 0.5) { // gedung: fasad 3 zona (GEDUNG §11 — bible 3.1/3.4)
+    base *= r40tx(uTexFac, vU / 8.0); // R40: grain fasad (vU = satuan dunia) — SEBELUM logika jendela, jadi jendela/etalase/neon tetap di atas tekstur
     // Hash stabil per gedung dari warna fasad (sama di semua vertex gedung).
     float bh = h21(floor(vC.xy * 61.0));
     float wtype = floor(bh * 3.0); // 0 punched, 1 ribbon, 2 curtain
@@ -158,7 +170,7 @@ void main(){
     float streak = smoothstep(0.06, 0.0, abs(fract((gl_FragCoord.x + gl_FragCoord.y * 0.7) * 0.012) - 0.5) - 0.32);
     base += mix(uSunCol, vec3(1.0, 0.95, 0.85), 0.5) * streak * 0.55;
     base = mix(base, vec3(0.02), pow(1.0 - abs(dot(N, V)), 2.0) * 0.3);
-  } else if (vM < 3.5) { // jalan: marka (dari UV: u=sepanjang jalan, v=melintang) + streak matahari
+  } else if (vM < 3.5 || (vM > 12.5 && vM < 13.5)) { // jalan: marka (dari UV: u=sepanjang jalan, v=melintang) + streak matahari
     float dash = step(0.45, fract(vU.x * 0.06)) * step(abs(vU.y - 0.5), 0.03);
     base = mix(base, vec3(0.85, 0.7, 0.25), dash);
     float asp = h21(floor(vW.xz * vec2(2.5, 2.5))); // SIANG v2: tekstur aspal (variasi butir)
@@ -172,6 +184,15 @@ void main(){
     float along = dot(rel, sd);
     float streak = exp(-lat * lat * 0.06) * exp(-max(along - 6.0, 0.0) * 0.012);
     base += uSunCol * streak * 0.32; // TOD: streak jalan ikut matahari
+    // R40: aspal mat 13 (roadSeg) bertekstur — vU.x = sepanjang jalan (unit
+    // dunia), vU.y = 0..1 melintang per 8.8 unit lebar. Mat 3 (dek jembatan)
+    // TIDAK kena tekstur (gate vM>12.5). Tekstur dikali SETELAH streak:
+    // permukaan jalan yang bikin pusing justru piringan kuning streak
+    // (base-share slab chase ~0,3% — pengali base saja tidak bergerak);
+    // glare matahari di aspal kasar ASLI juga pecah oleh butir permukaan,
+    // jadi streak ikut berbutir — warna rata-rata tetap (mean mult ~1.0).
+    // Dash di atas ikut berbutir sedikit (cat di atas aspal kasar) — wajar.
+    if (vM > 12.5) base *= r40tx(uTexRoad, vec2(vU.x / R40T, vU.y * 8.8 / R40T));
     spec = 0.5; shin = 24.0;
   } else if (vM < 4.5) { // emissive (lampu rem, neon, jendela menyala) — bible §1.5
     emit = 1.0;
@@ -232,6 +253,11 @@ void main(){
     gl_FragColor = vec4(postfx(col), tex.a);
     return;
   }
+  // R40: trotoar (14) + pasir (15) — UV SUDAH skala dunia dari emitter
+  // (flat uvs eksplisit), dibagi R40T di sini; dikali ke base SEBELUM
+  // lighting generik supaya grading TOD tetap menguasai warna.
+  if (vM > 13.5 && vM < 14.5) base *= r40tx(uTexWalk, vU / R40T);
+  else if (vM > 14.5 && vM < 15.5) base *= r40tx(uTexSand, vU / R40T);
   // Half-Lambert (bible §1.2): bayangan tidak pernah hitam pekat (Valorant)
   float ndl = max(dot(N, uSun), 0.0);
   float halfLam = ndl * 0.5 + 0.5;
@@ -1169,6 +1195,23 @@ if (typeof Image !== 'undefined') {
   PED_ATLAS_IMG.onerror = () => { PED_ATLAS.failed = true; window.__pa = 1; if (_pedAtlasResolve) _pedAtlasResolve(false); };
   PED_ATLAS_IMG.src = PED_ATLAS_SRC;
 }
+// R40 TEX: 4 PNG grayscale Worker A (512/256 POT, REPEAT + mipmap). Fetch
+// awal saat modul dimuat (pola atlas R39) supaya PNG 101 KB sudah tiba
+// sebelum paint shot; GL texture dibuat di createRenderer dengan placeholder
+// 1x1 abu-128 (multiplier 1.0) — tanpa race, tanpa __tx di main.js.
+const R40_TEX = {
+  road: { src: 'assets/asphalt.png', img: null, tex: null, ok: false },
+  walk: { src: 'assets/sidewalk.png', img: null, tex: null, ok: false },
+  sand: { src: 'assets/sand.png', img: null, tex: null, ok: false },
+  fac: { src: 'assets/facade.png', img: null, tex: null, ok: false },
+};
+if (typeof Image !== 'undefined') {
+  for (const k of Object.keys(R40_TEX)) {
+    const e = R40_TEX[k];
+    e.img = new Image();
+    e.img.src = e.src;
+  }
+}
 const PED_CELL_W = 96, PED_CELL_H = 192, PED_COLS = 32, PED_ROWS = 10;
 const PED_AW = 3072, PED_AH = 1920;
 function personSprite(SP, B, x, z, yaw, col, opt, camFwd, t) {
@@ -1324,15 +1367,19 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     if (vertical) {
       const X = x0 * S, z0 = y0 * S, z1 = y1 * S;
       quad(OP, [X - hw, -0.05, z0], [X + hw, -0.05, z0], [X + hw, -0.05, z1], [X - hw, -0.05, z1],
-        [0, 1, 0], [[0, 0], [0, 1], [len, 1], [len, 0]], roadCol, 3);
-      flat(OP, X - (hw + 1.2), 0.02, (z0 + z1) / 2, 2.4, (z1 - z0), walkCol, 6);
-      flat(OP, X + (hw + 1.2), 0.02, (z0 + z1) / 2, 2.4, (z1 - z0), walkCol, 6);
+        [0, 1, 0], [[0, 0], [0, 1], [len, 1], [len, 0]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
+      flat(OP, X - (hw + 1.2), 0.02, (z0 + z1) / 2, 2.4, (z1 - z0), walkCol, 14, // R40: trotoar 6 -> 14 + UV dunia (u = lebar 2.4, v = panjang)
+        [[0, 0], [2.4, 0], [2.4, (z1 - z0)], [0, (z1 - z0)]]);
+      flat(OP, X + (hw + 1.2), 0.02, (z0 + z1) / 2, 2.4, (z1 - z0), walkCol, 14,
+        [[0, 0], [2.4, 0], [2.4, (z1 - z0)], [0, (z1 - z0)]]);
     } else {
       const Z = y0 * S, x0u = x0 * S, x1u = x1 * S;
       quad(OP, [x0u, -0.05, Z - hw], [x1u, -0.05, Z - hw], [x1u, -0.05, Z + hw], [x0u, -0.05, Z + hw],
-        [0, 1, 0], [[0, 0], [len, 0], [len, 1], [0, 1]], roadCol, 3);
-      flat(OP, (x0u + x1u) / 2, 0.02, Z - (hw + 1.2), (x1u - x0u), 2.4, walkCol, 6);
-      flat(OP, (x0u + x1u) / 2, 0.02, Z + (hw + 1.2), (x1u - x0u), 2.4, walkCol, 6);
+        [0, 1, 0], [[0, 0], [len, 0], [len, 1], [0, 1]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
+      flat(OP, (x0u + x1u) / 2, 0.02, Z - (hw + 1.2), (x1u - x0u), 2.4, walkCol, 14, // R40: trotoar 6 -> 14 + UV dunia (u = panjang, v = lebar 2.4)
+        [[0, 0], [(x1u - x0u), 0], [(x1u - x0u), 2.4], [0, 2.4]]);
+      flat(OP, (x0u + x1u) / 2, 0.02, Z + (hw + 1.2), (x1u - x0u), 2.4, walkCol, 14,
+        [[0, 0], [(x1u - x0u), 0], [(x1u - x0u), 2.4], [0, 2.4]]);
     }
   };
   for (const rx of city.roadsV) {
@@ -1597,19 +1644,20 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   if (hx0 > 1300 && near(2390, 1120, 1750) && vis(2390, 1120, 700)) {
     const SAND = [0.76, 0.64, 0.42], SAND_D = [0.62, 0.50, 0.32], SAND_L = [0.86, 0.74, 0.52];
     if (hx0 <= 2250) flat(OP, 250.4, 0.0, 112.0, 11.2, 94.0, [0.05, 0.20, 0.32], 10); // air pantai (x 2448..2560, y 650..1590)
-    flat(OP, 239.4, 0.03, 100.8, 10.8, 13.2, SAND, 5); // pasir utara jalan
-    flat(OP, 239.4, 0.03, 123.2, 10.8, 13.2, SAND, 5); // pasir selatan jalan
-    flat(OP, 239.4, 0.03, 84.0, 10.8, 20.0, SAND, 5); // pasir lanjut utara
-    flat(OP, 239.4, 0.03, 140.0, 10.8, 20.0, SAND, 5); // pasir lanjut selatan
+    flat(OP, 239.4, 0.03, 100.8, 10.8, 13.2, SAND, 15, [[0, 0], [10.8, 0], [10.8, 13.2], [0, 13.2]]); // R40: pasir 5 -> 15 + UV dunia
+    flat(OP, 239.4, 0.03, 123.2, 10.8, 13.2, SAND, 15, [[0, 0], [10.8, 0], [10.8, 13.2], [0, 13.2]]); // pasir selatan jalan
+    flat(OP, 239.4, 0.03, 84.0, 10.8, 20.0, SAND, 15, [[0, 0], [10.8, 0], [10.8, 20.0], [0, 20.0]]); // pasir lanjut utara
+    flat(OP, 239.4, 0.03, 140.0, 10.8, 20.0, SAND, 15, [[0, 0], [10.8, 0], [10.8, 20.0], [0, 20.0]]); // pasir lanjut selatan
     for (let i = 0; i < 10; i += 1) { // bercak tone pasir (utara/selatan, JANGAN di koridor jalan)
       const pz = (i % 2 ? 74 : 118) + hash2(i, 5) * 32;
-      flat(OP, 234.5 + hash2(i, 3) * 9, 0.04, pz, 1.6 + hash2(i, 9) * 2.4, 1.2 + hash2(i, 11) * 2.0, hash2(i, 7) < 0.5 ? SAND_D : SAND_L, 5);
+      const bw = 1.6 + hash2(i, 9) * 2.4, bd = 1.2 + hash2(i, 11) * 2.0;
+      flat(OP, 234.5 + hash2(i, 3) * 9, 0.04, pz, bw, bd, hash2(i, 7) < 0.5 ? SAND_D : SAND_L, 15, [[0, 0], [bw, 0], [bw, bd], [0, bd]]);
     }
     for (let i = 0; i < 14; i += 1) { // jejak kaki berpasangan di pasir
       const pz = (i % 2 ? 96 : 118) + hash2(i, 17) * 10;
       const px = 235 + hash2(i, 13) * 8.5;
-      flat(OP, px, 0.045, pz, 0.35, 0.18, SAND_D, 5);
-      flat(OP, px + 0.5, 0.045, pz + 0.35, 0.35, 0.18, SAND_D, 5);
+      flat(OP, px, 0.045, pz, 0.35, 0.18, SAND_D, 15, [[0, 0], [0.35, 0], [0.35, 0.18], [0, 0.18]]);
+      flat(OP, px + 0.5, 0.045, pz + 0.35, 0.35, 0.18, SAND_D, 15, [[0, 0], [0.35, 0], [0.35, 0.18], [0, 0.18]]);
     }
     // ombak: 2 baris buih di garis pantai, bergeser pelan dengan t.
     for (let r = 0; r < 2; r += 1) {
@@ -2028,6 +2076,8 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo (HUD asli ui2.
     uGradeGamma: gl.getUniformLocation(P, 'uGradeGamma'), uRes: gl.getUniformLocation(P, 'uRes'),
     uTime: gl.getUniformLocation(P, 'uTime'), // R36 POSTFX
     uAtlas: gl.getUniformLocation(P, 'uAtlas'), // R39 SPRITE
+    uTexRoad: gl.getUniformLocation(P, 'uTexRoad'), uTexWalk: gl.getUniformLocation(P, 'uTexWalk'), // R40
+    uTexSand: gl.getUniformLocation(P, 'uTexSand'), uTexFac: gl.getUniformLocation(P, 'uTexFac'), uTexK: gl.getUniformLocation(P, 'uTexK'), // R40
   };
   // R39 SPRITE: muat atlas ped (assets/ped-atlas.png, relatif ke game/index.html).
   // Gagal load (404/error) -> PED_ATLAS.ok tetap false -> person() box tetap jalan.
@@ -2062,6 +2112,46 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo (HUD asli ui2.
       img.onload = () => { makeTex(); if (_pedAtlasResolve) _pedAtlasResolve(PED_ATLAS.ok); };
       img.onerror = () => { PED_ATLAS.failed = true; window.__pa = 1; console.warn('R39 SPRITE: atlas image failed to load — fallback box person()'); if (_pedAtlasResolve) _pedAtlasResolve(false); };
       if (!PED_ATLAS_IMG) img.src = PED_ATLAS_SRC;
+    }
+  })();
+  // R40 TEX: 4 tekstur permukaan (REPEAT + mipmap, POT). Tiap texture dibuat
+  // SEKARANG dengan placeholder 1x1 abu-128 (multiplier 1.0) lalu diganti
+  // isi PNG saat gambar tiba — frame sebelum load = jalan polos-lama, bukan
+  // hitam/rusak. Gagal load (404) = placeholder bertahan, game tetap jalan.
+  // window.__tx = 1 saat keempatnya settle (diagnostik saja; runShot TIDAK
+  // menunggunya — main.js TIDAK disentuh, 0 byte dossier).
+  (function loadR40Tex() {
+    let settled = 0;
+    const done = () => { settled += 1; if (settled === 4) window.__tx = 1; };
+    for (const k of Object.keys(R40_TEX)) {
+      const e = R40_TEX[k];
+      e.tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, e.tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      const up = () => {
+        try {
+          gl.bindTexture(gl.TEXTURE_2D, e.tex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, e.img);
+          gl.generateMipmap(gl.TEXTURE_2D);
+          gl.bindTexture(gl.TEXTURE_2D, null);
+          e.ok = true;
+          console.log('R40 TEX: ' + k + ' loaded (' + e.img.width + 'x' + e.img.height + ')');
+        } catch (err) { console.warn('R40 TEX: upload failed ' + k, err); }
+        done();
+      };
+      const img = e.img || new Image();
+      if (img.complete && img.naturalWidth > 0) up();
+      else {
+        img.onload = up;
+        img.onerror = () => { console.warn('R40 TEX: image failed to load — placeholder kept: ' + e.src); done(); };
+        if (!e.img) img.src = e.src;
+      }
     }
   })();
   const skyU = {
@@ -2192,6 +2282,14 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo (HUD asli ui2.
     gl.uniform1f(A.uShadowK, U.shadowK); gl.uniform1f(A.uRoadTex, U.roadTex); gl.uniform1f(A.uFogK, U.fogK);
     gl.uniform3fv(A.uGradeLift, new Float32Array(U.gradeLift)); gl.uniform3fv(A.uGradeGain, new Float32Array(U.gradeGain));
     gl.uniform1f(A.uGradeGamma, U.gradeGamma); gl.uniform2f(A.uRes, glCanvas.width, glCanvas.height); gl.uniform1f(A.uTime, t); // R36 POSTFX
+    // R40 TEX: sampler unit 1-4 (uAtlas tetap unit 0) — bind sekali per frame
+    // sebelum drawBuf(OP); uTexK=1.0: placeholder abu-128 = multiplier 1.0.
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, R40_TEX.road.tex); gl.uniform1i(A.uTexRoad, 1);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, R40_TEX.walk.tex); gl.uniform1i(A.uTexWalk, 2);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, R40_TEX.sand.tex); gl.uniform1i(A.uTexSand, 3);
+    gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, R40_TEX.fac.tex); gl.uniform1i(A.uTexFac, 4);
+    gl.uniform1f(A.uTexK, 1.0);
+    gl.activeTexture(gl.TEXTURE0);
     drawBuf(bufOP);
     // contact shadow (normal blend — SH + elips material 9 hasil belah-G)
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);

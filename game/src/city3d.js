@@ -35,10 +35,10 @@ let NEON = 1;     // neon-sign brightness (dim at noon)
 let WINLIT = 0.62; // lit-window threshold (see wins())
 let WIN_T = [1,1,1]; // lit-window tint (cool blue at noon)
 const TITLE_PAL = {
-  sore: { hz:[255,150,110], sky:['#1e0b33','#6b2355','#e0545e','#ffb35c'], ground:'#241a20', bounce:[255,140,80], sunY:-20, sunX:60, sunDisc:'#ffe9a8', sunG0:'rgba(255,230,160,.95)', sunG1:'rgba(255,170,90,.55)', sunG2:'rgba(255,140,80,0)', sunR:18, sunGr:150, glitter:['rgba(255,170,90,.6)','rgba(255,170,90,.35)'], water:[70,50,110], lamp:1, roadGlow:'rgba(255,150,80,.15)', stars:0, winLit:0.62, winTint:[1,1,1], fogK:1, shadowLen:16, shadowA:0.35, tlGain:1, neon:1 },
-  pagi: { hz:[232,217,200], sky:['#2e4a7a','#96aad2','#e8a878','#ffc98a'], ground:'#3a3f4a', bounce:[255,180,160], sunY:-20, sunX:330, sunDisc:'#ffe0b8', sunG0:'rgba(255,214,170,.95)', sunG1:'rgba(255,170,140,.55)', sunG2:'rgba(255,150,120,0)', sunR:18, sunGr:150, glitter:['rgba(255,190,150,.5)','rgba(255,190,150,.3)'], water:[90,110,160], lamp:0.5, roadGlow:'rgba(255,180,150,.10)', stars:0, winLit:0.25, winTint:[1,0.90,0.85], fogK:1, shadowLen:9, shadowA:0.30, tlGain:0.45, neon:0.6 },
-  siang: { hz:[150,180,205], sky:['#1447a6','#4682c8','#8fb8dd','#aacdeb'], ground:'#4a4a52', bounce:[255,255,255], sunY:-170, sunX:60, sunDisc:'#ffffff', sunG0:'rgba(255,255,240,.9)', sunG1:'rgba(255,255,220,.5)', sunG2:'rgba(255,255,200,0)', sunR:14, sunGr:170, glitter:['rgba(255,255,255,.45)','rgba(255,255,255,.25)'], water:[40,90,160], lamp:0.05, roadGlow:'rgba(255,255,255,.06)', stars:0, winLit:0.06, winTint:[0.70,0.82,1.00], fogK:0.45, shadowLen:3, shadowA:0.45, tlGain:0.12, neon:0.35 },
-  malam: { hz:[16,22,44], sky:['#05070f','#0d1330','#1c2547','#2a3355'], ground:'#0d0f18', bounce:[120,140,200], sunY:-120, sunX:60, sunDisc:'#e8ecff', sunG0:'rgba(200,210,255,.55)', sunG1:'rgba(160,170,230,.3)', sunG2:'rgba(140,150,220,0)', sunR:13, sunGr:80, glitter:['rgba(180,190,255,.25)','rgba(180,190,255,.12)'], water:[10,20,40], lamp:1.6, roadGlow:'rgba(120,140,220,.08)', stars:1, winLit:0.75, winTint:[1.05,0.85,0.55], fogK:1, shadowLen:5, shadowA:0.12, tlGain:1, neon:1 },
+  sore: { hz:[255,150,110], sky:['#1e0b33','#6b2355','#e0545e','#ffb35c'], ground:'#241a20', bounce:[255,140,80], sunY:-20, sunX:60, sunDisc:'#ffe9a8', sunCore:'#fff8dc', sunEdge:'#ffc978', sunG0:'rgba(255,230,160,.95)', sunG1:'rgba(255,170,90,.55)', sunG2:'rgba(255,140,80,0)', sunR:18, sunGr:150, glitter:['rgba(255,170,90,.6)','rgba(255,170,90,.35)'], water:[70,50,110], lamp:1, roadGlow:'rgba(255,150,80,.15)', stars:0, winLit:0.62, winTint:[1,1,1], fogK:1, shadowLen:16, shadowA:0.35, tlGain:1, neon:1 },
+  pagi: { hz:[232,217,200], sky:['#2e4a7a','#96aad2','#e8a878','#ffc98a'], ground:'#3a3f4a', bounce:[255,180,160], sunY:-20, sunX:330, sunDisc:'#ffe0b8', sunCore:'#fff3d0', sunEdge:'#ffb27a', sunG0:'rgba(255,214,170,.95)', sunG1:'rgba(255,170,140,.55)', sunG2:'rgba(255,150,120,0)', sunR:18, sunGr:150, glitter:['rgba(255,190,150,.5)','rgba(255,190,150,.3)'], water:[90,110,160], lamp:0.5, roadGlow:'rgba(255,180,150,.10)', stars:0, winLit:0.25, winTint:[1,0.90,0.85], fogK:1, shadowLen:9, shadowA:0.30, tlGain:0.45, neon:0.6 },
+  siang: { hz:[150,180,205], sky:['#1447a6','#4682c8','#8fb8dd','#aacdeb'], ground:'#4a4a52', bounce:[255,255,255], sunY:-170, sunX:60, sunDisc:'#ffffff', sunCore:'#ffffff', sunEdge:'#ffe9a8', sunG0:'rgba(255,255,240,.9)', sunG1:'rgba(255,255,220,.5)', sunG2:'rgba(255,255,200,0)', sunR:14, sunGr:170, glitter:['rgba(255,255,255,.45)','rgba(255,255,255,.25)'], water:[40,90,160], lamp:0.05, roadGlow:'rgba(255,255,255,.06)', stars:0, winLit:0.06, winTint:[0.70,0.82,1.00], fogK:0.45, shadowLen:1.8, shadowA:0.32, tlGain:0.12, neon:0.35 },
+  malam: { hz:[16,22,44], sky:['#05070f','#0d1330','#1c2547','#2a3355'], ground:'#0d0f18', bounce:[120,140,200], sunY:-120, sunX:60, sunDisc:'#e8ecff', sunCore:'#f4f6ff', sunEdge:'#c9d2f0', sunG0:'rgba(200,210,255,.55)', sunG1:'rgba(160,170,230,.3)', sunG2:'rgba(140,150,220,0)', sunR:13, sunGr:80, glitter:['rgba(180,190,255,.25)','rgba(180,190,255,.12)'], water:[10,20,40], lamp:1.6, roadGlow:'rgba(120,140,220,.08)', stars:1, winLit:0.75, winTint:[1.05,0.85,0.55], fogK:1, shadowLen:5, shadowA:0.12, tlGain:1, neon:1 },
 };
 // round 22: the chase camera uses a longer lens + a higher eye than the
 // title frame (narrower FOV = the road fills more of the frame, the
@@ -57,28 +57,50 @@ for(let z=10;z<900;z+=24+R()*10){
   mk(-1);if(z<150||z>260)mk(1);
 }
 function wins(b){const{x,z:zf,w,h,bi}=b,nc=Math.max(2,w/2.6|0),nr=Math.max(3,h/3.4|0),t=hz(zf-camZ);
+  // R40-D: di siang jendela mati dulu kaca gelap [52,66,88]/[34,44,62] di
+  // fasad gelap + kabut biru = titik-titik tak terbaca, gedung lempeng.
+  // Siang: kaca MEMANTULKAN langit (biru terang bervariasi per hash) +
+  // jendela sedikit lebih besar. Sore/pagi/malam TIDAK berubah.
+  const noon=titleTOD==='siang';
   for(let i=0;i<nc;i++)for(let j=0;j<nr;j++){const q=h2(bi*131+i*7,j*3+1),q2=h2(bi*17+i*3,j*11+5);
-    const wx=x-w/2+1.2+(w-2.4)*(i+.15)/nc,wy=2+(h-3)*(j+.2)/nr,ww=(w-2.4)/nc*.62*(.75+.5*q2),wh=(h-3)/nr*.6*(.8+.4*q2);
+    const wx=x-w/2+1.2+(w-2.4)*(i+.15)/nc,wy=2+(h-3)*(j+.2)/nr,ww=(w-2.4)/nc*(noon?0.72:0.62)*(.75+.5*q2),wh=(h-3)/nr*(noon?0.68:0.6)*(.8+.4*q2);
     // R33: lit windows follow the time preset — at noon almost none are lit
     // (WINLIT 0.06) and the few lit ones are cool-tinted (WIN_T), not warm
     // yellow like at sunset. The bands are fractions of WINLIT, so for sore
     // (WINLIT 0.62) they land on the original q<.4/.57/.62 exactly.
     const warm=q<WINLIT*.65?[255,205,120]:q<WINLIT*.92?[255,190,120]:q<WINLIT?[255,150,90]:null;
-    const c=warm?[Math.round(warm[0]*WIN_T[0]),Math.round(warm[1]*WIN_T[1]),Math.round(warm[2]*WIN_T[2])]:q2<.5?[52,66,88]:[34,44,62];
+    const c=warm?[Math.round(warm[0]*WIN_T[0]),Math.round(warm[1]*WIN_T[1]),Math.round(warm[2]*WIN_T[2])]:noon?(q2<.33?[168,198,232]:q2<.66?[96,128,175]:[196,216,240]):q2<.5?[52,66,88]:[34,44,62];
     Q([wx,wy,zf],[wx+ww,wy,zf],[wx+ww,wy+wh,zf],[wx,wy+wh,zf],mix(c,t),zf-camZ);}}
 function bld(b){const{x,z,w,d,h,c}=b,zf=z-d/2,zb=z+d/2,dep=zf-camZ;if(dep<35)return;const sx=x>0?x-w/2:x+w/2;
-  Q([x-w/2,0,zf],[x+w/2,0,zf],[x+w/2,h,zf],[x-w/2,h,zf],sh(c,.8,hz(dep)),dep);
-  Q([sx,0,zf],[sx,0,zb],[sx,h,zb],[sx,h,zf],sh(c,1.05,hz(dep)),dep);
+  // R40-D: fasad siang dulu ×0.8 = hampir hitam (depan), jendela gelap di
+  // atasnya hilang. Siang: depan ×0.95 + sisi ×1.15 supaya fasad kebaca.
+  const noon=titleTOD==='siang';
+  Q([x-w/2,0,zf],[x+w/2,0,zf],[x+w/2,h,zf],[x-w/2,h,zf],sh(c,noon?0.95:0.8,hz(dep)),dep);
+  Q([sx,0,zf],[sx,0,zb],[sx,h,zb],[sx,h,zf],sh(c,noon?1.15:1.05,hz(dep)),dep);
   Q([x-w/2,h,zf],[x+w/2,h,zf],[x+w/2,h,zb],[x-w/2,h,zb],sh(c,1.3,hz(dep)),dep);
   if(b.bi%3){const u=w*.31,v=d*.19,e=3+b.bi%3*2,s2=x>0?x-u:x+u;
   Q([x-u,h,zf+v],[x+u,h,zf+v],[x+u,h+e,zf+v],[x-u,h+e,zf+v],sh(c,1,hz(dep)),dep);
   Q([s2,h,zf+v],[s2,h,zb-v],[s2,h+e,zb-v],[s2,h+e,zf+v],sh(c,.9,hz(dep)),dep);
-  Q([x-u,h+e,zf+v],[x+u,h+e,zf+v],[x+u,h+e,zb-v],[x-u,h+e,zb-v],sh(c,1.3,hz(dep)),dep);}
+  Q([x-u,h+e,zf+v],[x+u,h+e,zf+v],[x+u,h+e,zb-v],[x-u,h+e,zb-v],sh(c,1.3,hz(dep)),dep);
+  // R40-D: jendela di muka setback (dulu slab polos di puncak gedung).
+  for(let si=0;si<3;si++){const q3=h2(b.bi,201+si),q4=h2(b.bi,211+si);
+    const swx=x-u+0.6+(2*u-1.2)*(si+.2)/3,sww=(2*u-1.2)/3*.6;
+    const swc=q3<WINLIT?[255,205,120]:noon?(q4<.33?[168,198,232]:q4<.66?[96,128,175]:[196,216,240]):[52,66,88];
+    Q([swx,h+0.6,zf+v],[swx+sww,h+0.6,zf+v],[swx+sww,h+e-0.6,zf+v],[swx,h+e-0.6,zf+v],mix(swc,hz(dep)),dep);}}
+  // R40-D: variasi atap — antena + kotak AC di atap gedung tinggi, supaya
+  // siluet atap tidak slab polos (deterministik hash per gedung).
+  if(h>35&&h2(b.bi,91)<0.5){const ax=x+(h2(b.bi,93)-0.5)*w*0.4;
+    Q([ax-0.15,h,zf+2],[ax+0.15,h,zf+2],[ax+0.15,h+4.5,zf+2],[ax-0.15,h+4.5,zf+2],mix([52,54,62],hz(dep)),dep);
+    Q([ax-0.5,h+4.5,zf+2],[ax+0.5,h+4.5,zf+2],[ax+0.5,h+4.9,zf+2],[ax-0.5,h+4.9,zf+2],mix([70,72,82],hz(dep)),dep);}
+  if(h2(b.bi,97)<0.4){
+    Q([x-w*0.28,h,zf+3],[x-w*0.05,h,zf+3],[x-w*0.05,h+1.1,zf+3],[x-w*0.28,h+1.1,zf+3],mix([62,64,72],hz(dep)),dep);}
   wins(b);
   // R36-BLD ground floor: dulu dinding polos (jendela mulai y=2). Etalase
   // kaca (hangat menyala bila hash < WINLIT, kaca dingin bila tidak) +
   // awning merah di muka depan, di bawah baris jendela terbawah (y<2.6).
-  const gw=h2(b.bi,77)<WINLIT,gc=gw?[200,150,90]:[30,38,52];
+  // R40-D: etalase siang dulu [30,38,52] gelap = lubang hitam; kini kaca
+  // pantul langit [105,135,170] bila tidak menyala.
+  const gw=h2(b.bi,77)<WINLIT,gc=gw?[200,150,90]:noon?[105,135,170]:[30,38,52];
   Q([x-w/2+.6,.3,zf],[x+w/2-.6,.3,zf],[x+w/2-.6,1.9,zf],[x-w/2+.6,1.9,zf],mix(gc,hz(dep)),dep);
   Q([x-w/2+.6,2,zf],[x+w/2-.6,2,zf],[x+w/2-.6,2.55,zf],[x-w/2+.6,2.55,zf],mix([150,45,55],hz(dep)),dep);}
 function car(o){const{x,z,w,h,l,c}=o,zb=z-l/2,zf=z+l/2,dep=zb-camZ,t=hz(dep);
@@ -191,6 +213,11 @@ function palmT(x, z) {
       (u) => pcy + 0.3 + 1.0 * u - 1.2 * u * u, 0.26, gL);
   }
 }
+// R40-D: garis pantai berlekuk (bukan lurus x=64) — tepi air/pasir ikut
+// fungsi dunia yang sama supaya pasir, air, dan buih selalu bertemu.
+// Amplitudo total ±7 unit (tepi terendah ~57 — semua prop pantai di x<=55
+// tetap di pasir).
+const coast=(z)=>64+4.5*Math.sin(z*0.028)+2.5*Math.sin(z*0.083+1.7);
 function frame(t){
   // R33: time-of-day palette — the title backdrop is no longer hardcoded
   // sunset. Default 'sore' reproduces the R31 values exactly.
@@ -216,14 +243,24 @@ function frame(t){
   Q([-64,0,camZ+2],[-16,0,camZ+2],[-16,0,camZ+24],[-64,0,camZ+24],shW([48,38,44],1,0),2);
   // R36 PANTAI (title): strip kanan (x 16..64) = pasir pantai, bukan
   // trotoar gelap — tone pasir + jejak di apron dekat kamera juga.
-  Q([16,0,camZ+2],[64,0,camZ+2],[64,0,camZ+24],[16,0,camZ+24],shW([196,164,116],1,0),2);
+  // R40-D: tepi kanan ikut coast() (berlekuk) + 2 bercak tone supaya apron
+  // pasir dekat kamera tidak lempeng beige.
+  Q([16,0,camZ+2],[coast(camZ+2),0,camZ+2],[coast(camZ+24),0,camZ+24],[16,0,camZ+24],shW([196,164,116],1,0),2);
   Q([24,.05,camZ+8],[24.9,.05,camZ+8],[24.9,.05,camZ+11],[24,.05,camZ+11],mix([150,120,80],0),2);
   Q([40,.05,camZ+14],[40.7,.05,camZ+14],[40.7,.05,camZ+14.7],[40,.05,camZ+14.7],mix([235,220,190],0),2);
+  Q([30,.05,camZ+5],[31.8,.05,camZ+5],[31.8,.05,camZ+6.4],[30,.05,camZ+6.4],mix([170,140,95],0),2);
+  Q([48,.05,camZ+18],[49.6,.05,camZ+18],[49.6,.05,camZ+19.2],[48,.05,camZ+19.2],mix([215,185,140],0),2);
+  Q([36,.05,camZ+11],[38.5,.05,camZ+11],[38.5,.05,camZ+13],[36,.05,camZ+13],mix([170,140,95],0),2);
+  Q([52,.05,camZ+9],[54,.05,camZ+9],[54,.05,camZ+10.6],[52,.05,camZ+10.6],mix([215,185,140],0),2);
   // R33: tyre tracks on the near apron too — the foreground road was a flat
   // brown expanse (Juna: sore "aneh banget"). Two dark wheel lines + a
   // crack, y=0.04 so they sit on the asphalt, under the dashes (y=0.05).
-  Q([-3.4,.04,camZ+2],[-2.2,.04,camZ+2],[-2.2,.04,camZ+24],[-3.4,.04,camZ+24],shW([40,32,36],1,0),2);
-  Q([2.2,.04,camZ+2],[3.4,.04,camZ+2],[3.4,.04,camZ+24],[2.2,.04,camZ+24],shW([40,32,36],1,0),2);
+  // R40-D: bekas ban dulu mix([40,32,36]) TANPA bounce — di atas aspal
+  // shW() (bounce putih siang) ia kebaca dua pita HITAM membujur selebar
+  // 1.2 unit sepanjang jalan. Kini shW() juga (tone ikut aspal) + warna
+  // nyaris seaspal [52,43,48] + lebar 0.8 = samar, bukan slab.
+  Q([-3.2,.04,camZ+2],[-2.4,.04,camZ+2],[-2.4,.04,camZ+24],[-3.2,.04,camZ+24],shW([52,43,48],1,0),2);
+  Q([2.4,.04,camZ+2],[3.2,.04,camZ+2],[3.2,.04,camZ+24],[2.4,.04,camZ+24],shW([52,43,48],1,0),2);
   Q([-6,.04,camZ+9],[-4.8,.04,camZ+9],[-5.6,.04,camZ+20],[-6.8,.04,camZ+20],shW([30,24,28],1,0),2);
   // road + sidewalks (segmented so fog deepens with distance)
   for(let z=Math.floor((camZ-30)/30)*30;z<camZ+430;z+=30){const d=z-camZ,v=h2(3,z);
@@ -234,8 +271,8 @@ function frame(t){
     Q([12,.1,z],[16,.1,z],[16,.1,z+30],[12,.1,z+30],sh([80,70,76],1,hz(d)),d);
     Q([-11.7,.06,z],[-11.4,.06,z],[-11.4,.06,z+30],[-11.7,.06,z+30],mix([220,200,170],hz(d)),d);
     Q([11.4,.06,z],[11.7,.06,z],[11.7,.06,z+30],[11.4,.06,z+30],mix([220,200,170],hz(d)),d);
-    Q([-3.4,.04,z],[-2.2,.04,z],[-2.2,.04,z+30],[-3.4,.04,z+30],mix([40,32,36],hz(d)),d);
-    Q([2.2,.04,z],[3.4,.04,z],[3.4,.04,z+30],[2.2,.04,z+30],mix([40,32,36],hz(d)),d);
+    Q([-3.2,.04,z],[-2.4,.04,z],[-2.4,.04,z+30],[-3.2,.04,z+30],shW([52,43,48],1,hz(d)),d);
+    Q([2.4,.04,z],[3.2,.04,z],[3.2,.04,z+30],[2.4,.04,z+30],shW([52,43,48],1,hz(d)),d);
     if(h2(17,z)<.2){const px0=-8+h2(29,z)*10;Q([px0,.045,z+5],[px0+4,.045,z+5],[px0+4,.045,z+18],[px0,.045,z+18],mix([48,38,44],hz(d)),d);}
     if(h2(13,z)<.3){const cx=-8+h2(31,z)*16;Q([cx,.045,z+8],[cx+1.2,.045,z+8],[cx+.4,.045,z+20],[cx-.8,.045,z+20],mix([30,24,28],hz(d)),d);}}
   // R31 title foreground: flanking ground — the frame's lower half was flat
@@ -247,10 +284,15 @@ function frame(t){
     Q([-64,0,z],[-16,0,z],[-16,0,z+30],[-64,0,z+30],shW([46+v*8,36+v*6,42+v*6],1,hz(d)),d);
     // R36 PANTAI (title): strip kanan = pasir bertekstur (bukan hamparan
     // datar) — tone jitter + jejak kaki + kerang, per segmen 30 unit.
-    Q([16,0,z],[64,0,z],[64,0,z+30],[16,0,z+30],shW([196+v*14,164+v*10,116+v*8],1,hz(d)),d);
-    if(h2(23,z)<.45){const fx=22+h2(29,z)*36;Q([fx,.05,z+6],[fx+.9,.05,z+6],[fx+.9,.05,z+9],[fx,.05,z+9],mix([150,120,80],hz(d)),d);}
-    if(h2(41,z)<.3){const sx2=20+h2(43,z)*40;Q([sx2,.05,z+16],[sx2+.7,.05,z+16],[sx2+.7,.05,z+16.7],[sx2,.05,z+16.7],mix([235,220,190],hz(d)),d);}
-    if(h2(53,z)<.4){const fx2=24+h2(59,z)*34;Q([fx2,.05,z+22],[fx2+.8,.05,z+22],[fx2+.8,.05,z+24.5],[fx2,.05,z+24.5],mix([140,112,74],hz(d)),d);}
+    // R40-D: tepi kanan ikut coast() (berlekuk) + 2 bercak tone kecil per
+    // segmen supaya pasir tidak lempeng beige (grain halus = tugas C).
+    Q([16,0,z],[coast(z),0,z],[coast(z+30),0,z+30],[16,0,z+30],shW([196+v*14,164+v*10,116+v*8],1,hz(d)),d);
+    if(h2(23,z)<.45){const fx=22+h2(29,z)*30;Q([fx,.05,z+6],[fx+.9,.05,z+6],[fx+.9,.05,z+9],[fx,.05,z+9],mix([150,120,80],hz(d)),d);}
+    if(h2(41,z)<.3){const sx2=20+h2(43,z)*32;Q([sx2,.05,z+16],[sx2+.7,.05,z+16],[sx2+.7,.05,z+16.7],[sx2,.05,z+16.7],mix([235,220,190],hz(d)),d);}
+    if(h2(53,z)<.4){const fx2=24+h2(59,z)*28;Q([fx2,.05,z+22],[fx2+.8,.05,z+22],[fx2+.8,.05,z+24.5],[fx2,.05,z+24.5],mix([140,112,74],hz(d)),d);}
+    if(h2(89,z)<.8){const px2=20+h2(97,z)*30,pz2=z+4+h2(101,z)*18;Q([px2,.05,pz2],[px2+3,.05,pz2],[px2+3,.05,pz2+2.2],[px2,.05,pz2+2.2],mix([170,140,95],hz(d)),d);}
+    if(h2(103,z)<.6){const px3=22+h2(107,z)*28,pz3=z+8+h2(109,z)*16;Q([px3,.05,pz3],[px3+2.6,.05,pz3],[px3+2.6,.05,pz3+2],[px3,.05,pz3+2],mix([215,185,140],hz(d)),d);}
+    if(h2(113,z)<.5){const px4=24+h2(117,z)*26,pz4=z+14+h2(119,z)*12;Q([px4,.05,pz4],[px4+2.2,.05,pz4],[px4+2.2,.05,pz4+1.8],[px4,.05,pz4+1.8],mix([150,120,80],hz(d)),d);}
     Q([-16.4,.08,z],[-16,.08,z],[-16,.08,z+30],[-16.4,.08,z+30],mix([150,132,120],hz(d)),d);
     Q([16,.08,z],[16.4,.08,z],[16.4,.08,z+30],[16,.08,z+30],mix([150,132,120],hz(d)),d);}
   // R36-ROADS item 16: kiri bawah title datar (gradasi cokelat polos) — sambungan
@@ -270,8 +312,8 @@ function frame(t){
     Q([-7.8,.03,z2],[-6.2,.03,z2],[-6.2,.03,z2+1.6],[-7.8,.03,z2+1.6],mix([50,44,48],hz(16)),16);}
   { // bekas ban samar di apron (dua lajur, z camZ+6..camZ+17, di depan mobil
     // hero) — warna nyaris seaspal supaya tidak jadi dua slab hitam.
-    Q([-3.2,.03,camZ+6],[-1.4,.03,camZ+6],[-1.4,.03,camZ+17],[-3.2,.03,camZ+17],mix([50,42,46],hz(11)),11);
-    Q([1.4,.03,camZ+6],[3.2,.03,camZ+6],[3.2,.03,camZ+17],[1.4,.03,camZ+17],mix([50,42,46],hz(11)),11);}
+    Q([-3.1,.03,camZ+6],[-2.3,.03,camZ+6],[-2.3,.03,camZ+17],[-3.1,.03,camZ+17],shW([52,43,48],1,hz(11)),11);
+    Q([2.3,.03,camZ+6],[3.1,.03,camZ+6],[3.1,.03,camZ+17],[2.3,.03,camZ+17],shW([52,43,48],1,hz(11)),11);}
   {const z=camZ+14; // hidran merah (depan + atas + kubah)
     Q([-22.8,0,z],[-21.2,0,z],[-21.2,1.6,z],[-22.8,1.6,z],mix([200,60,55],hz(14)),14);
     Q([-22.8,1.6,z],[-21.2,1.6,z],[-21.2,1.6,z-.9],[-22.8,1.6,z-.9],mix([140,40,40],hz(14)),14);
@@ -296,7 +338,11 @@ function frame(t){
     Q([22,.9,z],[26,.9,z],[26,.9,z+1.6],[22,.9,z+1.6],mix([120,85,55],hz(38)),38);
     Q([22,.9,z+1.6],[26,.9,z+1.6],[26,1.9,z+1.6],[22,1.9,z+1.6],mix([105,72,45],hz(38)),38);}
   for(let z=Math.floor((camZ+14)/12)*12;z<camZ+420;z+=12){const d=z-camZ;
-    Q([-.45,.05,z],[.45,.05,z],[.45,.05,z+3.5],[-.45,.05,z+3.5],mix([255,179,71],hz(d)),d);
+    // R40-D: marka tengah dulu 0.9 lebar × 3.5 panjang, kuning penuh
+    // [255,179,71] = ubin kuning kotak-kotak. Kini marka CAT: 0.55 lebar ×
+    // 5.5 panjang, kuning cat sedikit aus (tone bervariasi per dash).
+    const dw=0.55+0.1*h2(19,z),dc=[232+h2(23,z)*23,158+h2(29,z)*27,58+h2(31,z)*18];
+    Q([-dw/2,.05,z],[dw/2,.05,z],[dw/2,.05,z+5.5],[-dw/2,.05,z+5.5],mix(dc,hz(d)),d);
     Q([-6.4,.05,z+6],[-6,.05,z+6],[-6,.05,z+11],[-6.4,.05,z+11],mix([200,180,140],hz(d)),d);
     Q([6,.05,z+6],[6.4,.05,z+6],[6.4,.05,z+11],[6,.05,z+11],mix([200,180,140],hz(d)),d);}
   // R36-ROADS (Juna 17:18: zebra di title): zebra + garis stop di depan hero
@@ -306,8 +352,15 @@ function frame(t){
     Q([bx,.06,camZ+32],[bx+1.1,.06,camZ+32],[bx+1.1,.06,camZ+38],[bx,.06,camZ+38],mix([235,235,235],hz(35)),35);}
   Q([-11,.06,camZ+27.5],[11,.06,camZ+27.5],[11,.06,camZ+28.7],[-11,.06,camZ+28.7],mix([235,235,235],hz(28)),28);
   // harbor water, right side (gap in buildings)
+  // R40-D: tepi kiri air ikut coast() (berlekuk, tumpang 1.5 unit ke pasir
+  // supaya tidak ada celah tanah di lekukan) + riak halus: 2 pita kilau
+  // putih samar per segmen + glitter matahari yang sudah ada.
   for(let z=Math.floor((camZ-30)/40)*40;z<camZ+430;z+=40){const d=z-camZ;
-    Q([64,-1,z],[240,-1,z],[240,-1,z+40],[64,-1,z+40],mix(PAL.water,cl(d/300,0,.85)),d);}
+    Q([coast(z)-1.5,-1,z],[240,-1,z],[240,-1,z+40],[coast(z+40)-1.5,-1,z+40],mix(PAL.water,cl(d/300,0,.85)),d);
+    if(h2(61,z)<.7){const wx2=coast(z)+18+h2(67,z)*90,wl=18+h2(71,z)*22;
+      Q([wx2,-.95,z+6],[wx2+wl,-.95,z+6],[wx2+wl,-.95,z+9],[wx2,-.95,z+9],'rgba(255,255,255,.10)',d);}
+    if(h2(73,z)<.5){const wx3=coast(z)+30+h2(79,z)*80,wl2=12+h2(83,z)*18;
+      Q([wx3,-.95,z+22],[wx3+wl2,-.95,z+22],[wx3+wl2,-.95,z+24.5],[wx3,-.95,z+24.5],'rgba(255,255,255,.08)',d);}}
   // sun glitter strips ON the water (world space, so perspective lands them right)
   Q([80,-.9,camZ+150],[150,-.9,camZ+150],[150,-.9,camZ+420],[80,-.9,camZ+420],PAL.glitter[0],150);
   Q([150,-.9,camZ+200],[175,-.9,camZ+200],[175,-.9,camZ+420],[150,-.9,camZ+420],PAL.glitter[1],200);
@@ -315,9 +368,10 @@ function frame(t){
   // Posisi dihitung dari proyeksi (proj-title.mjs): pita gedung kanan ada
   // di layar x 658..848 — semua prop di sini proyeksinya x>860 (kanan
   // pita) atau x<762 (kiri pita), jadi tidak ketutup gedung. VISUAL SAJA.
-  for(let z=Math.floor((camZ-30)/40)*40;z<camZ+430;z+=40){const d=z-camZ; // ombak: 2 garis buih di garis pantai x~64
-    Q([62,-.85,z],[66,-.85,z],[66,-.85,z+26],[62,-.85,z+26],'rgba(255,255,255,.65)',d);
-    Q([68,-.85,z+14],[71,-.85,z+14],[71,-.85,z+14+18],[68,-.85,z+14+18],'rgba(255,255,255,.35)',d);}
+  for(let z=Math.floor((camZ-30)/40)*40;z<camZ+430;z+=40){const d=z-camZ; // ombak: 2 garis buih MENGIKUTI lekuk pantai coast(z) (dulu 2 pita lurus x=62-66 / 68-71)
+    const e0=coast(z),e1=coast(z+26),e2=coast(z+14),e3=coast(z+32);
+    Q([e0-2,-.85,z],[e0+2,-.85,z],[e1+2,-.85,z+26],[e1-2,-.85,z+26],'rgba(255,255,255,.65)',d);
+    Q([e2+3,-.85,z+14],[e2+6,-.85,z+14],[e3+6,-.85,z+14+18],[e3+3,-.85,z+14+18],'rgba(255,255,255,.35)',d);}
   const bUmb=(ux,uz,cA,cB)=>{const t=hz(uz-camZ),d=uz-camZ; // payung: tiang + kanopi 2 sisi warna-warni (v2: lebih lebar + runcing supaya kebaca payung, bukan awning)
     Q([ux-.18,0,uz],[ux+.18,0,uz],[ux+.18,2.8,uz],[ux-.18,2.8,uz],mix([200,190,170],t),d);
     Q([ux-3,2.2,uz],[ux,2.2,uz],[ux,3.7,uz],[ux-3,2.55,uz],mix(cA,t),d);
@@ -384,16 +438,22 @@ function frame(t){
   // setback di sebagian menara. Deterministik h2(i,..) — dulu R() tiap
   // frame, jadi skyline bergeser tiap frame. Haze ikut hz() (siang jernih
   // = warna fasad tetap kebaca, sore berkabut hangat seperti dulu).
+  // R40-D: skyline siang — jendela mati dulu [52,66,88]/[34,44,62] di
+  // fasad gelap + kabut = titik-titik tak terbaca. Siang: kaca pantul
+  // langit (biru terang bervariasi) + jendela sedikit lebih besar +
+  // antena di sebagian menara (variasi siluet). Sore/pagi/malam sama.
+  const noonSky=titleTOD==='siang';
   for(let i=0;i<10;i++){const bx=-170+i*38+h2(i,3)*14,bh=40+h2(i,5)*60,bw=20+h2(i,7)*18,bz=camZ+400+h2(i,9)*30;
     const sc=[[58,26,58],[46,40,68],[68,46,42],[40,54,60],[74,60,46]][i%5],hz2=hz(bz-camZ);
     Q([bx,0,bz],[bx+bw,0,bz],[bx+bw,bh,bz],[bx,bh,bz],mix(sc,hz2),bz-camZ);
     const nc=3+(i%3),nr=Math.max(4,bh/9|0);
     for(let r=0;r<nr;r++)for(let c2=0;c2<nc;c2++){const q=h2(i*31+c2*7,r*3+1),q2=h2(i*17+c2*3,r*11+5);
-      const wx=bx+1.5+(bw-3)*(c2+.18)/nc,wy=2.5+(bh-4)*(r+.2)/nr,ww=(bw-3)/nc*.6,wh=(bh-4)/nr*.55;
+      const wx=bx+1.5+(bw-3)*(c2+.18)/nc,wy=2.5+(bh-4)*(r+.2)/nr,ww=(bw-3)/nc*(noonSky?0.68:0.6),wh=(bh-4)/nr*(noonSky?0.62:0.55);
       const warm=q<WINLIT*.65?[255,205,120]:q<WINLIT*.92?[255,190,120]:q<WINLIT?[255,150,90]:null;
-      const wc=warm?[Math.round(warm[0]*WIN_T[0]),Math.round(warm[1]*WIN_T[1]),Math.round(warm[2]*WIN_T[2])]:q2<.5?[52,66,88]:[34,44,62];
+      const wc=warm?[Math.round(warm[0]*WIN_T[0]),Math.round(warm[1]*WIN_T[1]),Math.round(warm[2]*WIN_T[2])]:noonSky?(q2<.33?[168,198,232]:q2<.66?[96,128,175]:[196,216,240]):q2<.5?[52,66,88]:[34,44,62];
       Q([wx,wy,bz],[wx+ww,wy,bz],[wx+ww,wy+wh,bz],[wx,wy+wh,bz],mix(wc,hz2),bz-camZ);}
-    if(i%3===0)Q([bx+bw*.25,bh,bz],[bx+bw*.75,bh,bz],[bx+bw*.75,bh+6,bz],[bx+bw*.25,bh+6,bz],mix(sc,hz2),bz-camZ);}
+    if(i%3===0)Q([bx+bw*.25,bh,bz],[bx+bw*.75,bh,bz],[bx+bw*.75,bh+6,bz],[bx+bw*.25,bh+6,bz],mix(sc,hz2),bz-camZ);
+    if(i%4===1){const ax=bx+bw*0.5;Q([ax-0.4,bh,bz],[ax+0.4,bh,bz],[ax+0.4,bh+7,bz],[ax-0.4,bh+7,bz],mix([70,72,82],hz2),bz-camZ);}}
   for(const b of B)bld(b);
   // R33: car shadows. The sun sits ahead-right, so shadows fall toward the
   // camera (-z) and slightly left (-x). Length/alpha come from the time
@@ -401,8 +461,13 @@ function frame(t){
   // car() call so the car paints over its own shadow (insertion order).
   // The near end is clamped to camZ+2.5 — Q() drops quads with a corner
   // at dz<2, and the hero's long sunset shadow would otherwise vanish.
+  // R40-D: bayangan ikut elevasi matahari — siang pendek + samar (dulu
+  // trapesium hitam besar: flare +0.8/sisi + alpha .45 tepi keras, padahal
+  // matahari siang ~57° = bayangan pendek di bawah mobil). Tepi lunak dari
+  // 2 lapis: luar samar sedikit lebih lebar, dalam lebih gelap seukuran mobil.
   const carShad=(cx,cz,w,l)=>{const L=PAL.shadowLen,z0=Math.max(cz-l/2-L,camZ+2.5),sx2=-0.15*L;
-    Q([cx-w/2-.8+sx2,.02,z0],[cx+w/2+.8+sx2,.02,z0],[cx+w/2,.02,cz+l/2],[cx-w/2,.02,cz+l/2],'rgba(0,0,0,'+PAL.shadowA+')',cz-camZ);};
+    Q([cx-w/2-.55+sx2,.02,z0],[cx+w/2+.55+sx2,.02,z0],[cx+w/2+.3,.02,cz+l/2],[cx-w/2-.3,.02,cz+l/2],'rgba(0,0,0,'+(PAL.shadowA*0.35)+')',cz-camZ);
+    Q([cx-w/2-.25+sx2,.02,z0],[cx+w/2+.25+sx2,.02,z0],[cx+w/2,.02,cz+l/2],[cx-w/2,.02,cz+l/2],'rgba(0,0,0,'+PAL.shadowA+')',cz-camZ);};
   carShad(0,camZ+17,3.6,6.6);car({x:0,z:camZ+17,w:3.6,h:1.5,l:6.6,c:[180,45,65],hero:1}); // R36V2: hero title merah gelap (Huracan; dulu [30,30,44] navy — samakan keluarga merah hero 3D)
   carShad(-5.5,camZ+48,3.2,6.2);car({x:-5.5,z:camZ+48,w:3.2,h:1.5,l:6.2,c:[12,12,16],pol:1});
   carShad(6,camZ+88,3.2,6);car({x:6,z:camZ+88,w:3.2,h:1.4,l:6,c:[200,90,30]});
@@ -429,7 +494,10 @@ function frame(t){
       const hw2=cl(500/pb[2],3,12),hh2=cl(160/pb[2],2,5);
       x.fillStyle='#2a2430';x.fillRect(aX-hw2/2,aY-hh2/2,hw2,hh2);
       x.fillStyle='rgba(255,217,160,'+(0.25*Math.min(1,PAL.lamp))+')';x.beginPath();x.arc(aX,aY+hh2/2,cl(700/pb[2],3,22),0,7);x.fill();
-      x.fillStyle='#ffd9a0';x.beginPath();x.arc(aX,aY+hh2/2+1,cl(220/pb[2],1.5,7),0,7);x.fill();}});}
+      // R40-D BUG: lensa dalam dulu '#ffd9a0' SOLID tanpa gate PAL.lamp —
+      // orb lampu menyala bulat terang di siang (lamp 0.05). Kini ikut gate:
+      // menyala hanya bila lamp>0.02; kalau tidak, kaca dingin redup.
+      x.fillStyle=PAL.lamp>0.02?('rgba(255,217,160,'+(0.9*Math.min(1,PAL.lamp))+')'):'rgba(160,175,200,0.55)';x.beginPath();x.arc(aX,aY+hh2/2+1,cl(220/pb[2],1.5,7),0,7);x.fill();}});}
   sign(-1,camZ+40,camZ+120,'NEON HARBOR','#35f0ff');
   sign(1,camZ+100,camZ+160,'CASINO','#ff5ca8');
   sign(-1,camZ+220,camZ+300,'MOTEL','#ffd23e');
@@ -446,7 +514,11 @@ function frame(t){
   const sg=x.createRadialGradient(sx,sy,4,sx,sy,PAL.sunGr);
   sg.addColorStop(0,PAL.sunG0);sg.addColorStop(.25,PAL.sunG1);sg.addColorStop(1,PAL.sunG2);
   x.fillStyle=sg;x.fillRect(sx-PAL.sunGr-10,sy-PAL.sunGr-10,(PAL.sunGr+10)*2,(PAL.sunGr+10)*2); // R36: rect ikut sunGr (siang 170, dulu rect 300 memotong gradien)
-  x.fillStyle=PAL.sunDisc;x.beginPath();x.arc(sx,sy,PAL.sunR,0,7);x.fill();
+  // R40-D: cakram matahari bergradasi (inti terang -> tepi hangat), bukan
+  // piringan putih polos — sunCore/sunEdge per preset di TITLE_PAL.
+  const sdg=x.createRadialGradient(sx,sy,1,sx,sy,PAL.sunR);
+  sdg.addColorStop(0,PAL.sunCore);sdg.addColorStop(.65,PAL.sunDisc);sdg.addColorStop(1,PAL.sunEdge);
+  x.fillStyle=sdg;x.beginPath();x.arc(sx,sy,PAL.sunR,0,7);x.fill();
   // R36-ROADS item 11: matahari siang polos (cakram putih + halo kecil) — halo
   // luar lebar + cincin tipis di tepi cakram supaya matahari siang kebaca
   // bercahaya, bukan stiker putih. Hanya siang; preset lain tak berubah.
