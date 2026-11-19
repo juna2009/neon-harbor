@@ -175,7 +175,9 @@ export function drawMapDot2(c, x, y, r, fill, ring) {
 // Shape: 'square' (shipped default) or 'round' — preview with ?minimap=round
 // in the URL (shot harness). Juna picks the shipped default; the round
 // variant clips the SAME world to a circle in the SAME slot, so the A/B is
-// shape-only. Title screen keeps its own round minimap (city3d.js, not here).
+// shape-only. Title screen uses this same square map now (drawTitle2 calls
+// drawMinimap in the old radar's slot) — the round radar in city3d.js
+// frame() was deleted (Juna: "dari mapnya beda banget").
 function minimapShape() {
   try {
     return new URLSearchParams(window.location.search).get('minimap') === 'round' ? 'round' : 'square';
@@ -637,6 +639,16 @@ export function drawTitle2(c, view, best, prog, backdrop, live) {
   careerNoteScreen('title'); // R35-F3: C toggles the career overlay here
   if (backdrop) backdrop(c);
   else { c.fillStyle = '#0e1420'; c.fillRect(0, 0, W2, H2); }
+  // TITLE-MINIMAP (unified): the title used to paint its own round radar
+  // in city3d.js frame() while gameplay uses the square map (drawMinimap)
+  // — Juna: "dari mapnya beda banget". Now one design, one code: the
+  // shared square minimap in the same slot (24,24) and size (160x120)
+  // as the gameplay HUD. State from window.__neonHarbor (live game) or
+  // stageShot (shot mode — runShot never runs runGame's exposure).
+  // NOTE: drawMinimap (not drawMinimap2) — drawMinimap2 also paints the
+  // district + PD panels, which would land on the title card.
+  const nhState = (typeof window !== 'undefined' && window.__neonHarbor) ? window.__neonHarbor.state : null;
+  if (nhState) drawMinimap(c, nhState, 24, 24, 160, 120);
   // TITLE-A6: banner height (46, or 64 when the objective wraps to two
   // lines) — the BEST CASH pill needs it on short viewports (see below).
   let titleBannerH = 46;

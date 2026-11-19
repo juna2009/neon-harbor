@@ -136,10 +136,14 @@ function car(o){const{x,z,w,h,l,c}=o,zb=z-l/2,zf=z+l/2,dep=zb-camZ,t=hz(dep);
     Q([so,.60,az+.35],[so,.60,az+.65],[so,.68,az+.65],[so,.68,az+.35],'rgba(0,0,0,.5)',dep);
   }
   Q([so,.06,zb+l*.30],[so,.06,zb+l*.70],[so,.16,zb+l*.70],[so,.16,zb+l*.30],'rgba(0,0,0,.5)',dep); // side skirt
-  // R33: rear lights scale with the taillight gain (TL, set by frame() from
-  // the time preset) — at noon they read as unlit plastic, not glowing.
-  const tl=(o.pol?[[255,60,60],[60,120,255]]:[[255,70,90],[255,70,90]]).map(c=>c.map(v=>v*TL|0));
-  if(o.hero){Q([x-w/2+.2,h-.06,zb-.08],[x+w/2-.2,h-.06,zb-.08],[x+w/2-.2,h+.1,zb-.08],[x-w/2+.2,h+.1,zb-.08],mix([255*TL|0,90*TL|0,140*TL|0],t),dep);
+  // TITLE-FIX (taillight floor): rear lights scaled with the taillight
+  // gain TL (0.12 at noon), so at noon they read as unlit plastic —
+  // nearly BLACK, not lights. A real lens is RED plastic in daylight:
+  // floor the LENS colour at 0.45 (visible red, no glow — the glow
+  // stays TL-gated in frame()).
+  const TLF=Math.max(TL,0.45);
+  const tl=(o.pol?[[255,60,60],[60,120,255]]:[[255,70,90],[255,70,90]]).map(c=>c.map(v=>v*TLF|0));
+  if(o.hero){Q([x-w/2+.2,h-.06,zb-.08],[x+w/2-.2,h-.06,zb-.08],[x+w/2-.2,h+.1,zb-.08],[x-w/2+.2,h+.1,zb-.08],mix([255*TLF|0,90*TLF|0,140*TLF|0],t),dep);
     Q([x-w/2+.3,h*.44,zb-.07],[x+w/2-.3,h*.44,zb-.07],[x+w/2-.3,h*.49,zb-.07],[x-w/2+.3,h*.49,zb-.07],'rgba(0,0,0,.5)',dep);
     Q([x-w/2+.2,h*.84,zb-.07],[x+w/2-.2,h*.84,zb-.07],[x+w/2-.2,h*.88,zb-.07],[x-w/2+.2,h*.88,zb-.07],'rgba(0,0,0,.4)',dep);
     // R32-MIRROR: spion dulu menggantung — tepi dalam 0.1 dari bodi + z 0.3
@@ -148,7 +152,14 @@ function car(o){const{x,z,w,h,l,c}=o,zb=z-l/2,zf=z+l/2,dep=zb-camZ,t=hz(dep);
     // menumpang bodi 0.06, z lebih dekat ke muka belakang.
     Q([x-w/2-.34,h*.8,zb-.12],[x-w/2+.06,h*.8,zb-.12],[x-w/2+.06,h*.95,zb-.12],[x-w/2-.34,h*.95,zb-.12],mix([20,22,30],t),dep);
     Q([x+w/2-.06,h*.8,zb-.12],[x+w/2+.34,h*.8,zb-.12],[x+w/2+.34,h*.95,zb-.12],[x+w/2-.06,h*.95,zb-.12],mix([20,22,30],t),dep);
-    Q([x-1.4,h+.02,zb-.4],[x+1.4,h+.02,zb-.4],[x+1.4,h+.14,zb-.4],[x-1.4,h+.14,zb-.4],mix([20,22,30],t),dep);} // R36V2: sayap hero dilebar (dulu ±0,25 — kini bilah sayap hampir selebar atap)}
+    Q([x-1.4,h+.02,zb-.4],[x+1.4,h+.02,zb-.4],[x+1.4,h+.14,zb-.4],[x-1.4,h+.14,zb-.4],mix([20,22,30],t),dep); // R36V2: sayap hero dilebar (dulu ±0,25 — kini bilah sayap hampir selebar atap)
+    // TITLE-FIX (rear diffuser + plate, hero only): the flat red slab
+    // below the window reads as a box. Black diffuser valance + 3 fins
+    // (Huracan) + light plate break the slab — display only, the
+    // collision box (w/l/h) is untouched.
+    Q([x-1.05,0,zb-.06],[x+1.05,0,zb-.06],[x+1.05,.42,zb-.06],[x-1.05,.42,zb-.06],'#0a0a0e',dep);
+    for(const fx of[-0.6,0,0.6])Q([x+fx-.05,0,zb-.07],[x+fx+.05,0,zb-.07],[x+fx+.05,.42,zb-.07],[x+fx-.05,.42,zb-.07],'#2a2d33',dep);
+    Q([x-.35,.5,zb-.06],[x+.35,.5,zb-.06],[x+.35,.72,zb-.06],[x-.35,.72,zb-.06],'#dfe3e8',dep);}
   Q([x-w/2+.3,.55,zb-.06],[x-w/2+1.1,.55,zb-.06],[x-w/2+1.1,.85,zb-.06],[x-w/2+.3,.85,zb-.06],mix(tl[0],t),dep);
   Q([x+w/2-1.1,.55,zb-.06],[x+w/2-.3,.55,zb-.06],[x+w/2-.3,.85,zb-.06],[x+w/2-1.1,.85,zb-.06],mix(tl[1],t),dep);
   Q([x-w/2+.1,0,zb-.05],[x-w/2+1.2,0,zb-.05],[x-w/2+1.2,.75,zb-.05],[x-w/2+.1,.75,zb-.05],'#0a0a0e',dep);
@@ -157,22 +168,29 @@ function car(o){const{x,z,w,h,l,c}=o,zb=z-l/2,zf=z+l/2,dep=zb-camZ,t=hz(dep);
   // depan di belakang mobil (probe: hub dicat cyan = dua kotak cyan).
   // Gelapkan jadi gunmetal + titik terang kecil di tengah: kebaca velg/ban,
   // bukan lampu. Lampu belakang yang benar = strip merah di atasnya.
-  // R36-HUB2D (item 15): gunmetal #4a4f57 + titik putih #c8ccd4 TETAP
-  // kebaca lampu kotak dari belakang (title siang 4x: kotak abu-abu +
-  // titik putih di dalam ban hitam = headlight). Hub digelapkan hampir
-  // sehitam ban (#1e2126) + titik putih DIGANTI palang spoke abu-abu
-  // (tanda +) — kebaca velg, bukan lampu.
-  Q([x-w/2+.35,.15,zb-.08],[x-w/2+.95,.15,zb-.08],[x-w/2+.95,.6,zb-.08],[x-w/2+.35,.6,zb-.08],'#1e2126',dep);
-  Q([x+w/2-.95,.15,zb-.08],[x+w/2-.35,.15,zb-.08],[x+w/2-.35,.6,zb-.08],[x+w/2-.95,.6,zb-.08],'#1e2126',dep);
-  Q([x-w/2+.61,.18,zb-.09],[x-w/2+.69,.18,zb-.09],[x-w/2+.69,.57,zb-.09],[x-w/2+.61,.57,zb-.09],'#565b63',dep);
-  Q([x-w/2+.39,.34,zb-.09],[x-w/2+.91,.34,zb-.09],[x-w/2+.91,.42,zb-.09],[x-w/2+.39,.42,zb-.09],'#565b63',dep);
-  Q([x+w/2-.69,.18,zb-.09],[x+w/2-.61,.18,zb-.09],[x+w/2-.61,.57,zb-.09],[x+w/2-.69,.57,zb-.09],'#565b63',dep);
-  Q([x+w/2-.91,.34,zb-.09],[x+w/2-.39,.34,zb-.09],[x+w/2-.39,.42,zb-.09],[x+w/2-.91,.42,zb-.09],'#565b63',dep);
-  if(o.pol){Q([x-1,h+.05,zb-.4],[x-.1,h+.05,zb-.4],[x-.1,h+.35,zb-.4],[x-1,h+.35,zb-.4],'#ff4040',dep);
-    Q([x+.1,h+.05,zb-.4],[x+1,h+.05,zb-.4],[x+1,h+.35,zb-.4],[x+.1,h+.35,zb-.4],'#4080ff',dep);
+  // TITLE-FIX (rear wheels): the R36-HUB2D hub (#1e2126 + grey spoke
+  // CROSS) still reads as a grey box with a "+" at title-noon distance
+  // (Juna's circle: two grey "+" squares). Concentric tire -> rim ->
+  // hubcap reads as a WHEEL: no cross, no light square.
+  Q([x-w/2+.35,.15,zb-.08],[x-w/2+.95,.15,zb-.08],[x-w/2+.95,.6,zb-.08],[x-w/2+.35,.6,zb-.08],'#0b0c10',dep);
+  Q([x+w/2-.95,.15,zb-.08],[x+w/2-.35,.15,zb-.08],[x+w/2-.35,.6,zb-.08],[x+w/2-.95,.6,zb-.08],'#0b0c10',dep);
+  Q([x-w/2+.45,.22,zb-.09],[x-w/2+.85,.22,zb-.09],[x-w/2+.85,.53,zb-.09],[x-w/2+.45,.53,zb-.09],'#3a3f47',dep);
+  Q([x+w/2-.85,.22,zb-.09],[x+w/2-.45,.22,zb-.09],[x+w/2-.45,.53,zb-.09],[x+w/2-.85,.53,zb-.09],'#3a3f47',dep);
+  Q([x-w/2+.58,.32,zb-.10],[x-w/2+.72,.32,zb-.10],[x-w/2+.72,.43,zb-.10],[x-w/2+.58,.43,zb-.10],'#565b63',dep);
+  Q([x+w/2-.72,.32,zb-.10],[x+w/2-.58,.32,zb-.10],[x+w/2-.58,.43,zb-.10],[x+w/2-.72,.43,zb-.10],'#565b63',dep);
+  if(o.pol){
+    // TITLE-FIX (police at distance): the light bar was a thin strip
+    // (h+.05-.35) that vanished at title distance — the patrol car read
+    // as a dark blob. Taller + wider bar with a white centre module;
+    // the halo is painted in frame() (see police glow below).
+    Q([x-1.15,h+.02,zb-.4],[x-.12,h+.02,zb-.4],[x-.12,h+.48,zb-.4],[x-1.15,h+.48,zb-.4],'#ff2d2d',dep);
+    Q([x+.12,h+.02,zb-.4],[x+1.15,h+.02,zb-.4],[x+1.15,h+.48,zb-.4],[x+.12,h+.48,zb-.4],'#2d6bff',dep);
+    Q([x-.12,h+.02,zb-.4],[x+.12,h+.02,zb-.4],[x+.12,h+.48,zb-.4],[x-.12,h+.48,zb-.4],'#e8e8e8',dep);
     // R36V2: bagasi putih (Charger hitam-putih) — pita putih di muka
     // belakang, di bawah lampu (lampu di h*.55-.85, bumper di bawah).
-    Q([x-w/2+.15,h*.30,zb-.07],[x+w/2-.15,h*.30,zb-.07],[x+w/2-.15,h*.48,zb-.07],[x-w/2+.15,h*.48,zb-.07],mix([232,232,228],t),dep);}}
+    // TITLE-FIX: widened (was h*.30-.48) so the black-white read
+    // survives title distance.
+    Q([x-w/2+.15,h*.26,zb-.07],[x+w/2-.15,h*.26,zb-.07],[x+w/2-.15,h*.52,zb-.07],[x-w/2+.15,h*.52,zb-.07],mix([240,240,236],t),dep);}}
 function sign(sd,z0,z1,txt,col){const b=B.find(b=>(b.x>0)===(sd>0)&&b.z>z0&&b.z<z1);if(!b)return;
   const p=P(b.x,b.h*.72,b.z-b.d/2-.6);if(!p)return;const fs=Math.round(1500/p[2]);
   ops.push({d:p[2],f(){x.save();x.globalAlpha=NEON;x.font='bold '+fs+'px sans-serif';x.textAlign='center';x.shadowColor=col;x.shadowBlur=14*NEON;x.fillStyle=col;x.fillText(txt,p[0],p[1]);x.restore();}});}
@@ -542,14 +560,22 @@ function frame(t){
     for(const gx of[-1.2,1.2]){const gp=P(gx,1,camZ+17-3.3);if(!gp)continue;
       const rg=x.createRadialGradient(gp[0],gp[1],1,gp[0],gp[1],26);rg.addColorStop(0,'rgba(255,80,100,'+(0.55*TL)+')');rg.addColorStop(1,'rgba(255,80,100,0)');
       x.fillStyle=rg;x.fillRect(gp[0]-26,gp[1]-26,52,52);}x.restore();}
+  // TITLE-FIX (police glow): the patrol car at camZ+48 reads as a dark
+  // blob at title distance — a soft red/blue halo over its light bar
+  // (fixed staging position, same pattern as the hero glow above).
+  // Alpha floors at 0.28 so it reads even at noon (unlike the hero
+  // glow, which is TL-gated and nearly invisible in daylight).
+  const pp=P(-5.5,1.75,camZ+44.5);if(pp){x.save();x.globalCompositeOperation='lighter';
+    const pgA=0.28+0.22*TL;
+    for(const [gx,col] of [[-0.6,'255,60,60'],[0.6,'60,120,255']]){const gp=P(-5.5+gx,1.75,camZ+44.5);if(!gp)continue;
+      const rg=x.createRadialGradient(gp[0],gp[1],1,gp[0],gp[1],30);rg.addColorStop(0,'rgba('+col+','+pgA+')');rg.addColorStop(1,'rgba('+col+',0)');
+      x.fillStyle=rg;x.fillRect(gp[0]-30,gp[1]-30,60,60);}x.restore();}
   // HUD
   x.textAlign='left';x.textBaseline='alphabetic';
-  rr(24,24,124,124,62);x.fillStyle='rgba(8,8,24,.75)';x.fill();x.strokeStyle='#6ad7ff';x.lineWidth=2;x.stroke();
-  x.save();rr(24,24,124,124,62);x.clip();x.strokeStyle='rgba(122,215,255,.35)';x.lineWidth=1;
-  for(let i=1;i<8;i++){x.beginPath();x.moveTo(24+i*15.5,24);x.lineTo(24+i*15.5,148);x.stroke();x.beginPath();x.moveTo(24,24+i*15.5);x.lineTo(148,24+i*15.5);x.stroke();}
-  x.strokeStyle='#ffd23e';x.lineWidth=2;x.beginPath();x.moveTo(86,140);x.lineTo(80,110);x.lineTo(96,84);x.lineTo(110,60);x.stroke();
-  x.fillStyle='#35f0ff';x.beginPath();x.arc(86,86,4,0,7);x.fill();x.restore();
-  x.fillStyle='#fff';x.font='bold 10px sans-serif';x.textAlign='center';x.fillText('NEON HARBOR',86,166);x.textAlign='left';
+  // TITLE-MINIMAP: the round radar used to be painted here (own design,
+  // dark disc + grid + yellow route) while gameplay uses the square map
+  // (minimap.js) — Juna: "dari mapnya beda banget". Deleted: the shared
+  // square minimap is now drawn by drawTitle2 (ui2.js) in this same slot.
   rr(CX-200,16,400,46,8);x.fillStyle='rgba(8,8,24,.75)';x.fill();x.strokeStyle='#c9a227';x.lineWidth=1.5;x.stroke();
   x.fillStyle='#ffd23e';x.font='bold 11px sans-serif';x.textAlign='center';x.fillText('CHAPTER 12/12: THE HARBOR KING',CX,33);
   x.fillStyle='#fff';x.font='bold 15px sans-serif';x.fillText('STEAL A SPEEDBOAT AND REACH THE MARINA',CX,52);x.textAlign='left';

@@ -145,6 +145,11 @@ export function stageShot(name, world) {
   if (todMatch) name = todMatch[1];
   const applyTod = () => { if (tod) { applyTimeOfDay(world.state, tod); setTitleTOD(tod); } };
   const state = world.state;
+  // TITLE-MINIMAP: shot mode never runs runGame(), so window.__neonHarbor
+  // (exposed there for the live title) is missing and drawTitle2 would
+  // have no state for the shared square minimap. Expose the staged world
+  // here (post-cut file, 0 dossier bytes).
+  if (typeof window !== 'undefined') window.__neonHarbor = { get state() { return world.state; } };
   const input = scriptedInput();
   world.reset();
   state.view3d = false; // staged shots are 2D top-down unless the scene says otherwise
