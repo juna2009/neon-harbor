@@ -820,6 +820,14 @@ function distPx(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
 
 function buildFrame(state, cam, OP, SH, GL, t) {
   const tod = state.timeOfDay || PRESETS.sore; // TOD: tanpa preset = sore (nilai lama)
+  // R38 Item 7: gain lampu rem ikut waktu — langkah SAMA seperti
+  // TITLE_PAL.tlGain di city3d.js (title): siang 0.12 (nyaris mati),
+  // sore/malam 1 (nyala penuh), pagi 0.45. BUKAN daylight preset
+  // (siang 1.00 / sore 0.45 / pagi 0.32 / malam 0.08 — itu kecerahan
+  // siang, bukan gain lampu). tod.name = 'siang'|'sore'|'pagi'|'malam';
+  // blend ('blend:a->b') fallback 1 = perilaku lama.
+  const TL_GAIN = { siang: 0.12, sore: 1, pagi: 0.45, malam: 1 };
+  const tlGain = TL_GAIN[tod.name] ?? 1;
   const SHB = tod.bldShadow ? SH : GL; // SIANG v2: bucket bayangan kontak — SH = blending normal (terlihat), G = lama (aditif, hitam = 0)
   // SIANG v2: bayangan gedung + palem (hanya bila preset minta — siang;
   // sore/pagi/malam TIDAK berubah). Matahari mengikuti kamera: arah bayangan
@@ -978,7 +986,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   const yawOf = (o) => Math.PI / 2 - (o.angle || 0);
   if (p.inCar && p.car) {
     const c = p.car;
-    drawCarRealistic(OP, GL, 'hero', c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#e33e5f'), { t }); // R26: hero selalu realistis v15d (gate heroReal dihapus)
+    drawCarRealistic(OP, GL, 'hero', c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#e33e5f'), { t, tl: tlGain }); // R26: hero selalu realistis v15d (gate heroReal dihapus)
     if (tod.headlight > 0.02) { // TOD: kerucut lampu depan (malam) — trapesium mat 8,
       // v=0 di bemper (terang) -> v=1 jauh (memudar, ikut shader smear).
       const yaw = yawOf(c), fw = [Math.sin(yaw), Math.cos(yaw)], rg = [Math.cos(yaw), -Math.sin(yaw)];
@@ -1008,7 +1016,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     if (police) type = (unit && unit.emergency && (c.body === 'fire' || c.body === 'medic')) ? c.body : 'police';
     else type = CAR_TYPE[c.body] || 'sedanL';
     const lod = distPx(c.x, c.y, hx0, hy0) < 250 ? undefined : 'low';
-    drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod });
+    drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, tl: tlGain });
   };
   for (const c of state.traffic.cars || []) drawCar(c, false);
   for (const c of state.traffic.parked || []) drawCar(c, false);
@@ -1040,7 +1048,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   if (at && at.alive && near(at.x, at.y, R) && vis(at.x, at.y, 100)) { // R27c-TUNE: 60->100
     // R27c: truk lapis baja = drawCarRealistic 'armored' (kab + bak + 6 roda),
     // bukan car() lama (slab + kaca + spoiler) — temuan video #4.
-    drawCarRealistic(OP, GL, 'armored', at.x * S, at.y * S, yawOf(at), (at.length || 54) * S, (at.width || 24) * S, hx(at.color || '#4a5240'), { t });
+    drawCarRealistic(OP, GL, 'armored', at.x * S, at.y * S, yawOf(at), (at.length || 54) * S, (at.width || 24) * S, hx(at.color || '#4a5240'), { t, tl: tlGain });
   }
 
   // Helikopter polisi + kolam cahaya searchlight di hero.
@@ -1077,14 +1085,18 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     if (cl.taken) continue;
     if (!near(cl.x, cl.y, 1200) || !vis(cl.x, cl.y, 25)) continue;
     // DEBOX R27b: token = permata berputar (bukan kubus kuning melayang)
-    // R31-ANCHOR: permata saja tidak cukup — tanpa alas ia tetap terbaca
-    // sebagai diamond kuning ngambang di samping gedung (chase3d R30).
-    // Alas silinder emas + tiang tipis menambatkannya ke tanah.
-    deboxPoly(OP, cl.x * S, 0, cl.y * S, deboxRingCircle(1.0, 10), 0.14, [0.72, 0.55, 0.1], 4);
-    deboxBeam(OP, cl.x * S, 0.1, cl.y * S, cl.x * S, 1.0, cl.y * S, 0.1, [1.0, 0.8, 0.2], 4);
+    // R38-COIN (item 1: koin melayang): tiang r=0.1 praktis tak terlihat
+    // dari chase-cam, ujung bawah koin (y≈0.22) jauh di atas cakram h=0.14
+    // → koin kebaca ngambang. Perbaikan: cakram jadi alas (plinth) h=0.28,
+    // tiang ditebalkan 0.22 (y 0.22→0.92), koin diturunkan ke y=0.92 —
+    // ujung bawah koin (0.14..0.30 dgn bob ±0.08) selalu menyentuh/masuk
+    // ke alas, jadi koin kebaca "nempel di tempatnya" seperti koin di slot.
+    // Desain koin (billboard + $ + ring glow) TIDAK diubah.
+    deboxPoly(OP, cl.x * S, 0, cl.y * S, deboxRingCircle(1.0, 10), 0.28, [0.72, 0.55, 0.1], 4);
+    deboxBeam(OP, cl.x * S, 0.22, cl.y * S, cl.x * S, 0.92, cl.y * S, 0.22, [1.0, 0.8, 0.2], 4);
     // R32-COIN: kotak kuning berputar DIHAPUS (Juna: "jelek banget") —
     // koin emas bulat menghadap kamera + $ + ring glow (lihat coinToken).
-    coinToken(OP, GL, cl.x * S, 1.0, cl.y * S, 0.7, [-cam.fwd[0], 0, -cam.fwd[1]], t);
+    coinToken(OP, GL, cl.x * S, 0.92, cl.y * S, 0.7, [-cam.fwd[0], 0, -cam.fwd[1]], t);
   }
 
   // DEBOX R27b: hydrant merah (silinder + kubah + tutup samping) — dulu tidak digambar di 3D.

@@ -281,8 +281,21 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = '#37e0e6';
   ctx.fillText('NEON HARBOR', x + w / 2, y + h + 12);
+  // R38-minimap (item 4): the compass used to be right-aligned at x+w-4
+  // with a font '↑' glyph — in headless Chromium that glyph renders as a
+  // hairline tick jammed against the frame edge, so Juna read the 'N' as
+  // clipped at the right edge. Now: 12px clearance from the frame edge
+  // and a DRAWN triangle arrow (font-independent), so the compass reads
+  // whole at 1x. 'NEON HARBOR' (ends ~x+w/2+40) keeps ~10px clear.
   ctx.textAlign = 'right';
   ctx.fillStyle = '#eef1f5';
-  ctx.fillText('N ↑', x + w - 4, y + h + 12);
+  const ly = y + h + 12;       // label-strip centre line
+  const cRight = x + w - 12;   // compass group right edge (12px clear of frame)
+  ctx.fillText('N', cRight - 11, ly);
+  ctx.beginPath();
+  ctx.moveTo(cRight - 4, ly + 4);
+  ctx.lineTo(cRight + 4, ly + 4);
+  ctx.lineTo(cRight, ly - 5);
+  ctx.closePath(); ctx.fill();
   ctx.textAlign = 'left';
 }

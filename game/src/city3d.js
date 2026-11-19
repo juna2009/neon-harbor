@@ -75,7 +75,8 @@ function bld(b){const{x,z,w,d,h,c}=b,zf=z-d/2,zb=z+d/2,dep=zf-camZ;if(dep<35)ret
   wins(b);}
 function car(o){const{x,z,w,h,l,c}=o,zb=z-l/2,zf=z+l/2,dep=zb-camZ,t=hz(dep);
   Q([x-w/2,0,zb],[x+w/2,0,zb],[x+w/2-.5,h,zb],[x-w/2+.5,h,zb],sh(c,.95,t),dep);
-  Q([x-w/2+.5,h*.55,zb-.06],[x+w/2-.5,h*.55,zb-.06],[x+w/2-.6,h*.9,zb-.06],[x-w/2+.6,h*.9,zb-.06],mix([70,90,130],t),dep);
+  Q([x-w/2+.5,h*.55,zb-.06],[x+w/2-.5,h*.55,zb-.06],[x+w/2-.5,h*.9,zb-.06],[x-w/2+.5,h*.9,zb-.06],mix([70,90,130],t),dep);
+  Q([x-w/2+.5,h*.72,zb-.07],[x+w/2-.5,h*.72,zb-.07],[x+w/2-.5,h*.78,zb-.07],[x-w/2+.5,h*.78,zb-.07],'rgba(190,215,245,0.25)',dep); // R38: pantulan horizontal halus di kaca belakang (ganti garis diagonal)
   Q([x-w/2,h,zb],[x+w/2,h,zb],[x+w/2*.82,h*.8,zf],[x-w/2*.82,h*.8,zf],sh(c,1.15,t),dep);
   const sx=x>0?x-w/2:x+w/2;
   // R32-FIN: sisi atas dulu h*.92 di depan — lebih tinggi dari tepi depan
@@ -88,7 +89,7 @@ function car(o){const{x,z,w,h,l,c}=o,zb=z-l/2,zf=z+l/2,dep=zb-camZ,t=hz(dep);
   // samping + garis pintu di bidang flank (offset 0.06 keluar; urutan
   // insert = urutan cat, jadi menimpa bidang bodi).
   const so=sx+(x>0?-0.06:0.06);
-  Q([so,h*.55,zb+l*.12],[so,h*.55,zb+l*.5],[so,h*.76,zb+l*.5],[so,h*.86,zb+l*.12],mix([70,90,130],t),dep); // kaca samping
+  Q([so,h*.55,zb+l*.12],[so,h*.55,zb+l*.5],[so,h*.81,zb+l*.5],[so,h*.81,zb+l*.12],mix([70,90,130],t),dep); // kaca samping
   for (const az of [zb+l*.22,zb+l*.78]) { // roda samping (as roda depan/belakang)
     Q([so,.02,az-.55],[so,.02,az+.55],[so,.62,az+.55],[so,.62,az-.55],'#0a0a0e',dep);
     Q([so,.2,az-.22],[so,.2,az+.22],[so,.45,az+.22],[so,.45,az-.22],'#6a6f76',dep); // hub roda samping
@@ -441,6 +442,8 @@ function inRange(wx, wy, fwdMax, latMax) {
   return r[0] > -12 && r[0] < fwdMax && Math.abs(r[1]) < latMax;
 }
 let rimOn = true; // warm rim light while the sun is up (set per frame)
+let chaseTL = 1; // R38: taillight gain for the chase renderer (set per frame from daylight — same steps as TITLE_PAL.tlGain)
+function tlC(r, g, b) { return 'rgb(' + ((r * chaseTL) | 0) + ',' + ((g * chaseTL) | 0) + ',' + ((b * chaseTL) | 0) + ')'; }
 function car3d(wx, wy, angle, len, wid, color, o) {
   let L = len * CS, Wd = wid * CS;
   const bodyH = o.hero ? 0.72 : 0.8;
@@ -471,7 +474,7 @@ function car3d(wx, wy, angle, len, wid, color, o) {
   vQuad(cx, cz, angle, L * 0.2, 0, Wd * 0.7, 1.0, 1.42, 'rgba(120,180,230,0.5)');
   vQuad(cx, cz, angle, -L * 0.32, 0, Wd * 0.7, 1.0, 1.42, 'rgba(120,180,230,0.4)');
   for (const s of [-1, 1]) {
-    vQuad(cx, cz, angle, -L / 2 - 0.06, s * Wd * 0.28, Wd * 0.22, 0.45, 0.72, o.hero ? '#ff5c7a' : '#ff3b30');
+    vQuad(cx, cz, angle, -L / 2 - 0.06, s * Wd * 0.28, Wd * 0.22, 0.45, 0.72, o.hero ? tlC(255, 92, 122) : tlC(255, 59, 48));
     vQuad(cx, cz, angle, L / 2 + 0.05, s * Wd * 0.28, Wd * 0.3, 0.4, 0.76, '#0c0e14'); // T2: headlight housing
     vQuad(cx, cz, angle, L / 2 + 0.06, s * Wd * 0.28, Wd * 0.22, 0.45, 0.7, '#ffe9a8');
     // REWORK: hero wheels BIGGER + protruding past the body sides (they were
@@ -506,12 +509,11 @@ function car3d(wx, wy, angle, len, wid, color, o) {
   vQuad(cx, cz, angle, L / 2 + 0.07, 0, Wd * 0.7, 0.28, 0.44, '#0c0e14');
   if (o.hero) {
     // round 21 hero rear (all emissive / reflective: raw colours, no shadeK)
-    vQuad(cx, cz, angle, -L / 2 - 0.08, 0, Wd * 0.96, 0.48, 0.86, '#ff2a4a'); // REWORK: thicker taillight bar, full width
-    vQuad(cx, cz, angle, -L / 2 - 0.1, 0, Wd * 0.96, 0.56, 0.8, '#ff7d95'); // hot core of the bar
+    vQuad(cx, cz, angle, -L / 2 - 0.08, 0, Wd * 0.96, 0.48, 0.86, tlC(255, 42, 74)); // REWORK: thicker taillight bar, full width
+    vQuad(cx, cz, angle, -L / 2 - 0.1, 0, Wd * 0.96, 0.56, 0.8, tlC(255, 125, 149)); // hot core of the bar
     vQuad(cx, cz, angle, -L / 2 - 0.075, 0, Wd * 0.94, 0.44, 0.48, 'rgba(0,0,0,0.6)'); // dark gap below the bar
     vQuad(cx, cz, angle, -L * 0.32 - 0.07, 0, Wd * 0.72, 1.0, 1.42, 'rgba(150,195,235,0.78)', dep - L / 2 - 1.0); // REWORK rear glass: pale sky glass + explicit dep (a red rear quad at d=14.00 covered it)
-    vQuad(cx, cz, angle, -L * 0.32 - 0.07, Wd * 0.1, Wd * 0.42, 1.06, 1.4, 'rgba(255,228,175,0.9)', dep - L / 2 - 1.0); // bright sky streak
-    vQuad(cx, cz, angle, -L * 0.32 - 0.07, -Wd * 0.18, Wd * 0.18, 1.3, 1.4, 'rgba(255,200,130,0.55)', dep - L / 2 - 1.0); // second warm streak
+    vQuad(cx, cz, angle, -L * 0.32 - 0.07, 0, Wd * 0.6, 1.22, 1.32, 'rgba(200,220,245,0.45)', dep - L / 2 - 1.0); // R38: pantulan horizontal halus (ganti bright sky streak vertikal yang kebaca garis diagonal)
     topStrip(cx, cz, angle, -L * 0.32, 0, Wd * 0.68, 0.3, 1.44, 'rgba(255,200,130,0.8)'); // glass top rim
     box3(cx - fx * (L / 2 - 0.3), 1.02, cz - fz * (L / 2 - 0.3), Wd * 0.96, 0.09, 0.5, angle, '#14141a', dep); // spoiler
     topStrip(cx, cz, angle, -(L / 2 - 0.3), 0, Wd * 0.9, 0.5, 1.13, 'rgba(255,179,92,0.9)'); // spoiler rim light
@@ -1281,6 +1283,7 @@ export function drawChase3D(ctx, state) {
   // sunset: faces toward the camera fall into shadow, warm rim on top edges
   shadeK = dl > 0.7 ? 1 : dl > 0.3 ? 0.5 : 0.55;
   rimOn = dl > 0.3;
+  chaseTL = dl > 0.7 ? 0.12 : dl > 0.3 ? 1 : dl > 0.15 ? 0.45 : 1; // R38 item 7: siang (dl 1.0) = mati, sore (0.45) = nyala, pagi (0.32) = redup, malam (0.08) = nyala
   const t = state.elapsed || 0;
   const city = state.city;
   const p = state.player;

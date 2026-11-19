@@ -211,7 +211,8 @@ export function carSpec(type) { return CAR_SPECS[type] || CAR_SPECS.hero; }
 //   len,wid: panjang/lebar unit (kosongkan = pakai spec)
 //   paint : [r,g,b] atau '#rrggbb' (kosongkan = warna spec)
 //   opts  : { brake:boolean, t:number (waktu — strobo), police:boolean,
-//           detail:'low'|'mid' (LOD), damage:boolean (penyok + kaca retak) }
+//           detail:'low'|'mid' (LOD), damage:boolean (penyok + kaca retak),
+//           tl:number (gain lampu rem ikut waktu — R38 Item 7, default 1) }
 //   Return: jumlah segitiga yang ditambahkan.
 // ---------------------------------------------------------------------------
 export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts) {
@@ -294,6 +295,21 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     const nrm = dir(0, -face * Math.sin(rx), face * Math.cos(rx));
     quad(B, corners[0], corners[1], corners[2], corners[3], nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], col, 4);
   };
+  // Pita HORIZONTAL (sudut 0°) di muka kaca — pantulan langit yang tenang,
+  // bukan garis miring. R38 Item 3: glassStreak 20° di kaca belakang terbaca
+  // garis diagonal di shot chase (probe warna magenta/lime terbukti);
+  // pantulan horizontal tetap membuat kaca kebaca kaca. Geometri sama
+  // seperti glassStreak (bidang kaca miring rx, offset muka face*0.045),
+  // hanya sudutnya 0° — 0 tris tambahan vs streak (1 quad ganti 2).
+  const glassSheen = (lx, ly, lz, w, h, rx, face, col, du, dv) => {
+    const hl = w / 2, hw = h / 2, ou = du || 0, ov = dv || 0;
+    const corners = [];
+    for (const [su, sv] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      corners.push(glassPt(lx, ly, lz, ou + su * hl, ov + sv * hw, face * 0.045, rx));
+    }
+    const nrm = dir(0, -face * Math.sin(rx), face * Math.cos(rx));
+    quad(B, corners[0], corners[1], corners[2], corners[3], nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], col, 4);
+  };
   // v15c: pantulan langit + border — HARUS sebidang muka kaca boxR
   // (faceQuad memakai rot boxR yg sama). v16: diagnosis "menyilang" itu
   // ternyata urutan rotasi boxR (roll, bukan pitch) — kini diperbaiki.
@@ -337,11 +353,11 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     faceQuad(lx, ly, lz, hw, hw + b, -hh, hh * 0.7, 0.035, rx, 0.009, DARK, 5); // kanan (v15d: pendek)
   };
   // Kaca tegak (rx=0): bingkai (kotak lebih besar, 0.02 ke dalam) + kaca
-  // material 1 + streak diagonal. face = -1 belakang / +1 depan.
+  // material 1 + pantulan horizontal halus. face = -1 belakang / +1 depan.
   const flatGlass = (lx, ly, lz, w, h, face) => {
     p(lx, ly, lz - face * 0.02, w + 0.08, h + 0.08, 0.05, DARK, 5); // bingkai karet
     p(lx, ly, lz, w, h, 0.06, GLASS, 1); // kaca glossy (bukan material 2)
-    glassStreak(lx, ly, lz, w * 0.6, 0.12, 0, face, [0.22, 0.28, 0.38], 0, 0.05);
+    glassSheen(lx, ly, lz, w * 0.6, 0.10, 0, face, [0.30, 0.37, 0.48], 0, 0.05); // R38 Item 3: pantulan horizontal halus (dulu streak diagonal 20° — garis miring di kaca belakang bus)
   };
   // Bevel belakang v15: talang antara muka belakang dan deck — dari
   // (topY-0,10, -L/2-0,03) ke (topY+0,01, -L/2+0,08). Sedan: topY 1,06
@@ -834,8 +850,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     glassBorder(0, rearY, rearZ, W * spec.cabW * rearW, rearH, rearRx);
     p(0, rearY, rearZ, W * spec.cabW * rearW, rearH, 0.07, GLASS, 1, rearRx);
     skyGlass(0, rearY, rearZ, W * spec.cabW * rearW, rearH, rearRx);
-    glassStreak(0, rearY, rearZ, W * spec.cabW * 0.42, 0.12, rearRx, -1, [0.16, 0.20, 0.28], 0, 0.0); // v16: streak diredup (kaca gelap)
-    glassStreak(0, rearY, rearZ, W * spec.cabW * 0.42, 0.06, rearRx, -1, [0.26, 0.31, 0.42], 0, -0.04);
+    glassSheen(0, rearY, rearZ, W * spec.cabW * 0.55, 0.10, rearRx, -1, [0.34, 0.41, 0.54], 0, 0.08); // R38 Item 3: pantulan horizontal halus — ganti 2 streak diagonal 20° (probe: garis diagonal di kaca = streak ini)
     const shieldY = beltY + (wind.h * Math.cos(wind.rx)) / 2;
     const shieldZ = (shieldBaseZ + shieldTopZ) / 2;
     p(0, shieldY, shieldZ - 0.02, W * spec.cabW * (wind.w + 0.04), wind.h + 0.04, 0.05, DARK, 5, -wind.rx); // bingkai
@@ -989,7 +1004,14 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   // tetap pakai bar penuh (realistis untuk kendaraan besar).
   function drawRearLights(clusters) {
     const barY = 0.86;
-    const tailCol = o.brake ? [1.0, 0.25, 0.25] : [0.85, 0.10, 0.13];
+    // R38 Item 7: gain lampu rem ikut waktu (o.tl dari webgl2.js — langkah
+    // sama seperti TITLE_PAL.tlGain di city3d.js: siang 0.12 = nyaris mati,
+    // sore/malam 1, pagi 0.45). Default 1 = perilaku lama. Diskalakan ke
+    // klaster + bar + glow supaya siang tidak ada halo pink sama sekali.
+    const tlGain = o.tl ?? 1;
+    const tailCol = (o.brake ? [1.0, 0.25, 0.25] : [0.85, 0.10, 0.13]).map((c) => c * tlGain);
+    const tailGlow = [1.0 * tlGain, 0.15 * tlGain, 0.2 * tlGain];
+    const tailBar = [0.45 * tlGain, 0.05 * tlGain, 0.08 * tlGain];
     p(0, 0.48, -L / 2 - 0.05, W * 0.68, 0.18, 0.16, DARK, 5);                    // bumper belakang (v16: W*0,68 — ban kebaca di sudut; v15 W*0,84)
     if (clusters) {
       for (const s of [-1, 1]) {
@@ -1000,11 +1022,11 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
           at(s * (W / 2 + 0.21), 0.80, -L / 2 + 0.30), at(s * (W / 2 + 0.21), 0.80, -L / 2 - 0.02),
           [s, 0.3, 0], tailCol, 4);
       }
-      qB(0, barY, -L / 2 - 0.02, 0.52, 0.06, [0.45, 0.05, 0.08], 4);             // bar tengah redup (penghubung, bukan lampu)
+      qB(0, barY, -L / 2 - 0.02, 0.52, 0.06, tailBar, 4);             // bar tengah redup (penghubung, bukan lampu)
     } else {
       p(0, barY, -L / 2 - 0.03, W * 0.72, 0.15, 0.06, tailCol, 4);               // light bar (kendaraan besar)
     }
-    qGlowB(0, barY, -L / 2 - 0.14, W * 0.95, 0.4, [1.0, 0.15, 0.2]);
+    qGlowB(0, barY, -L / 2 - 0.14, W * 0.95, 0.4, tailGlow);
     p(0, barY - 0.1, -L / 2 - 0.03, W * 0.72, 0.04, 0.06, CHROME, 1);            // strip krom bawah lampu
     for (const s of [-1, 1]) {
       p(s * W * 0.32, 0.30, -L / 2 - 0.10, 0.22, 0.14, 0.1, DARK, 5);            // knalpot (v16: lebih besar + keluar)

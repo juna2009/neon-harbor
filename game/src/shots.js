@@ -210,18 +210,39 @@ export function stageShot(name, world) {
       // staged traffic faces away instead.
       const px = state.player.x;
       const u1 = state.police.units[state.police.units.length - 2];
-      if (u1) { u1.car.x = px + 300; u1.car.y = 1120; u1.car.angle = 0; u1.car.speed = 320; }
+      if (u1) { u1.car.x = px + 305; u1.car.y = 1127; u1.car.angle = -0.03; u1.car.speed = 320; }
       const u2 = state.police.units[state.police.units.length - 1];
-      if (u2) { u2.car.x = px + 460; u2.car.y = 1120; u2.car.angle = 0; u2.car.speed = 300; }
+      if (u2) { u2.car.x = px + 448; u2.car.y = 1113; u2.car.angle = 0.025; u2.car.speed = 300; }
       stageTrafficCar(world, 'h', 1120, px + 200, 1, 110);
       // round 21: more traffic ahead for depth (center lane only now)
       stageTrafficCar(world, 'h', 1120, px + 520, 1, 110);
       stageTrafficCar(world, 'h', 1120, px + 700, 1, 100);
+      // R38 (item 5): STAGGER the convoy. R33 forced all 5 cars to y=1120
+      // exactly and the re-shoot reads as a ruler-straight file — staged,
+      // not traffic. Stagger stays INSIDE the centre lane: |y-1120| <= 8
+      // (R33's "nempel gedung" limit — never back to road+14), uneven x
+      // gaps (113/143/85/155) and a small yaw (±0.03) so each car sits at
+      // its own angle like real traffic. Police units staggered too.
+      const convoy = state.traffic.cars
+        .filter((c) => c.staged && c.road === 1120)
+        .sort((a, b) => a.x - b.x);
+      const stagger = [
+        { dx: -8, dy: -6, a: 0.02 },
+        { dx: 13, dy: 8, a: -0.02 },
+        { dx: -12, dy: -5, a: 0.03 },
+      ];
+      convoy.forEach((c, i) => {
+        const s = stagger[i] || stagger[0];
+        c.x += s.dx; c.y = 1120 + s.dy; c.angle = s.a;
+      });
       // R33-MERGE (Juna #5): staged convoy on the CENTRELINE. stageTrafficCar
       // puts dir=1 cars at road+14 (one lane over); at chase distance that
       // reads as hugging the building line. Probe (seed 7): all 3 staged
       // cars + both police units were at y=1134, none at 1120.
-      for (const c of state.traffic.cars) if (c.staged && c.road === 1120) c.y = 1120;
+      // R38: clamp to |y-1120| <= 8 instead of forcing =1120 — the clamp
+      // keeps R33's guarantee (no car near the buildings) while preserving
+      // the stagger above.
+      for (const c of state.traffic.cars) if (c.staged && c.road === 1120) c.y = Math.max(1112, Math.min(1128, c.y));
       // R33: Juna — "mobil jangan ada di samping situ". The R31 staged
       // parked cars (parkSpots) are DELETED, and every live parked car in
       // the visible stretch is hidden for this shot (alive=false). Only the
@@ -244,10 +265,64 @@ export function stageShot(name, world) {
       }
     }
     const cp = world.state.player;
+    // R38 (item 12): photo peds OFF the road edge. At ±48 the ped body
+    // (5.5u) sits mid-strip but its 16u shadow spills 4u onto the visual
+    // asphalt (R33 widened it to 44) and the feet sit 4u from the edge —
+    // at chase distance that reads as "standing in the road". The north
+    // ped moves to -56 (shadow 48..64 clears the asphalt; it stays
+    // visible — it stands in the gap at the north building's east edge,
+    // x 1707 vs the building ending at 1710). The SOUTH ped must stay
+    // at +48: at +56 it is 6u behind the south building face (y=1170)
+    // and the depth-sorted chase view paints the face OVER it — probe
+    // (seed 7, re-shoot): ped2@56 invisible, ped2@48 visible standing
+    // on the sidewalk. The "on the road" read at +48 came from the
+    // live green ped overlapping it at off 44, which is hidden below
+    // (item 12b) — with that gone, ped2@48 reads as on the sidewalk.
+    // Live spawn (createPedestrians, walk line 40) is NOT touched — the
+    // same root cause lives there for the traffic-AI round (see STATUS).
     stagePhotoPeds(world, [
-      { x: cp.x + 120, y: 1120 - 48 },
+      { x: cp.x + 120, y: 1120 - 56 },
       { x: cp.x + 260, y: 1120 + 48 },
     ]);
+    if (name === 'chase3d') {
+      // R38 (item 12b): live peds in the visible stretch walk at ±40 —
+      // ON the visual asphalt (44) — and read as standing in the road
+      // exactly like the staged ones (green shirt at (1797,1164),
+      // red shirt at (2066,1160) in the before-shot). Push them to the
+      // only (R33b pattern: hide/move live actors for the shot, gameplay
+      // untouched). Skip photo peds (photo===3), peds on a cross street
+      // (they read as crossing, which is fine), and keep clear of the
+      // two staged photo-ped spots.
+      for (const p of state.peds) {
+        if (!p.alive || p.photo === 3) continue;
+        if (p.x < cp.x - 100 || p.x > cp.x + 1600) continue;
+        const off = p.y - 1120;
+        if (Math.abs(off) <= 30 || Math.abs(off) >= 52) continue;
+        // Probe (seed 7) found the one the first version missed: a live
+        // ped at (1797,1164) — 37u east of the 1760 cross road, i.e.
+        // ON the intersection asphalt (cross visual asphalt is 44 wide),
+        // straddling the corner where the two asphalts meet. The old 58u
+        // cross-street exclusion was wider than the asphalt and let it
+        // through. Cross exclusion is now the visual asphalt (44+2).
+        // Such a ped cannot be pushed to a clean sidewalk — every point
+        // off both asphalts at that corner is inside the building — so
+        // it is HIDDEN for the shot (R33 pattern: hide live actors that
+        // read as edge actors). That includes the distant one at
+        // (2066,1160): at ~480u it is only a speck at full frame, but
+        // at 2x it still reads as a person standing in the road.
+        const onCross = state.city.roadsV.some((rx) => Math.abs(p.x - rx) < 46);
+        if (onCross) {
+          p.alive = false;
+          continue;
+        }
+        const side = off > 0 ? 1 : -1;
+        let nx = p.x;
+        if (side < 0 && Math.abs(nx - (cp.x + 120)) < 40) nx += 90;
+        if (side > 0 && Math.abs(nx - (cp.x + 260)) < 40) nx += 90;
+        p.x = nx;
+        p.y = 1120 + side * 56;
+      }
+    }
     if (name === 'chase3d') state.view3d = true;
   } else if (name === 'mission') {
     setLight(world, 0.9);
