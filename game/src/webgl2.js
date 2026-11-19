@@ -47,7 +47,7 @@ function lookAt(e, t, up) {
   return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -dot(x, e), -dot(y, e), -dot(z, e), 1];
 }
 
-// ---- shaders (GLSL ES 1.00 — webgl DAN webgl2); material: 0 gedung 1 cat 2 kaca 3 jalan 4 emissive 5 matte 6 trotoar 7 glow 8 smear 9 shadow 10 air 11 groundShadow 12 sprite | R40: 13 aspal 14 trotoar 15 pasir ----
+// ---- shaders (GLSL ES 1.00 — webgl DAN webgl2); material: 0 gedung 1 cat 2 kaca 3 jalan 4 emissive 5 matte 6 trotoar 7 glow 8 smear 9 shadow 10 air 11 groundShadow 12 sprite | R40: 13 aspal 14 trotoar 15 pasir | FIX3-B: 16 ramp ----
 const VS = `
 attribute vec3 aP; attribute vec3 aN; attribute vec2 aU; attribute vec3 aC; attribute float aM;
 uniform mat4 uP, uV;
@@ -258,6 +258,11 @@ void main(){
   // lighting generik supaya grading TOD tetap menguasai warna.
   if (vM > 13.5 && vM < 14.5) base *= r40tx(uTexWalk, vU / R40T);
   else if (vM > 14.5 && vM < 15.5) base *= r40tx(uTexSand, vU / R40T);
+  else if (vM > 15.5 && vM < 16.5) { // FIX3-B: ramp — chevron diagonal + grain halus (vW = koordinat dunia, sama di semua sisi box): permukaan ramp terbaca bertekstur, bukan bidang kuning polos. Pengali murni sebelum lighting generik, tanpa uniform/sampler baru.
+    float ch = step(0.5, fract((vW.x + vW.z) * 0.9));
+    float gr = h21(floor(vW.xz * 3.0));
+    base *= mix(1.0, 0.55, ch) * (0.94 + 0.12 * gr);
+  }
   // Half-Lambert (bible §1.2): bayangan tidak pernah hitam pekat (Valorant)
   float ndl = max(dot(N, uSun), 0.0);
   float halfLam = ndl * 0.5 + 0.5;
@@ -1536,6 +1541,10 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // ONE block: everything F7 in this file. Stunt ramps = 2 chevron boxes +
   // 3 LOW rising yellow steps (0.18/0.36/0.54 high — the 4-step 1.28-high
   // version read as a giant staircase filling the frame in the first shot).
+  // FIX3-A: width 56 -> 36 (road is 72: 18 asphalt visible each side, no
+  // more yellow plate covering the road) + steps alternate yellow/dark
+  // (was two near-identical yellows that merged into one flat slab at
+  // chase-cam grazing angle). Heights/positions/trigger untouched (jobs.js).
   // boxR yaw = PI/2 - angle so local +Z is the ramp facing; job beacon =
   // cyan ground marker + vertical beam (same deboxBeam shape as the
   // token's gold beam). Lamps, tokens, buildings and roads are NOT
@@ -1546,11 +1555,11 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     const fx = Math.cos(r.angle), fz = Math.sin(r.angle);
     for (let i = 0; i < 2; i += 1) {
       const h = 0.08;
-      boxR(OP, (r.x - fx * (35 + i * 14)) * S, 0.02 + h / 2, (r.y - fz * (35 + i * 14)) * S, 56 * S, h, 10 * S, ry, 0, i % 2 ? [0.08, 0.08, 0.1] : [1, 0.95, 0.35], 5);
+      boxR(OP, (r.x - fx * (35 + i * 14)) * S, 0.02 + h / 2, (r.y - fz * (35 + i * 14)) * S, 36 * S, h, 10 * S, ry, 0, i % 2 ? [0.08, 0.08, 0.1] : [1, 0.95, 0.35], 16);
     }
     for (let i = 0; i < 3; i += 1) {
       const h = 0.18 * (i + 1);
-      boxR(OP, (r.x + fx * (-21 + i * 14)) * S, 0.02 + h / 2, (r.y + fz * (-21 + i * 14)) * S, 56 * S, h, 14 * S, ry, 0, i % 2 ? [0.95, 0.8, 0.22] : [1, 0.9, 0.3], 5);
+      boxR(OP, (r.x + fx * (-21 + i * 14)) * S, 0.02 + h / 2, (r.y + fz * (-21 + i * 14)) * S, 36 * S, h, 14 * S, ry, 0, i % 2 ? [0.12, 0.12, 0.14] : [1, 0.9, 0.3], 16);
     }
   }
   {

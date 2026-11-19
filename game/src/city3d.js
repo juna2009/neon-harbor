@@ -743,7 +743,10 @@ function tlC(r, g, b) { return 'rgb(' + ((r * chaseTL) | 0) + ',' + ((g * chaseT
 // R35-F7: stunt ramp — 3 LOW rising yellow steps (0.18/0.36/0.54 — the
 // 4-step 1.28-high version read as a giant staircase in the first WebGL2
 // shot) + chevron approach on the road, with a depth-sorted floating
-// label. World px in, CS-scaled out (same convention as car3d). ONE
+// label. FIX3-A: width 56 -> 36 (road 72: asphalt visible each side) +
+// steps alternate yellow/dark (was two near-identical yellows merging into
+// one flat slab) — mirror of the webgl2.js block, same numbers. World px
+// in, CS-scaled out (same convention as car3d). ONE
 // block: everything F7-A in this file is this function + the loop below
 // (F7-RAMP-START..END). Lamps, tokens, buildings and roads are NOT
 // touched (zona R36/R38).
@@ -752,11 +755,11 @@ function drawRamp3D(r) {
   const dep = Math.hypot(r.x * CS - ccX, r.y * CS - ccZ);
   for (let i = 0; i < 2; i += 1) {
     const ox = (r.x - fx * (35 + i * 14)) * CS, oz = (r.y - fz * (35 + i * 14)) * CS;
-    box3(ox, 0.05, oz, 56 * CS, 0.08, 10 * CS, r.angle, i % 2 ? '#14141a' : '#ffe55c', dep);
+    box3(ox, 0.05, oz, 36 * CS, 0.08, 10 * CS, r.angle, i % 2 ? '#14141a' : '#ffe55c', dep);
   }
   for (let i = 0; i < 3; i += 1) {
     const ox = (r.x + fx * (-21 + i * 14)) * CS, oz = (r.y + fz * (-21 + i * 14)) * CS;
-    box3(ox, 0.05, oz, 56 * CS, 0.18 * (i + 1), 14 * CS, r.angle, i % 2 ? '#f2cc37' : '#ffe14d', dep);
+    box3(ox, 0.05, oz, 36 * CS, 0.18 * (i + 1), 14 * CS, r.angle, i % 2 ? '#1f1f24' : '#ffe14d', dep);
   }
   const lp = cP(r.x * CS, 3.4, r.y * CS);
   if (lp) {
