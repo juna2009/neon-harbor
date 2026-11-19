@@ -30,8 +30,10 @@ export const WEAPONS = {
     name: 'Shotgun', damage: 1, pellets: 6, spread: 0.22,
     fireInterval: 0.85, mag: 6, reserve: 30, bulletSpeed: 640, color: '#ff9d4d',
   },
+  // R35-F4 weapon wheel: fists = melee (short-life bullet, ~38u reach, never runs out) + rifle (AR, found as a pickup).
+  fists: { name: 'Fists', damage: 2, pellets: 1, spread: 0, fireInterval: 0.35, mag: 9999, reserve: 9999, bulletSpeed: 760, life: 0.05, color: '#e8e4d8' }, rifle: { name: 'Rifle', damage: 2, pellets: 1, spread: 0.02, fireInterval: 0.14, mag: 30, reserve: 90, bulletSpeed: 950, color: '#ff5d5d' },
 };
-export const WEAPON_ORDER = ['pistol', 'smg', 'shotgun'];
+export const WEAPON_ORDER = ['fists', 'pistol', 'smg', 'shotgun', 'rifle'];
 export const CAR = {
   accel: 430,
   brake: 760,
@@ -99,5 +101,5 @@ export const RADIO_STATIONS = [
 ];
 export const MISSION_REWARDS = [250, 400, 350, 900, 1200, 240, 300, 450, 300, 200, 350, 600];
 export const RACE_REWARD = 300;
-export const COLLECTIBLE_COUNT = 12;
+export const COLLECTIBLE_COUNT = 20;
 export const COLLECTIBLE_VALUE = 50;

@@ -468,10 +468,10 @@ export function createWorld(rng, savedMission, sp) {
     const tireFactor = car.tiresPopped ? 0.45 : 1;
     const speedFactor = state.upgrades.turbo ? 1.15 : 1;
     const accelFactor = state.upgrades.turbo ? 1.1 : 1;
-    const topSpeed = CAR.maxSpeed * tireFactor * speedFactor;
+    const topSpeed = CAR.maxSpeed * tireFactor * speedFactor * (car.crew === 'jax' ? 1.08 : 1); // R35-F1
     const wet = (state.weather && state.weather.heavy)
       || state.wet.some((w) => Math.hypot(car.x - w.x, car.y - w.y) < w.r);
-    const steerFactor = (state.upgrades.slicks ? 1.25 : 1) * (wet ? 0.55 : 1);
+    const steerFactor = (state.upgrades.slicks ? 1.25 : 1) * (wet ? 0.55 : 1) * (car.crew === 'jax' ? 1.15 : 1); // R35-F1
     // R34: taper acceleration near top speed (was flat to the cap, so the
     // car surged then sat on the limiter) and soften the coast decay (1.4/s
     // braked hard on lift-off, making cruise speed yo-yo).
@@ -634,6 +634,7 @@ export function createWorld(rng, savedMission, sp) {
     state.events = {};
     const p = state.player;
     const events = state.events;
+    for (const k of ['fists', 'rifle']) if (!p.weapons[k]) p.weapons[k] = { ammo: k === 'fists' ? 9999 : 0, reserve: k === 'fists' ? 9999 : 0 };
     const wantedBefore = state.wanted;
     if (!state.daylightManual) {
       state.daylight = 0.55 + 0.45 * Math.sin(state.elapsed * 0.013);
@@ -669,7 +670,7 @@ export function createWorld(rng, savedMission, sp) {
       syncAmmo();
     }
     if (input.wasPressed && input.wasPressed('weapon')) {
-      const order = ['pistol', 'smg', 'shotgun'];
+      const order = ['fists', 'pistol', 'smg', 'shotgun', 'rifle'];
       const owned = order.filter((k) => p.weapons[k].ammo + p.weapons[k].reserve > 0);
       const idx = owned.indexOf(p.weapon);
       p.weapon = owned[(idx + 1) % owned.length] || 'pistol';
@@ -887,7 +888,7 @@ export function createWorld(rng, savedMission, sp) {
     if (heatGain > 0) {
       const d = districtAt(city, p.x, p.y);
       const idx = city.districts.indexOf(d);
-      state.heat[idx] = Math.min(100, state.heat[idx] + heatGain * 10 * (state.upgrades.cooler ? 0.5 : 1));
+      state.heat[idx] = Math.min(100, state.heat[idx] + heatGain * 10 * (state.upgrades.cooler || p.crew === 'mara' ? 0.5 : 1)); // R35-F1
     }
     const coolRate = 0.4 * (state.upgrades.cooler ? 2 : 1);
     for (let i = 0; i < state.heat.length; i += 1) {

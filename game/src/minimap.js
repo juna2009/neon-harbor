@@ -1,5 +1,6 @@
 import { ROAD_W, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
+import { DISTRICT7, standingLabel, updateStanding } from './districts.js';
 import { drawMapBridge, drawMapGas, drawMapHydrant, drawMapMission, drawMapPlayer, drawMapWrench } from './ui-art.js';
 // Neon Harbor minimap — redrawn as a REAL MAP (BEAT-GHK A1, 2026-11-19).
 // Juna (13:27 WIB): "MAPNYA JELEK — isinya cuma kotak-kotak." The old map
@@ -78,6 +79,10 @@ function policeGlyph(c, px, py, s, roadblock) {
 export function drawMinimap(ctx, state, x, y, w, h) {
   const sx = w / WORLD_W;
   const sy = h / WORLD_H;
+  // R35-F2: district standing — per-frame update (mission/wanted deltas)
+  // + police-response effect live here, in the post-cut HUD layer.
+  const st7 = updateStanding(state);
+  const here = st7.current;
   const round = minimapShape() === 'round';
   const cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2;
   const city = state.city || {};
@@ -170,6 +175,27 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   for (const rx of roadsV) { ctx.beginPath(); ctx.moveTo(x + rx * sx, y); ctx.lineTo(x + rx * sx, y + h); ctx.stroke(); }
   for (const ry of roadsH) { ctx.beginPath(); ctx.moveTo(x, y + ry * sy); ctx.lineTo(x + w, y + ry * sy); ctx.stroke(); }
   ctx.setLineDash([]);
+  // ---- R35-F2: district standing tint (Friendly green / Wary red wash
+  // over each of the 7 districts, current district outlined + coded) ----
+  for (let i = 0; i < 7; i++) {
+    const d = DISTRICT7[i];
+    const lab = standingLabel(st7.scores[i]);
+    if (lab !== 'NEUTRAL') {
+      ctx.fillStyle = lab === 'FRIENDLY' ? 'rgba(47,191,113,0.20)' : 'rgba(255,90,60,0.22)';
+      ctx.fillRect(x + d.x * sx, y + d.y * sy, d.w * sx, d.h * sy);
+    }
+  }
+  const hd = DISTRICT7[here];
+  ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.strokeRect(x + hd.x * sx + 0.5, y + hd.y * sy + 0.5, hd.w * sx - 1, hd.h * sy - 1);
+  ctx.font = 'bold 7px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  for (let i = 0; i < 7; i++) {
+    const d = DISTRICT7[i];
+    if (d.w * sx < 24) continue; // Marina strip is too narrow for a code
+    ctx.fillText(d.short, x + (d.x + d.w / 2) * sx, y + (d.y + d.h / 2) * sy);
+  }
+  ctx.textAlign = 'left';
   // ---- route line: dashed from player to the mission target ----
   const p = state.player;
   if (state.mission.target && p) {

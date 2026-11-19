@@ -9,6 +9,7 @@ import { drawArmoredTruck, drawBoatWake, drawCarShape, drawExplosionSprite, draw
 import { drawJaxPortrait, drawMaraPortrait } from './portraits.js';
 import { drawBridge } from './drawbridge.js';
 import { drawHud2, drawPause2, drawShop2, drawTitle2, hudCluster, hudScaleFor } from './ui2.js';
+import { drawMarket2D } from './market.js'; // R35-F9: night market stalls in the 2D static layer (2-line hook)
 import * as space from './space.js';
 export const SCREEN_TITLE = 'title';
 export const SCREEN_PLAY = 'play';
@@ -146,6 +147,7 @@ export function createRenderer(canvas) {
       g.fillRect(park.x, park.y, park.w, park.h);
     }
     for (const tree of city.trees) drawTree(g, tree.x, tree.y, tree.r, (tree.x + tree.y) % 2);
+    drawMarket2D(g, city); // R35-F9: night market stalls + PASAR MALAM label (visual only)
     for (const b of city.buildings) {
       drawBuildingShadow(g, b, { dx: 1, dy: 1 });
       if (b.landmark === 'lighthouse') { drawBuilding(g, b.x, b.y, b.w, b.h, 4); continue; }
@@ -1140,7 +1142,11 @@ export function createRenderer(canvas) {
     // Bottom/top are unchanged fractions of W (the bottom pill clamp below
     // is now also a fraction of W, so it works at 640 wide — the old
     // hardcoded [810, 1065] pinned the pill off-screen there).
-    const free = { top: [0.25, 0.78], right: [0.56, 0.79], bottom: [0.65, 0.81], left: [0.34, 0.60] }[edge];
+    // R35-F1: left floor 0.53 (was 0.34) — the crew panel (ui2.js) occupies
+    // the left edge y244-362, so the compass pill must slide below it (its
+    // top is ay-12 at full scale, ay-6 at 640x360; 0.53 clears the panel at
+    // both sizes). Ceiling 0.60 still clears the Mara dialogue below.
+    const free = { top: [0.25, 0.78], right: [0.56, 0.79], bottom: [0.65, 0.81], left: [0.53, 0.60] }[edge];
     const span = (edge === 'top' || edge === 'bottom') ? W : H;
     if (edge === 'top' || edge === 'bottom') ax = Math.min(Math.max(ax, free[0] * span), free[1] * span);
     else ay = Math.min(Math.max(ay, free[0] * span), free[1] * span);

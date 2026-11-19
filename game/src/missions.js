@@ -96,12 +96,12 @@ export const MISSION_DEFS = [
   },
   {
     title: 'Token Hunt',
-    brief: 'Day 3 — four harbor tokens are still out there. Find them and the crew pays.',
-    objective: 'Collect 4 more harbor tokens',
+    brief: 'Day 3 — eight harbor tokens are still out there. Find them and the crew pays.',
+    objective: 'Collect 8 more harbor tokens',
     reward: MISSION_REWARDS[9],
     dialogue: [
-      'MARA: Four harbor tokens are still out there, Jax — gold, hidden, ours for the taking.',
-      'MARA: The minimap marks the ones left. Bring me four.',
+      'MARA: Eight harbor tokens are still out there, Jax — gold, hidden, ours for the taking.',
+      'MARA: The minimap marks the ones left. Bring me eight.',
     ],
   },
   {
@@ -240,12 +240,12 @@ export function createRace(city) {
 export function createCollectibles(city, rng) {
   const spots = [];
   for (const park of city.parks) spots.push({ x: park.x + park.w / 2, y: park.y + park.h / 2 });
-  spots.push({ x: city.docks.x + 30, y: city.docks.y + 40 });
+  spots.push({ x: city.docks.x + 40, y: city.docks.y + 40 });
   spots.push({ x: city.docks.x + 90, y: city.docks.y + 240 });
-  spots.push({ x: city.marina.x + 40, y: city.marina.y + 120 });
+  spots.push({ x: city.marina.x + 120, y: city.marina.y + 140 });
   spots.push({ x: city.marina.x + 130, y: city.marina.y + 40 });
   for (const pt of city.intersections) {
-    if (rng.chance(0.25)) spots.push({ x: pt.x + 46, y: pt.y + 46 });
+    if (rng.chance(0.5)) spots.push({ x: pt.x + 46, y: pt.y + 46 });
   }
   const picked = rng.shuffle(spots).slice(0, COLLECTIBLE_COUNT);
   return picked.map((s) => ({ x: s.x, y: s.y, taken: false }));
@@ -255,6 +255,7 @@ export function createWeaponPickups(city) {
     { x: city.roadsV[2] + 46, y: city.roadsH[1] + 46, weapon: 'smg', taken: false },
     { x: city.docks.x + 30, y: city.docks.y + 200, weapon: 'shotgun', taken: false },
     { x: city.marina.x + 84, y: city.marina.y + 130, weapon: 'pistol', taken: false },
+    { x: city.roadsV[4] + 46, y: city.roadsH[3] + 46, weapon: 'rifle', taken: false },
   ];
 }
 export function startMission(world, index) {
@@ -425,7 +426,7 @@ export function updateMission(world, dt) {
     if ((world.raceWins || 0) > (mission.count || 0)) completeMission(world);
   } else if (mission.index === 9) {
     const got = world.collectibles.filter((c) => c.taken).length - (mission.count || 0);
-    if (got >= 4) completeMission(world);
+    if (got >= 8) completeMission(world);
   } else if (mission.index === 10) {
     if (world.wanted <= 0) completeMission(world);
   } else if (mission.index === 11) {
@@ -675,8 +676,8 @@ export function repairAtGarage(world) {
   if (!p.inCar || !p.car) return 'far';
   if (Math.hypot(p.car.x - g.x, p.car.y - g.y) > 80) return 'far';
   if (!p.car.tiresPopped && (p.car.hp === undefined || p.car.hp >= maxCarHp(world))) return 'fine';
-  if (world.cash < GARAGE_COST) return 'broke';
-  world.cash -= GARAGE_COST;
+  if (world.cash < (p.crew === 'reno' ? 113 : GARAGE_COST)) return 'broke'; // R35-F1: 113 = round(150*0.75)
+  world.cash -= p.crew === 'reno' ? 113 : GARAGE_COST; // R35-F1
   p.car.hp = maxCarHp(world);
   p.car.tiresPopped = false;
   world.events.repair = true;
@@ -704,8 +705,8 @@ export function buyUpgrade(world, id) {
   if (!nearGarage(world)) return 'far';
   if (garageHot(world)) return 'closed';
   if (world.upgrades && world.upgrades[id]) return 'owned';
-  if (world.cash < def.cost) return 'broke';
-  world.cash -= def.cost;
+  if (world.cash < (world.districtPrice = world.city && world.city.districtPrice ? world.city.districtPrice(def.cost) : def.cost)) return 'broke';
+  world.cash -= world.districtPrice;
   if (!world.upgrades) world.upgrades = {};
   world.upgrades[id] = true;
   world.events.upgrade = true;
@@ -755,7 +756,12 @@ export function updatePickups(world) {
     for (const pk of world.pickups) {
       if (!pk.taken && Math.hypot(p.x - pk.x, p.y - pk.y) < 30) {
         pk.taken = true;
-        world.events.weaponPickup = pk.weapon;
+        // R35-F4: grant here, NOT via events.weaponPickup — updatePickups runs
+        // AFTER world.js consumes that event (and events reset each step), so
+        // the event was always wiped: pickups never granted anything (R34
+        // latent bug: pistol pickup left ammo at 24/120). [mag,reserve] below
+        // mirrors WEAPONS in config.js (no WEAPONS import here, dossier budget).
+        const g = { smg: [32, 160], shotgun: [6, 30], pistol: [24, 120], rifle: [30, 90] }[pk.weapon]; const w = world.player.weapons[pk.weapon] || (world.player.weapons[pk.weapon] = { ammo: 0, reserve: 0 }); if (w.ammo + w.reserve === 0) { w.ammo = g[0]; w.reserve = g[1]; world.player.weapon = pk.weapon; world.player.ammo = g[0]; world.player.reserve = g[1]; } else w.reserve += g[1];
         world.events.pickup = true;
       }
     }
@@ -795,7 +801,7 @@ export function currentObjective(world) {
   }
   if (mission.index === 9) {
     const got = world.collectibles.filter((c) => c.taken).length - (mission.count || 0);
-    return `${n} Token Hunt: tokens ${Math.min(4, got)}/4`;
+    return `${n} Token Hunt: tokens ${Math.min(8, got)}/8`;
   }
   return `${n} ${def.title}: ${def.objective}`;
 }

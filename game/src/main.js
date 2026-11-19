@@ -95,6 +95,7 @@ function runGame() {
   function startGame() {
     world.reset();
     world.state.mission.index = Math.min(11, Math.max(0, readNumber(PROGRESS_KEY)));
+    if (window.__NHSaves) window.__NHSaves.applyStart(world); // R35-F6: load active save slot
     accumulator = 0;
     ts = 1;
     prevWanted = 0;
@@ -246,6 +247,7 @@ function runGame() {
       announce('Settings.');
       return;
     }
+    if (screen === SCREEN_TITLE && window.__NHSaves && window.__NHSaves.titleInput(input)) return; // R35-F6: save-slot keys/click
     if (input.wasPressed(ACTION_CONFIRM) && (screen === SCREEN_TITLE || screen === SCREEN_OVER)) {
       startGame();
     } else if (input.wasPressed(ACTION_PAUSE) && screen === SCREEN_PLAY) {

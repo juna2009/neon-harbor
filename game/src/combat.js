@@ -10,7 +10,7 @@ export function fireBullet(bullets, x, y, angle, hostile, weapon) {
     x, y,
     vx: Math.cos(angle) * def.bulletSpeed,
     vy: Math.sin(angle) * def.bulletSpeed,
-    life: 1.1,
+    life: def.life || 1.1,
     damage: def.damage,
     hostile: !!hostile,
   });

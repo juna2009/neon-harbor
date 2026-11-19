@@ -10,6 +10,8 @@
 import { PRESETS, webglUniforms } from './timeofday.js';
 import { drawCarRealistic } from './cars3d.js'; // R26: cars3d v15d di game/src/
 import { drawCruiseShips } from './ships3d.js'; // R27b: kapal pesiar + yacht (statis, visual saja)
+import { marketSite, marketStalls } from './market.js'; // R35-F9: night market (Pasar Malam) — geometri dari market.js
+import { STUNT_RAMPS, activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
 
 const S = 0.1; // game px -> unit WebGL
 const W = 1280, H = 800;
@@ -1141,6 +1143,13 @@ function heroOf(state) {
 function distPx(ax, ay, bx, by) { return Math.hypot(ax - bx, ay - by); }
 
 function buildFrame(state, cam, OP, SH, GL, t) {
+  // R35-F7: jobs tick — runs once per DRAW (live play + staged shots).
+  // The cinematic.update hook CANNOT do this: the shot page only paints
+  // twice and never runs the main frame loop, so a cinematic-only tick
+  // never fires in shots (cash stayed $2,150, 0/5). buildFrame receives
+  // the REAL state (not the HUD spread copy), so cash rewards land.
+  // 2D top-down view does NOT tick (no real-state post-cut hook there).
+  tickJobs(state, 1 / 60);
   const tod = state.timeOfDay || PRESETS.sore; // TOD: tanpa preset = sore (nilai lama)
   // R38 Item 7: gain lampu rem ikut waktu — langkah SAMA seperti
   // TITLE_PAL.tlGain di city3d.js (title): siang 0.12 (nyaris mati),
@@ -1360,6 +1369,35 @@ function buildFrame(state, cam, OP, SH, GL, t) {
       }
     }
   }
+  // ---- R35-F7-RAMP-START (F7-A stunt ramps + F7-B job beacon, WebGL2) ----
+  // ONE block: everything F7 in this file. Stunt ramps = 2 chevron boxes +
+  // 3 LOW rising yellow steps (0.18/0.36/0.54 high — the 4-step 1.28-high
+  // version read as a giant staircase filling the frame in the first shot).
+  // boxR yaw = PI/2 - angle so local +Z is the ramp facing; job beacon =
+  // cyan ground marker + vertical beam (same deboxBeam shape as the
+  // token's gold beam). Lamps, tokens, buildings and roads are NOT
+  // touched (zona R36/R38).
+  for (const r of STUNT_RAMPS) {
+    if (!near(r.x, r.y, R) || !vis(r.x, r.y, 90)) continue;
+    const ry = Math.PI / 2 - r.angle;
+    const fx = Math.cos(r.angle), fz = Math.sin(r.angle);
+    for (let i = 0; i < 2; i += 1) {
+      const h = 0.08;
+      boxR(OP, (r.x - fx * (35 + i * 14)) * S, 0.02 + h / 2, (r.y - fz * (35 + i * 14)) * S, 56 * S, h, 10 * S, ry, 0, i % 2 ? [0.08, 0.08, 0.1] : [1, 0.95, 0.35], 5);
+    }
+    for (let i = 0; i < 3; i += 1) {
+      const h = 0.18 * (i + 1);
+      boxR(OP, (r.x + fx * (-21 + i * 14)) * S, 0.02 + h / 2, (r.y + fz * (-21 + i * 14)) * S, 56 * S, h, 14 * S, ry, 0, i % 2 ? [0.95, 0.8, 0.22] : [1, 0.9, 0.3], 5);
+    }
+  }
+  {
+    const _job = activeJob(jobsState(state));
+    if (_job && near(_job.tx, _job.ty, R) && vis(_job.tx, _job.ty, 90)) {
+      flat(OP, _job.tx * S, 0.12, _job.ty * S, 5.2, 5.2, [0.22, 0.88, 0.9], 4);
+      deboxBeam(OP, _job.tx * S, 0.1, _job.ty * S, _job.tx * S, 2.4, _job.ty * S, 0.3, [0.22, 0.88, 0.9], 4);
+    }
+  }
+  // ---- R35-F7-RAMP-END ----
 
 
   // Gedung (dekat hero saja) + taman + pohon.
@@ -1512,6 +1550,51 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     fishBoat(OP, 239.0, 98.0, true); // perahu nelayan kedua (lambung searah X)
   }
 
+  // R35-F9: night market (Pasar Malam) — BEGIN. Satu blok, jangan pecah.
+  // Stalls + string lights di taman Downtown (geometri: game/src/market.js).
+  // Visual only, no collision. Zona R36/R38 (lampu, token, gedung, jalan,
+  // heli) TIDAK disentuh — blok ini hanya MENAMBAH geometri pasar.
+  {
+    const mSite = marketSite(city);
+    if (mSite && near(mSite.x + mSite.w / 2, mSite.y + mSite.h / 2, R) && vis(mSite.x + mSite.w / 2, mSite.y + mSite.h / 2, 170)) {
+      const mLit = (tod.lamp || 0) > 0.4;
+      const mBulb = mLit ? [0.85, 0.68, 0.38] : [0.55, 0.48, 0.35];
+      flat(OP, (mSite.x + mSite.w / 2) * S, 0.04, (mSite.y + mSite.h / 2) * S, (mSite.w - 24) * S, (mSite.h - 24) * S, [0.32, 0.24, 0.16], 5);
+      // sign board on the EAST edge (backdrop behind the gunmen): the west
+      // edge sits ~10 units from the chase camera and a board there filled
+      // the whole frame and hid the hero (shot v1).
+      const mSx = (mSite.x + mSite.w - 8) * S, mCz = (mSite.y + mSite.h / 2) * S;
+      box(OP, mSx, 1.3, mCz - 3.2, 0.3, 2.6, 0.3, [0.14, 0.12, 0.16], 5);
+      box(OP, mSx, 1.3, mCz + 3.2, 0.3, 2.6, 0.3, [0.14, 0.12, 0.16], 5);
+      box(OP, mSx, 2.05, mCz, 0.35, 1.5, 7, [0.55, 0.17, 0.35], 4);
+      box(OP, mSx, 2.92, mCz, 0.45, 0.28, 7.3, [0.12, 0.5, 0.55], 4);
+      for (const st of marketStalls(city)) {
+        const scx = (st.x + st.w / 2) * S, scz = (st.y + st.d / 2) * S;
+        const sw = st.w * S, sd = st.d * S;
+        box(OP, scx, 0.55, scz, sw, 1.1, sd, [0.35, 0.22, 0.12], 5);
+        box(OP, scx, 1.28, scz, sw * 0.6, 0.35, sd * 0.8, hx(st.hue), 5);
+        box(OP, scx - sw / 4, 1.99, scz, sw / 2 + 0.3, 0.18, sd + 0.6, hx(st.hue).map((v) => v * 0.55), 4);
+        box(OP, scx + sw / 4, 1.99, scz, sw / 2 + 0.3, 0.18, sd + 0.6, [0.55, 0.5, 0.42], 4);
+      }
+      const mPoles = [[mSite.x + 18, mSite.y + 18], [mSite.x + mSite.w - 18, mSite.y + 18], [mSite.x + 18, mSite.y + mSite.h - 18], [mSite.x + mSite.w - 18, mSite.y + mSite.h - 18]];
+      for (const [mPx, mPy] of mPoles) {
+        box(OP, mPx * S, 1.35, mPy * S, 0.22, 2.7, 0.22, [0.14, 0.12, 0.16], 5);
+        box(OP, mPx * S, 2.85, mPy * S, 0.26, 0.26, 0.26, mBulb, 4);
+      }
+      const mSpans = [[[mPoles[0][0], mPoles[0][1]], [mPoles[1][0], mPoles[1][1]]], [[mPoles[2][0], mPoles[2][1]], [mPoles[3][0], mPoles[3][1]]], [[mPoles[0][0], mPoles[0][1]], [mPoles[2][0], mPoles[2][1]]], [[mPoles[1][0], mPoles[1][1]], [mPoles[3][0], mPoles[3][1]]]];
+      for (const [[mX0, mY0], [mX1, mY1]] of mSpans) {
+        for (let mI = 1; mI < 6; mI += 1) {
+          const mK = mI / 6;
+          const mBx = (mX0 + (mX1 - mX0) * mK) * S, mBz = (mY0 + (mY1 - mY0) * mK) * S;
+          const mSag = 2.55 - 0.35 * Math.sin(mK * Math.PI);
+          box(OP, mBx, mSag, mBz, 0.24, 0.24, 0.24, mBulb, 4);
+        }
+      }
+      if (mLit) flat(GL, (mSite.x + mSite.w / 2) * S, 0.08, (mSite.y + mSite.h / 2) * S, (mSite.w - 24) * S, (mSite.h - 24) * S, [0.55, 0.4, 0.18], 8);
+    }
+  }
+  // R35-F9: night market — END.
+
   // Air + dermaga + marina (kalau hero dekat pelabuhan).
   if (hx0 > 2250) {
     const y0 = Math.max(0, hy0 - 1500), y1 = Math.min(1920, hy0 + 1500);
@@ -1578,6 +1661,27 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   } else {
     person(OP, p.x * S, p.y * S, yawOf(p), [0.95, 0.8, 0.2], { kind: 'player' });
   }
+
+  // R35-F9: bullets + muzzle flash (on-foot combat) — BEGIN. Satu blok.
+  // Canvas fallback (city3d.js) sudah menggambar peluru; WebGL2 belum —
+  // tanpa ini tembak-menembak tidak kelihatan di chase-cam. state.events
+  // dibekukan di staged shot (runShot tidak step), jadi flash + peluru
+  // yang tertangkap staging tetap di frame.
+  {
+    const mEv = state.events || {};
+    if (mEv.muzzle) {
+      const mMx = mEv.muzzle.x * S, mMz = mEv.muzzle.y * S;
+      billDir(GL, mMx, 1.1, mMz, 1.6, 1.6, [0, 0, -1], [1.0, 0.85, 0.45], 7);
+      box(OP, mMx, 1.1, mMz, 0.35, 0.35, 0.35, [1.0, 0.85, 0.45], 4);
+    }
+    let mBn = 0;
+    for (const mB of state.bullets || []) {
+      if (mBn > 12 || !near(mB.x, mB.y, R) || !vis(mB.x, mB.y, 40)) continue;
+      box(OP, mB.x * S, 0.9, mB.y * S, 0.5, 0.25, 0.25, [1.0, 0.9, 0.6], 4);
+      mBn += 1;
+    }
+  }
+  // R35-F9: bullets + muzzle flash — END.
 
   // Traffic + parkir — cars3d v14 (INTEGRATION.md §6 OPSI A) + LOD WAJIB:
   // hero + mobil <250 px game dari hero = high, sisanya 'low' (hemat ~43%).

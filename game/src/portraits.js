@@ -41,4 +41,6 @@ function P(c,x,y,w,h,o){const cx=x+w/2,cy=y+h*.38,fw=w*.42,fh=h*.42,u=w/200,ex=o
 }
 export function drawJaxPortrait(c,x,y,w,h,expr){P(c,x,y,w,h,{skin:'#d8a077',neck:'#b57e52',h0:'#120c07',h1:'#241609',h2:'#7a5230',hl:'#8a6a45',coat:'#5d3a1e',coat2:'#4a2c17',lip:'#7a3b28',stub:1,expr:expr||'stern'})}
 export function drawMaraPortrait(c,x,y,w,h,expr){P(c,x,y,w,h,{skin:'#e0aa7e',neck:'#bd8460',h0:'#0d0808',h1:'#1c0f0e',h2:'#6e3527',hl:'#a05a40',coat:'#7c1d24',coat2:'#9c2a30',lip:'#8a2f35',long:1,expr:expr||'alert'})}
+// R35-F1: Reno, the crew mechanic — salt-and-pepper hair, oil-stained teal coveralls, stub beard.
+export function drawRenoPortrait(c,x,y,w,h,expr){P(c,x,y,w,h,{skin:'#c98d64',neck:'#a06a42',h0:'#141210',h1:'#3a3a3a',h2:'#8a8a8a',hl:'#b0b0b0',coat:'#1f4d3a',coat2:'#16382b',lip:'#6e3b28',stub:1,expr:expr||'stern'})}
 export function drawPortraitSmall(c,x,y,who,expr){if(who==='mara')drawMaraPortrait(c,x,y,64,80,expr);else drawJaxPortrait(c,x,y,64,80,expr)}

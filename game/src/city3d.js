@@ -2,6 +2,8 @@ import { WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
 import { BRIDGE } from './drawbridge.js';
 import { PRESETS } from './timeofday.js';
+import { drawMarket3D } from './market.js'; // R35-F9: night market stalls + string lights (post-cut)
+import { STUNT_RAMPS, activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
 // Neon Harbor 3D title-screen — software 3D engine, Canvas 2D only, no libs.
 // Perspective projection + painter's algorithm. Deterministic (seeded).
 let x, W = 1280, H = 800, CX = W / 2, HOR = H * .46;
@@ -639,6 +641,36 @@ function inRange(wx, wy, fwdMax, latMax) {
 let rimOn = true; // warm rim light while the sun is up (set per frame)
 let chaseTL = 1; // R38: taillight gain for the chase renderer (set per frame from daylight — same steps as TITLE_PAL.tlGain)
 function tlC(r, g, b) { return 'rgb(' + ((r * chaseTL) | 0) + ',' + ((g * chaseTL) | 0) + ',' + ((b * chaseTL) | 0) + ')'; }
+// ---- R35-F7-RAMP-START (F7-A stunt jumps, canvas fallback) ----
+// R35-F7: stunt ramp — 3 LOW rising yellow steps (0.18/0.36/0.54 — the
+// 4-step 1.28-high version read as a giant staircase in the first WebGL2
+// shot) + chevron approach on the road, with a depth-sorted floating
+// label. World px in, CS-scaled out (same convention as car3d). ONE
+// block: everything F7-A in this file is this function + the loop below
+// (F7-RAMP-START..END). Lamps, tokens, buildings and roads are NOT
+// touched (zona R36/R38).
+function drawRamp3D(r) {
+  const fx = Math.cos(r.angle), fz = Math.sin(r.angle);
+  const dep = Math.hypot(r.x * CS - ccX, r.y * CS - ccZ);
+  for (let i = 0; i < 2; i += 1) {
+    const ox = (r.x - fx * (35 + i * 14)) * CS, oz = (r.y - fz * (35 + i * 14)) * CS;
+    box3(ox, 0.05, oz, 56 * CS, 0.08, 10 * CS, r.angle, i % 2 ? '#14141a' : '#ffe55c', dep);
+  }
+  for (let i = 0; i < 3; i += 1) {
+    const ox = (r.x + fx * (-21 + i * 14)) * CS, oz = (r.y + fz * (-21 + i * 14)) * CS;
+    box3(ox, 0.05, oz, 56 * CS, 0.18 * (i + 1), 14 * CS, r.angle, i % 2 ? '#f2cc37' : '#ffe14d', dep);
+  }
+  const lp = cP(r.x * CS, 3.4, r.y * CS);
+  if (lp) {
+    ops.push({ d: lp[2], f() {
+      x.save();
+      x.font = 'bold ' + Math.round(cl(900 / lp[2], 11, 20)) + 'px sans-serif'; x.textAlign = 'center';
+      x.fillStyle = '#ffd23e'; x.fillText('STUNT JUMP ▲', lp[0], lp[1]);
+      x.restore();
+    } });
+  }
+}
+// ---- R35-F7-RAMP-END (F7-A stunt jumps, canvas fallback) ----
 function car3d(wx, wy, angle, len, wid, color, o) {
   let L = len * CS, Wd = wid * CS;
   const bodyH = o.hero ? 0.72 : 0.8;
@@ -1492,6 +1524,7 @@ function sunStreaks(sx, sy, len, soft) {
   x.restore();
 }
 export function drawChase3D(ctx, state) {
+  tickJobs(state, 1 / 60); // R35-F7: jobs tick (canvas fallback; see webgl2.js buildFrame)
   x = ctx; W = ctx.canvas.width; H = ctx.canvas.height; CX = W / 2; HOR = H * .46;
   camZ = 0;
   fovF = 860; camH = 4.4; // round 22: telephoto chase lens; low eye keeps
@@ -1818,6 +1851,9 @@ export function drawChase3D(ctx, state) {
     const pd = Math.hypot((park.x + park.w / 2) * CS - ccX, (park.y + park.h / 2) * CS - ccZ);
     flatQuad(park.x, park.y, park.x + park.w, park.y + park.h, 0.03, sh(hx3('#3f8f4f'), shadeK, hz(pd)));
   }
+  // R35-F9: night market (Pasar Malam) on the Downtown park — stalls +
+  // string lights; visual only, no collision (see game/src/market.js).
+  drawMarket3D({ box3, vQuad, flatQuad, inRange, sh, hx3, hz, CS, dist: (wx, wy) => Math.hypot(wx * CS - ccX, wy * CS - ccZ) }, city, nightF);
   // roads + sidewalks + center dashes, segmented per 320 px
   // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44,
   // sidewalk 52->58, so cars sit clearly clear of the flanking buildings.
@@ -2013,6 +2049,29 @@ export function drawChase3D(ctx, state) {
       x.fillStyle = '#ffd23e'; x.fillText(tgt.label, lp[0], lp[1]); x.restore();
     }
   }
+  // ---- R35-F7-RAMP-START (F7-A ramps + F7-B job beacon, canvas fallback) ----
+  // Stunt ramps on the road + active district-job beacon (cyan, same shape
+  // as the mission beacon above so it reads as a waypoint). ONE block.
+  for (const r of STUNT_RAMPS) {
+    if (inRange(r.x, r.y, 160, 120)) drawRamp3D(r);
+  }
+  const _job = activeJob(jobsState(state));
+  if (_job && inRange(_job.tx, _job.ty, 160, 120)) {
+    const txp = _job.tx * CS, tzp = _job.ty * CS;
+    const rx = -cfZ, rz = cfX;
+    QW([[txp - rx * 1.6, 0.1, tzp - rz * 1.6], [txp + rx * 1.6, 0.1, tzp + rz * 1.6], [txp + rx * 1.6, 24, tzp + rz * 1.6], [txp - rx * 1.6, 24, tzp - rz * 1.6]], 'rgba(55,224,230,0.28)');
+    flatQuad(_job.tx - 26, _job.ty - 26, _job.tx + 26, _job.ty + 26, 0.12, 'rgba(55,224,230,0.35)');
+    const lp = cP(txp, 27, tzp);
+    if (lp && Math.hypot(_job.tx - p.x, _job.ty - p.y) < 450) {
+      ops.push({ d: lp[2], f() {
+        x.save();
+        x.font = 'bold ' + Math.round(cl(900 / lp[2], 11, 22)) + 'px sans-serif'; x.textAlign = 'center';
+        x.fillStyle = '#37e0e6'; x.fillText('JOB: ' + _job.title.toUpperCase(), lp[0], lp[1]);
+        x.restore();
+      } });
+    }
+  }
+  // ---- R35-F7-RAMP-END ----
   // parked + moving traffic
   for (const car of state.traffic.parked) {
     if (!car.alive || !inRange(car.x, car.y, 150, 100)) continue;

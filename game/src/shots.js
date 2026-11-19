@@ -6,6 +6,7 @@ import { makeCar } from './traffic.js';
 import { SCREEN_PLAY, SCREEN_SHOP, SCREEN_TITLE } from './render.js';
 import { applyTimeOfDay } from './timeofday.js';
 import { setTitleTOD } from './city3d.js';
+import { marketAisle } from './market.js'; // R35-F9: night-market staging site
 function scriptedInput() {
   const pressed = new Set();
   const state = { mx: 0, my: 0, shoot: false, mouseX: 640, mouseY: 400 };
@@ -617,6 +618,55 @@ export function stageShot(name, world) {
       unit.x = qx;
       unit.y = qy;
     }
+  } else if (name === 'market') {
+    // R35-F9: night-market on-foot combat, 3D chase view at night
+    // (shot name carries the '-malam' suffix — applyTod() at the end of
+    // stageShot applies the malam preset). Player walks the centre aisle
+    // facing east; gunmen hold the aisle ahead among the stalls.
+    state.view3d = true;
+    state.mission.done = true;
+    state.cash = 2150;
+    const aisle = marketAisle(state.city);
+    const px = aisle.x - 70, py = aisle.y;
+    // player 12 px south of the aisle centre: the park tree at (1557,640)
+    // sits exactly on the centreline and would stand directly behind the
+    // hero in the chase frame.
+    placePlayerOnFoot(world, px, py + 12);
+    // 2 gunmen ahead (they may fall to the player's fire — that IS the
+    // combat; 2 more are placed after the shooting so the frame always
+    // shows armed opponents).
+    for (let i = 0; i < 2; i += 1) {
+      spawnPoliceUnit(state.police, state.player, state.rng, 'gunman', state.city);
+      const unit = state.police.units[state.police.units.length - 1];
+      unit.x = px + 140 + i * 18;
+      unit.y = py + (i === 0 ? -18 : 22);
+    }
+    stagePed(world, px + 30, py - 52);
+    stagePed(world, px + 44, py + 56);
+    input.setMouse(900, 400);
+    input.setShoot(true);
+    walkFor(world, input, 1.4, 0, 0);
+    if (!state.events.muzzle) {
+      const p = state.player;
+      state.events.muzzle = {
+        x: p.x + Math.cos(p.angle) * 22,
+        y: p.y + Math.sin(p.angle) * 22,
+        angle: p.angle,
+      };
+    }
+    for (let i = 0; i < 2; i += 1) {
+      spawnPoliceUnit(state.police, state.player, state.rng, 'gunman', state.city);
+      const unit = state.police.units[state.police.units.length - 1];
+      unit.x = px + 160 + i * 16;
+      unit.y = py + (i === 0 ? -10 : 15);
+    }
+    stagePed(world, px + 58, py - 44);
+    stagePed(world, px + 66, py + 54);
+    addWanted(state, 4);
+    state.wanted = 4;
+    stageHeat(world);
+    state.mission.dialogue = ['MARA: Night market — hold the plaza, Jax. The crew cut is in the stalls.'];
+    state.mission.dialogueTimer = 30;
   } else if (name === 'shop' || name === 'shopclosed') {
     setLight(world, 0.9);
     state.cash = 2150;
