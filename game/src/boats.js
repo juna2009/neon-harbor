@@ -9,7 +9,7 @@ export function createBoats(city, rng) {
   ];
   return spots.map((s, i) => ({
     x: s.x, y: s.y, angle: s.angle, speed: 0,
-    color: ['#e8e4d8', '#37e0e6', '#ff7fc0'][i],
+    color: ['#e8e4d8', '#37e0e6', '#0b0e13'][i],
     stolen: false, wake: [], length: 54, width: 20, alive: true, hp: 100,
   }));
 }

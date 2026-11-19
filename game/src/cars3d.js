@@ -83,7 +83,18 @@
 // Geometri kit (format bucket = webgl2.js)
 // ---------------------------------------------------------------------------
 export function newBucket() { return { p: [], n: [], u: [], c: [], m: [], i: [] }; }
-export { quad, boxR, box, flat, billDir };
+export { quad, boxR, box, flat, billDir, quadN };
+// Quad dengan normal PER-VERTEX (R36V2-SMOOTH): untuk strip melengkung —
+// normal tiap sudut dirata-rata dari faset tetangga; shader menginterpolasi
+// vN (tanpa culling, tanpa gl_FrontFacing — winding tak berpengaruh,
+// hanya atribut normal) → permukaan terbaca melengkung, bukan faset.
+// 0 tris tambahan: quad yang sama, normal berbeda.
+function quadN(B, a, b, c, d, na, nb, nc, nd, uvs, col, m) {
+  const base = B.p.length / 3;
+  push(B, a, na, uvs[0], col, m); push(B, b, nb, uvs[1], col, m);
+  push(B, c, nc, uvs[2], col, m); push(B, d, nd, uvs[3], col, m);
+  B.i.push(base, base + 1, base + 2, base, base + 2, base + 3);
+}
 function push(B, v, n, uv, col, m) {
   B.p.push(v[0], v[1], v[2]); B.n.push(n[0], n[1], n[2]);
   B.u.push(uv[0], uv[1]); B.c.push(col[0], col[1], col[2]); B.m.push(m);
@@ -219,7 +230,12 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   const spec = carSpec(type);
   const tri0 = (B.i.length + G.i.length) / 3;
   const L = len || spec.len, W = wid || spec.wid;
-  const col = Array.isArray(paint) ? paint : paint ? hx(paint) : hx(spec.paint);
+  let col = Array.isArray(paint) ? paint : paint ? hx(paint) : hx(spec.paint);
+  // R36V2-POLICE: unit polisi datang dengan cat biru #2f6fd0 (police.js)
+  // — di 3D terbaca sedan biru, bukan Charger hitam-putih target. Paksa
+  // cat 3D jadi hitam-navy; 2D top-down tetap biru (readability gameplay),
+  // hanya model 3D yang berubah. paintDark/Light turun dari col ini.
+  if (type === 'police') col = [0.07, 0.08, 0.12];
   // Nada cat v2 (cat 3 lapis TERBACA): badan bawah lebih gelap (pantulan
   // tanah), pita atap lebih terang (clear-coat kena matahari).
   // v3: kontras diperkuat (×0,66 / ×1,35) — batch 5: flop sisi matahari
@@ -266,6 +282,34 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       quad(B, a, d, c, b, [-n[0], -n[1], -n[2]], [[0, 0], [1, 0], [1, 1], [0, 1]], col, m);
     } else {
       quad(B, a, b, c, d, n, [[0, 0], [1, 0], [1, 1], [0, 1]], col, m);
+    }
+  };
+  // ---- R36V2-SMOOTH: strip 2-titik sepanjang z, normal halus per stasiun ----
+  // sec(t) -> [P0, P1] titik LOKAL (kiri, kanan) di stasiun t (0..1);
+  // hint = arah luar (konvensi sama seperti quadOut — normal muka dicek
+  // hint lalu dibalik bila berlawanan). Normal stasiun k = rata-rata
+  // normal muka segmen k-1 dan k (ujung = segmen terdekat). Crease antar
+  // band TIDAK dihaluskan (tiap band strip sendiri: bahu, punggung atap,
+  // garis kap). 0 tris baru — strip yang sama, normal berbeda.
+  const smoothStripZ = (n, sec, hint, col, m) => {
+    const S = [];
+    for (let k = 0; k <= n; k += 1) S.push(sec(k / n));
+    const wpt = (p) => at(p[0], p[1], p[2]);
+    const faceN = [];
+    for (let i = 0; i < n; i += 1) {
+      const a = wpt(S[i][0]), b = wpt(S[i + 1][0]), c = wpt(S[i + 1][1]);
+      let nn = norm(cross([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]));
+      if (nn[0] * hint[0] + nn[1] * hint[1] + nn[2] * hint[2] < 0) nn = [-nn[0], -nn[1], -nn[2]];
+      faceN.push(nn);
+    }
+    const statN = S.map((_, k) => {
+      if (k === 0) return faceN[0];
+      if (k === n) return faceN[n - 1];
+      return norm([faceN[k - 1][0] + faceN[k][0], faceN[k - 1][1] + faceN[k][1], faceN[k - 1][2] + faceN[k][2]]);
+    });
+    for (let i = 0; i < n; i += 1) {
+      const a = wpt(S[i][0]), b = wpt(S[i + 1][0]), c = wpt(S[i + 1][1]), d = wpt(S[i][1]);
+      quadN(B, a, b, c, d, statN[i], statN[i + 1], statN[i + 1], statN[i], [[0, 0], [1, 0], [1, 1], [0, 1]], col, m);
     }
   };
   // ---- KACA v2: streak HALUS (bukan zebra shader) + bingkai karet ----
@@ -402,9 +446,13 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     const pt = (a, dx) => [C[0] + rgt[0] * dx + fwd[0] * r * Math.sin(a), C[1] + r * Math.cos(a), C[2] + rgt[1] * dx + fwd[1] * r * Math.sin(a)];
     for (let j = 0; j < seg; j += 1) {
       const a0 = (j / seg) * Math.PI * 2, a1 = ((j + 1) / seg) * Math.PI * 2;
-      const am = (a0 + a1) / 2;
-      quad(B, pt(a0, -len / 2), pt(a0, len / 2), pt(a1, len / 2), pt(a1, -len / 2),
-        dir(0, Math.cos(am), Math.sin(am)), [[0, 0], [1, 0], [1, 1], [0, 1]], colM, m);
+      // R36V2-SMOOTH: tapak ban bulat — normal tiap sudut = arah radial
+      // di sudut ITU (a0/a1), bukan mid-angle datar → ban terbaca
+      // silinder halus, bukan prisma 14-sisi. 0 tris (quad yang sama).
+      quadN(B, pt(a0, -len / 2), pt(a0, len / 2), pt(a1, len / 2), pt(a1, -len / 2),
+        dir(0, Math.cos(a0), Math.sin(a0)), dir(0, Math.cos(a0), Math.sin(a0)),
+        dir(0, Math.cos(a1), Math.sin(a1)), dir(0, Math.cos(a1), Math.sin(a1)),
+        [[0, 0], [1, 0], [1, 1], [0, 1]], colM, m);
     }
     for (const s of [1, -1]) {
       const nrm = [rgt[0] * s, 0, rgt[1] * s];
@@ -419,6 +467,12 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   };
   const drawWheel = (lx, lz, s) => {
     const C = at(lx, wheelY, lz);
+    // R36V2-WHEEL: hero = velg hitam + kaliper merah (Huracan); polisi =
+    // velg baja hitam + hub krom, tanpa kaliper merah (Charger steelies);
+    // sisanya velg alloy perak. Hanya warna (+ skip kaliper polisi) — 0 tris.
+    const wheelMode = type === 'hero' ? 'black' : type === 'police' ? 'steel' : 'alloy';
+    const spokeCol = wheelMode === 'alloy' ? [0.82, 0.82, 0.86] : wheelMode === 'black' ? [0.13, 0.13, 0.15] : [0.10, 0.10, 0.11];
+    const spokeHi = wheelMode === 'alloy' ? [0.98, 0.98, 0.98] : [0.30, 0.30, 0.34];
     const r = wheelD / 2, seg = hi ? 14 : mid ? 12 : 8; // v12: hi 14 sisi (dari 16) — BAYAR stripe highlight spoke: -8 tris/ban x 4 = -32 tris. A/B macro v12b: siluet tepi bawah ban 14 vs 16 IDENTIK (12 lug tapak yang mendominasi outline); 12 sisi = stop sign (v10a) — 14 aman.
     wheelCyl(C, r, 0.26, seg, TIRE, 5, [0.07, 0.07, 0.07]); // ban + dinding samping
     const rimR = wheelD * 0.34; // v16: pelek LEBIH BESAR (0,30->0,34) — velg terbaca sebagai velg, bukan bintik
@@ -442,18 +496,18 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
         const rc = rimR * 0.52, sl = rimR * 0.95, sw = 0.12; // v11: spoke LEBIH SEMPIT (0,12) + lebih panjang (0,95) — v10 0,20 LEBIH LEBAR dari jarak antar-spoke (0,20 > 2*0,093*sin36°=0,109 di dekat hub) sehingga 5 spoke menyatu jadi cakram pucat solid; 0,12 membuka celah gelap antar-spoke. Lebar 0,20 tetap PLAFON (jangan lebarkan lagi).
         const base = [C[0] + rgt[0] * dx + d[0] * rc, C[1] + d[1] * rc, C[2] + rgt[1] * dx + d[2] * rc];
         const mk = (sd, sp) => [base[0] + d[0] * sd * sl / 2 + pp[0] * sp * sw / 2, base[1] + d[1] * sd * sl / 2 + pp[1] * sp * sw / 2, base[2] + d[2] * sd * sl / 2 + pp[2] * sp * sw / 2];
-        quad(B, mk(-1, -1), mk(1, -1), mk(1, 1), mk(-1, 1), [rgt[0] * s, 0, rgt[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], [0.82, 0.82, 0.86], 1);
+        quad(B, mk(-1, -1), mk(1, -1), mk(1, 1), mk(-1, 1), [rgt[0] * s, 0, rgt[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], spokeCol, 1);
         // v12: STRIPE HIGHLIGHT tengah spoke [0,98] — garis terang tipis (22% lebar spoke, 85% panjang), 0,005 unit di depan bidang spoke (anti z-fight). Tiap spoke punya highlight spine = terbaca LOGAM; celah gelap antar-spoke tetap (TIDAK jadi bunga v6a). +2 tris/spoke x 5 x 4 roda = +40 tris, dibayar ban 14 sisi (-32) -> hero 1526 (<=1550).
         const mkH = (sd, sp) => [base[0] + rgt[0] * s * 0.005 + d[0] * sd * sl * 0.85 / 2 + pp[0] * sp * sw * 0.22 / 2, base[1] + d[1] * sd * sl * 0.85 / 2 + pp[1] * sp * sw * 0.22 / 2, base[2] + rgt[1] * s * 0.005 + d[2] * sd * sl * 0.85 / 2 + pp[2] * sp * sw * 0.22 / 2];
-        quad(B, mkH(-1, -1), mkH(1, -1), mkH(1, 1), mkH(-1, 1), [rgt[0] * s, 0, rgt[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], [0.98, 0.98, 0.98], 1);
+        quad(B, mkH(-1, -1), mkH(1, -1), mkH(1, 1), mkH(-1, 1), [rgt[0] * s, 0, rgt[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], spokeHi, 1);
       }
-      wheelCyl(C, 0.08, 0.34, 6, CHROME, 1); // hub tengah v6 (0,07→0,08 — lebih besar/terang, pusat velg)
+      wheelCyl(C, 0.08, 0.34, 6, wheelMode === 'black' ? [0.15, 0.15, 0.17] : CHROME, 1); // hub tengah v6 (0,07→0,08 — lebih besar/terang, pusat velg; R36V2: hero hub gelap)
       // Kaliper rem v7: LEBIH BESAR (0,12×0,24×0,18 — dari 0,10×0,20×0,16)
       // + LEBIH TERANG [0,90, 0,14, 0,08] + digeser keluar (dx 0,08→0,09) —
       // batch 10: kaliper v6 cuma bintik merah kecil, hampir tak terbaca
       // tanpa crop zoom. v7a 0,14×0,28 TERLALU BESAR — jadi balok merah
       // yang menutupi velg; 0,12×0,24 jalan tengah. Hi-only, v4 LOD mid.
-      if (hi) {
+      if (hi && wheelMode !== 'steel') { // R36V2: polisi steelies tanpa kaliper merah
         const thc = -2.4;
         const cq = at(lx + s * 0.09, wheelY + Math.cos(thc) * rimR * 0.7, lz + Math.sin(thc) * rimR * 0.7);
         boxR(B, cq[0], cq[1], cq[2], 0.12, 0.24, 0.18, yaw, 0, [0.90, 0.14, 0.08], 5);
@@ -467,11 +521,19 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       const fxc = s * (W / 2 + 0.14), fR = r + 0.10, iR = r + 0.02; // v9: fender DIPISAH dari roda (tetap W/2+0,14, tepi luar W/2+0,22) — roda geser, fender tidak ikut
       for (let j = 0; j < 6; j += 1) {
         const a0 = (-75 + j * 25) * Math.PI / 180, a1 = (-75 + (j + 1) * 25) * Math.PI / 180;
-        const am = (a0 + a1) / 2, nrm = dir(0, Math.cos(am), Math.sin(am));
+        // R36V2-SMOOTH: lengkung roda — normal tiap sudut = arah radial
+        // di sudut ITU (bukan mid-angle) → busur fender terbaca melengkung
+        // halus, bukan 6 faset. 0 tris (2 quad yang sama).
         const ptF = (a, dx) => at(fxc + dx, wheelY + fR * Math.cos(a), lz + fR * Math.sin(a));
-        quad(B, ptF(a0, 0.13), ptF(a0, -0.13), ptF(a1, -0.13), ptF(a1, 0.13), nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], col, 1); // v11: pita fender LEBIH TEBAL (±0,13, dari ±0,08) — di macro v10 fender terbaca seperti garis wireframe karena dilihat nyaris edge-on; 0 tris
+        quadN(B, ptF(a0, 0.13), ptF(a0, -0.13), ptF(a1, -0.13), ptF(a1, 0.13),
+          dir(0, Math.cos(a0), Math.sin(a0)), dir(0, Math.cos(a0), Math.sin(a0)),
+          dir(0, Math.cos(a1), Math.sin(a1)), dir(0, Math.cos(a1), Math.sin(a1)),
+          [[0, 0], [1, 0], [1, 1], [0, 1]], col, 1); // v11: pita fender LEBIH TEBAL (±0,13, dari ±0,08) — di macro v10 fender terbaca seperti garis wireframe karena dilihat nyaris edge-on; 0 tris
         const ptI = (a, dx) => at(lx + s * 0.02 + dx, wheelY + iR * Math.cos(a), lz + iR * Math.sin(a));
-        quad(B, ptI(a0, 0.05), ptI(a0, -0.05), ptI(a1, -0.05), ptI(a1, 0.05), nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], DARK, 5);
+        quadN(B, ptI(a0, 0.05), ptI(a0, -0.05), ptI(a1, -0.05), ptI(a1, 0.05),
+          dir(0, Math.cos(a0), Math.sin(a0)), dir(0, Math.cos(a0), Math.sin(a0)),
+          dir(0, Math.cos(a1), Math.sin(a1)), dir(0, Math.cos(a1), Math.sin(a1)),
+          [[0, 0], [1, 0], [1, 1], [0, 1]], DARK, 5);
       }
       // TAPAK BAN v5 (hi-only): 12 lug LEBIH BESAR + kontras KUAT — v4 tapak
       // tidak terbaca di shot mana pun (batch 8). Lug kini menonjol 0,022,
@@ -485,7 +547,13 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       // yang menghadap kamera chase-cam).
       if (hi) for (let j = 0; j < 12; j += 1) {
         const am = ((j + 0.5) / 12) * Math.PI * 2, hw2 = 0.34;
-        const lug = j % 2 === 0 ? [0.68, 0.68, 0.68] : [0.04, 0.04, 0.04];
+        // R36-LUG (item 15): lug terang [0,68] di kuadran belakang ban
+        // menghadap langsung ke chase-cam dan kebaca kotak lampu pucat
+        // di belakang mobil (probe: lug oranye = patch oranye di kedua
+        // roda belakang). Lug yang paling menghadap ke belakang
+        // (sin(am)<-0,7) digelapkan ke 0,22 — pola tapak tetap terbaca
+        // dari samping/3-4, tapi muka belakang ban gelap, bukan lampu.
+        const lug = j % 2 === 0 ? (Math.sin(am) < -0.7 ? [0.22, 0.22, 0.22] : [0.68, 0.68, 0.68]) : [0.04, 0.04, 0.04];
         const lp = (a, dx) => at(lx + dx, wheelY + (r + 0.022) * Math.cos(a), lz + (r + 0.022) * Math.sin(a));
         quad(B, lp(am - hw2, 0.15), lp(am - hw2, -0.15), lp(am + hw2, -0.15), lp(am + hw2, 0.15),
           dir(0, Math.cos(am), Math.sin(am)), [[0, 0], [1, 0], [1, 1], [0, 1]], lug, 5);
@@ -504,7 +572,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       // di close-up; dari chase-cam lurus tetap tidak terbaca.
       if (hi) for (let j = 0; j < 6; j += 1) {
         const am = ((j * 60 + 30) * Math.PI) / 180, hw3 = 0.17;
-        const gcol = j % 2 === 0 ? [0.88, 0.88, 0.88] : [0.02, 0.02, 0.02];
+        const gcol = j % 2 === 0 ? (wheelMode === 'alloy' ? [0.88, 0.88, 0.88] : [0.30, 0.30, 0.30]) : [0.02, 0.02, 0.02]; // R36V2: alur dinding ban ikut gelap di velg hitam/baja
         const r1 = rimR * 1.12, r2 = r * 0.97;
         const gp = (a, rr) => at(lx + s * 0.20, wheelY + rr * Math.cos(a), lz + rr * Math.sin(a)); // v8: dx 0,20 — lebih menonjol dari dinding ban
         quad(B, gp(am - hw3, r1), gp(am - hw3, r2), gp(am + hw3, r2), gp(am + hw3, r1),
@@ -753,42 +821,59 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
           [s, 0.5, 0], col, 1);
       }
     };
-    for (const s of [-1, 1]) {
-      flankQuad(s, W * 0.485, 1.06, W / 2 + 0.14, 0.95, paintLight); // (A1)
-      flankQuad(s, W / 2 + 0.14, 0.95, W / 2 + 0.20, 0.80, paintLight); // (A2)
-      flankQuad(s, W / 2 + 0.20, 0.80, W / 2 + 0.20, 0.55, col); // (B) — tonjolan 0,20
-      flankQuad(s, W / 2 + 0.20, 0.55, W / 2 + 0.10, 0.45, paintDark); // (C1)
-      flankQuad(s, W / 2 + 0.10, 0.45, W * 0.46, 0.34, paintDark); // (C2)
-    }
+    // R36V2-SMOOTH: flank — 5 faset penampang dibulatkan: normal di tiap
+    // sambungan = rata-rata normal faset tetangga (bukan flat per faset)
+    // → tonjolan samping terbaca melengkung halus. Tepi atas (bahu) +
+    // bawah (skirt) tetap tajam = crease desain. 0 tris baru.
+    const flankProfile = [
+      [W * 0.485, 1.06, W / 2 + 0.14, 0.95, paintLight], // (A1)
+      [W / 2 + 0.14, 0.95, W / 2 + 0.20, 0.80, paintLight], // (A2)
+      [W / 2 + 0.20, 0.80, W / 2 + 0.20, 0.55, col], // (B) — tonjolan 0,20
+      [W / 2 + 0.20, 0.55, W / 2 + 0.10, 0.45, paintDark], // (C1)
+      [W / 2 + 0.10, 0.45, W * 0.46, 0.34, paintDark], // (C2)
+    ];
+    const flankStrip = (s, profile) => {
+      for (const [zA, zB] of flankSegs) {
+        const fn = profile.map(([ax0, ay0, ax1, ay1]) => {
+          const a = at(s * ax0, ay0 - flankDrop(zA), zA);
+          const b = at(s * ax0, ay0 - flankDrop(zB), zB);
+          const c = at(s * ax1, ay1 - flankDrop(zB), zB);
+          let nn = norm(cross([b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]));
+          if (nn[0] * s + nn[1] * 0.5 < 0) nn = [-nn[0], -nn[1], -nn[2]];
+          return nn;
+        });
+        const jn = [fn[0]];
+        for (let k = 1; k < 5; k += 1) jn.push(norm([fn[k - 1][0] + fn[k][0], fn[k - 1][1] + fn[k][1], fn[k - 1][2] + fn[k][2]]));
+        jn.push(fn[4]);
+        profile.forEach(([ax0, ay0, ax1, ay1, cc], k) => {
+          const a = at(s * ax0, ay0 - flankDrop(zA), zA);
+          const b = at(s * ax0, ay0 - flankDrop(zB), zB);
+          const c = at(s * ax1, ay1 - flankDrop(zB), zB);
+          const d = at(s * ax1, ay1 - flankDrop(zA), zA);
+          quadN(B, a, b, c, d, jn[k], jn[k], jn[k + 1], jn[k + 1], [[0, 0], [1, 0], [1, 1], [0, 1]], cc, 1);
+        });
+      }
+    };
+    for (const s of [-1, 1]) flankStrip(s, flankProfile);
     // KAP v15: cangkang 3 faset (tengah + 2 sisi menurun ke fender) —
     // 1,14 di cowl menurun ke 0,99 di hidung; sisi luar turun sampai tepi
     // atas flank (tanpa celah). BAGASI v15: sama, 1,16 -> 1,06 ke ekor
     // (pickup: tidak ada — bak terbuka; hatch: deck pendek 1 segmen).
     const hoodY = (t) => 1.14 - 0.15 * Math.pow(t, 1.25);
     const hoodZ = (t) => cowlZ + (noseZ - cowlZ) * t;
-    for (let i = 0; i < nHood; i += 1) {
-      const t0 = i / nHood, t1 = (i + 1) / nHood;
-      const z0 = hoodZ(t0), z1 = hoodZ(t1), y0 = hoodY(t0), y1 = hoodY(t1);
-      quadOut(at(-0.55, y0, z0), at(-0.55, y1, z1), at(0.55, y1, z1), at(0.55, y0, z0), [0, 1, 0.2], col, 1);
-      for (const s of [-1, 1]) {
-        quadOut(at(s * 0.55, y0, z0), at(s * 0.55, y1, z1),
-          at(s * (W * 0.485), 1.06 - flankDrop(z1) - 0.01, z1), at(s * (W * 0.485), 1.06 - flankDrop(z0) - 0.01, z0),
-          [s * 0.3, 1, 0.2], col, 1);
-      }
+    // R36V2-SMOOTH: kap — normal halus sepanjang z (tengah + 2 sisi).
+    smoothStripZ(nHood, (t) => [[-0.55, hoodY(t), hoodZ(t)], [0.55, hoodY(t), hoodZ(t)]], [0, 1, 0.2], col, 1);
+    for (const s of [-1, 1]) {
+      smoothStripZ(nHood, (t) => [[s * 0.55, hoodY(t), hoodZ(t)], [s * (W * 0.485), 1.06 - flankDrop(hoodZ(t)) - 0.01, hoodZ(t)]], [s * 0.3, 1, 0.2], col, 1);
     }
     if (spec.kind !== 'pickup') {
       const nTrunkH = spec.kind === 'hatch' ? 1 : nTrunk;
       const trunkY = (t) => rearBotY - (rearBotY - 1.06) * Math.pow(t, 1.2);
       const trunkZ = (t) => trunkZ0 + (-noseZ - trunkZ0) * t;
-      for (let i = 0; i < nTrunkH; i += 1) {
-        const t0 = i / nTrunkH, t1 = (i + 1) / nTrunkH;
-        const z0 = trunkZ(t0), z1 = trunkZ(t1), y0 = trunkY(t0), y1 = trunkY(t1);
-        quadOut(at(-0.55, y0, z0), at(-0.55, y1, z1), at(0.55, y1, z1), at(0.55, y0, z0), [0, 1, -0.2], col, 1);
-        for (const s of [-1, 1]) {
-          quadOut(at(s * 0.55, y0, z0), at(s * 0.55, y1, z1),
-            at(s * (W * 0.485), 1.06 - flankDrop(z1) - 0.01, z1), at(s * (W * 0.485), 1.06 - flankDrop(z0) - 0.01, z0),
-            [s * 0.3, 1, -0.2], col, 1);
-        }
+      // R36V2-SMOOTH: bagasi — normal halus sepanjang z (tengah + 2 sisi).
+      smoothStripZ(nTrunkH, (t) => [[-0.55, trunkY(t), trunkZ(t)], [0.55, trunkY(t), trunkZ(t)]], [0, 1, -0.2], col, 1);
+      for (const s of [-1, 1]) {
+        smoothStripZ(nTrunkH, (t) => [[s * 0.55, trunkY(t), trunkZ(t)], [s * (W * 0.485), 1.06 - flankDrop(trunkZ(t)) - 0.01, trunkZ(t)]], [s * 0.3, 1, -0.2], col, 1);
       }
     }
     // HIDUNG v15: bevel miring (0,99 -> 0,45) + chamfer sudut 45° depan &
@@ -808,25 +893,46 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     p(0, 1.36, (coreFrontZ + coreRearZ) / 2, W * spec.cabW * 0.84, 0.28, coreFrontZ - coreRearZ, col, 1);
     // ATAP v15: cangkang lengkung (depan -> puncak -> belakang) × V
     // melintang (punggung +0,05) — atap datar MATI.
-    for (let i = 0; i < nRoof; i += 1) {
-      const t0 = i / nRoof, t1 = (i + 1) / nRoof;
-      const z0 = roofFZ + (roofRZ - roofFZ) * t0, z1 = roofFZ + (roofRZ - roofFZ) * t1;
-      const e0 = roofEdgeY(z0), e1 = roofEdgeY(z1);
-      quadOut(at(0, e0 + 0.05, z0), at(0, e1 + 0.05, z1), at(-roofHalf, e1, z1), at(-roofHalf, e0, z0), [-0.25, 1, 0], col, 1);
-      quadOut(at(0, e0 + 0.05, z0), at(0, e1 + 0.05, z1), at(roofHalf, e1, z1), at(roofHalf, e0, z0), [0.25, 1, 0], col, 1);
+    // R36V2-SMOOTH: atap — normal halus sepanjang z per paruh (punggung
+    // tengah tetap crease); kap hitam hero ikut strip yang sama.
+    const roofSec = (half, eOff) => (t) => {
+      const z = roofFZ + (roofRZ - roofFZ) * t, e = roofEdgeY(z) + eOff;
+      return [[0, e + 0.05, z], [half * roofHalf, e, z]];
+    };
+    smoothStripZ(nRoof, roofSec(-1, 0), [-0.25, 1, 0], col, 1);
+    smoothStripZ(nRoof, roofSec(1, 0), [0.25, 1, 0], col, 1);
+    if (spec.kind === 'sport') {
+      // R36V2-HERO-ROOF: atap hitam (Huracan) — panel mengikuti lengkung
+      // atap, 0,02 di atas permukaan, nRoof segmen × 2 sisi (20 tris hi).
+      // nCap HARUS = nRoof: kap 3 segmen (v2) talinya datar menembus
+      // lengkung atap (puncak arch +0,085, deviasi tali 0,0114 > offset
+      // 0,012) → cat merah atap menembus kap hitam di tengah atap
+      // (terlihat di crop v3/v5). 5 segmen + 0,02 = margin 0,016.
+      const nCap = nRoof, capHalf = roofHalf * 0.80;
+      const capSec = (half) => (t) => {
+        const z = roofFZ + (roofRZ - roofFZ) * t, e = roofEdgeY(z) + 0.02;
+        return [[0, e + 0.05, z], [half * capHalf, e, z]];
+      };
+      smoothStripZ(nCap, capSec(-1), [-0.25, 1, 0], DARK, 5);
+      smoothStripZ(nCap, capSec(1), [0.25, 1, 0], DARK, 5);
+      // R36V2-HERO-HOOD: kap tengah hitam + 2 ventilasi (Huracan) —
+      // panel mengikuti faset kap, 0,012 di atas permukaan (8 + 2 tris).
+      smoothStripZ(nHood, (t) => [[-0.30, hoodY(t) + 0.012, hoodZ(t)], [0.30, hoodY(t) + 0.012, hoodZ(t)]], [0, 1, 0.2], DARK, 5);
+      for (const s of [-1, 1]) {
+        quadOut(at(s * 0.38, hoodY(0.15) + 0.012, hoodZ(0.15)), at(s * 0.38, hoodY(0.45) + 0.012, hoodZ(0.45)),
+          at(s * 0.58, hoodY(0.45) + 0.012, hoodZ(0.45)), at(s * 0.58, hoodY(0.15) + 0.012, hoodZ(0.15)), [s * 0.3, 1, 0.2], DARK, 5);
+      }
     }
     // KACA SAMPING v15: miring ke dalam (tumblehome) + tepi atas mengikuti
     // lengkung atap; pilar B membagi jendela depan/belakang (hi/mid).
     const glassBotX = (W * spec.cabW) / 2, glassTopX = roofHalf - 0.025;
     const sideFZ = roofFZ - 0.05, sideRZ = spec.kind === 'pickup' ? -0.40 : roofRZ + 0.05;
     for (const s of [-1, 1]) {
-      for (let i = 0; i < nRoof; i += 1) {
-        const t0 = i / nRoof, t1 = (i + 1) / nRoof;
-        const z0 = sideFZ + (sideRZ - sideFZ) * t0, z1 = sideFZ + (sideRZ - sideFZ) * t1;
-        quadOut(at(s * glassBotX, beltY, z0), at(s * glassBotX, beltY, z1),
-          at(s * glassTopX, roofEdgeY(z1) - 0.015, z1), at(s * glassTopX, roofEdgeY(z0) - 0.015, z0),
-          [s, 0.4, 0], GLASS, 1);
-      }
+      // R36V2-SMOOTH: kaca samping — normal halus sepanjang z.
+      smoothStripZ(nRoof, (t) => {
+        const z = sideFZ + (sideRZ - sideFZ) * t;
+        return [[s * glassBotX, beltY, z], [s * glassTopX, roofEdgeY(z) - 0.015, z]];
+      }, [s, 0.4, 0], GLASS, 1);
       if (hi || mid) {
         const bz = cabZ;
         quadOut(at(s * glassBotX, beltY, bz - 0.03), at(s * glassBotX, beltY, bz + 0.03),
@@ -872,6 +978,19 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     for (const s of [-1, 1]) {
       if (hi) qS(s * (W / 2 + 0.21), 0.98, 0, L * 0.85, 0.03, DARK, 5); // garis pinggang (v7: di atas faset B v7)
     }
+    // R36-SKIRT: side skirt — pita gelap di paruh bawah faset C2
+    // (mengikuti kemiringan flank, +0,012 keluar dari bidang faset anti
+    // z-fight). Sisi bawah tak lagi slab datar; strip terputus di roda
+    // karena ban lebih keluar dari bidang strip (seperti skirt asli).
+    for (const s of [-1, 1]) {
+      flankQuad(s, (W / 2 + 0.10 + W * 0.46) / 2 + 0.012, 0.395, W * 0.46 + 0.012, 0.34, DARK);
+    }
+    if (spec.kind === 'sport' && hi) {
+      // R36V2-HERO-INTAKE: intake samping hitam di kuarter belakang
+      // (Huracan) — di bidang detail 0,225, di atas fender + tutup
+      // tangki supaya tak z-fight (4 tris).
+      for (const s of [-1, 1]) qS(s * (W / 2 + 0.225), 0.98, -L * 0.32, 0.42, 0.14, DARK, 5);
+    }
     // Rim light hangat di tepi belakang atap (jurus GTA V — bible §1.2 butir 8)
     if (hi) p(0, roofEdgeY(roofRZ) + 0.02, roofRZ + 0.02, W * spec.cabW * 0.78, 0.04, 0.04, [0.9, 0.55, 0.28], 4);
     // v16c: sunroof + sweep DICABUT (8 tris hi) — kembali setelah Uint32.
@@ -904,20 +1023,79 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     drawRearLights(true); // v16: klaster (bukan bar slab)
     if (spec.kind === 'pickup') drawPickupBed(bodyTop);
     if (spec.spoiler) {
-      p(0, bodyTop + 0.02, -L * 0.47, W * 0.85, 0.07, 0.4, col, 1);              // spoiler WARNA BODI (v16: bukan bar hitam — menyatu dengan deck + ducktail)
-      if (hi) {
-        p(0, bodyTop + 0.06, -L * 0.47, W * 0.8, 0.04, 0.05, RIMWARM, 4);        // rim di spoiler
-        for (const s of [-1, 1]) p(s * W * 0.3, bodyTop - 0.04, -L * 0.47, 0.08, 0.12, 0.1, DARK, 5);
+      if (spec.kind === 'sport') {
+        // R36V2-WING: sayap belakang Huracan — bilah hitam di atas 2 kaki
+        // + endplate; bilah = quad atas + muka belakang (12 tris, bukan
+        // 38 tris balok v16 — hemat + terbaca sayap dari belakang).
+        const wy = bodyTop + 0.30, wz = -L * 0.47;
+        quad(B, at(-W * 0.44, wy, wz - 0.17), at(W * 0.44, wy, wz - 0.17), at(W * 0.44, wy, wz + 0.17), at(-W * 0.44, wy, wz + 0.17), [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], DARK, 5); // bilah atas
+        qB(0, wy - 0.025, wz - 0.17, W * 0.88, 0.05, DARK, 5); // muka belakang bilah
+        for (const s of [-1, 1]) {
+          qB(s * W * 0.30, bodyTop + 0.12, wz, 0.08, 0.36, DARK, 5); // kaki sayap (dari deck 1,06 ke bilah)
+          qS(s * (W * 0.44), wy, wz, 0.34, 0.16, DARK, 5); // endplate
+        }
+      } else {
+        p(0, bodyTop + 0.02, -L * 0.47, W * 0.85, 0.07, 0.4, col, 1);              // spoiler WARNA BODI (v16: bukan bar hitam — menyatu dengan deck + ducktail)
+        if (hi) {
+          p(0, bodyTop + 0.06, -L * 0.47, W * 0.8, 0.04, 0.05, RIMWARM, 4);        // rim di spoiler
+          for (const s of [-1, 1]) p(s * W * 0.3, bodyTop - 0.04, -L * 0.47, 0.08, 0.12, 0.1, DARK, 5);
+        }
       }
     }
     if (hi && spec.kind === 'sedan') {
       for (const s of [-1, 1]) p(s * (W / 2 + 0.21), 0.78, 0, 0.06, 0.06, L * 0.8, CHROME, 1); // strip krom flank (v8: 0,21 — di atas faset B 0,20)
     }
+    if (spec.kind === 'sedan') {
+      // R36V2-CHROME2: lis krom garis pinggang bawah kaca (Accord) —
+      // sepanjang kaca samping saja (tengah z -L*0,10, panjang L*0,30),
+      // 2 quad/sisi (4 tris).
+      for (const s of [-1, 1]) qS(s * (W / 2 + 0.215), 1.02, -L * 0.10, L * 0.30, 0.035, CHROME, 1);
+    }
     if (spec.police || o.police) {
-      for (const s of [-1, 1]) p(s * (W / 2 + 0.21), 0.72, 0, 0.06, 0.4, L * 0.5, WHITE, 1); // pintu putih (v8: 0,21)
-      qF(-0.35, cabY + cabH / 2 + 0.12, cabZ, 0.5, 0.18, blink ? RED_TAIL : [0.35, 0.1, 0.12], blink ? 4 : 5);
-      qF(0.35, cabY + cabH / 2 + 0.12, cabZ, 0.5, 0.18, blink ? [0.1, 0.15, 0.45] : [0.15, 0.3, 1.0], blink ? 5 : 4);
-      qGlowB(0, cabY + cabH / 2 + 0.12, cabZ + 0.2, 1.3, 0.45, [0.7, 0.2, 0.6]);
+      // R36V2-POLICE: Charger hitam-putih — panel putih digeser ke
+      // belakang (pintu belakang + kuarter, bukan tengah) + bagasi putih.
+      for (const s of [-1, 1]) p(s * (W / 2 + 0.21), 0.72, -L * 0.14, 0.06, 0.4, L * 0.56, WHITE, 1); // pintu belakang + kuarter putih
+      // Bagasi putih: 2 segmen mengikuti lengkung bagasi (+0,012).
+      // trunkY/Z didefinisikan di blok bagasi (scope blok) — hitung ulang.
+      const trY = (t) => rearBotY - (rearBotY - 1.06) * Math.pow(t, 1.2);
+      const trZ = (t) => trunkZ0 + (-noseZ - trunkZ0) * t;
+      // R36V2-SMOOTH: bagasi putih — normal halus (t 0,5–1,0).
+      smoothStripZ(2, (u) => {
+        const t = 0.5 + u * 0.5;
+        return [[-0.55, trY(t) + 0.012, trZ(t)], [0.55, trY(t) + 0.012, trZ(t)]];
+      }, [0, 1, -0.2], WHITE, 1);
+      // R36V2-LIGHTBAR: light bar 3D — alas hitam di atap + merah/biru di
+      // muka DEPAN dan BELAKANG (dulu cuma qF: dari belakang tak terbaca).
+      const lbY = cabY + cabH / 2 + 0.12;
+      p(0, lbY, cabZ, 1.15, 0.10, 0.30, DARK, 5); // alas
+      const lbR = blink ? RED_TAIL : [0.35, 0.1, 0.12], lbRm = blink ? 4 : 5;
+      const lbB = blink ? [0.1, 0.15, 0.45] : [0.15, 0.3, 1.0], lbBm = blink ? 5 : 4;
+      qF(-0.29, lbY, cabZ + 0.16, 0.5, 0.12, lbR, lbRm);
+      qF(0.29, lbY, cabZ + 0.16, 0.5, 0.12, lbB, lbBm);
+      qB(-0.29, lbY, cabZ - 0.16, 0.5, 0.12, lbR, lbRm);
+      qB(0.29, lbY, cabZ - 0.16, 0.5, 0.12, lbB, lbBm);
+      qGlowB(0, lbY, cabZ + 0.2, 1.3, 0.45, [0.7, 0.2, 0.6]);
+      // R36V2-PUSHBAR: push bar depan — 2 vertikal + 2 horizontal +
+      // 2 lampu amber (12 tris, quad saja — dari depan terbaca bull bar).
+      for (const s of [-1, 1]) qF(s * 0.55, 0.68, L / 2 + 0.14, 0.09, 0.52, DARK, 5);
+      qF(0, 0.92, L / 2 + 0.14, 1.2, 0.08, DARK, 5);
+      qF(0, 0.46, L / 2 + 0.14, 1.2, 0.08, DARK, 5);
+      for (const s of [-1, 1]) qF(s * 0.35, 0.92, L / 2 + 0.15, 0.14, 0.06, [1.0, 0.7, 0.2], 4);
+    }
+    if (o.taxi) {
+      // R36V2-TAXI: papan TAXI menyala di atap + strip kotak-kotak di
+      // flank (Camry target). Papan = alas hitam + kotak amber mat 4
+      // (24 tris); strip = pita putih + 5 kotak hitam per sisi (24 tris).
+      const signY = roofEdgeY(cabZ) + 0.05;
+      p(0, signY + 0.03, cabZ, 0.50, 0.06, 0.30, DARK, 5); // alas papan
+      p(0, signY + 0.13, cabZ, 0.62, 0.16, 0.24, [1.0, 0.62, 0.08], 4); // papan TAXI menyala
+      for (const s of [-1, 1]) {
+        qS(s * (W / 2 + 0.215), 0.90, 0, L * 0.58, 0.10, [0.93, 0.93, 0.90], 1); // pita putih
+        for (let k = 0; k < 10; k += 2) { // 5 kotak hitam berselang
+          const zc = -L * 0.29 + (k + 0.5) * (L * 0.58 / 10);
+          qS(s * (W / 2 + 0.225), 0.90, zc, L * 0.58 / 10, 0.10, [0.05, 0.05, 0.06], 5);
+        }
+      }
     }
     // ---- kerusakan/penyok + kaca retak v5 (opts.damage) ----
     // Untuk mobil parkir tua / mobil misi — BUKAN untuk hero utama.
@@ -1030,7 +1208,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     p(0, barY - 0.1, -L / 2 - 0.03, W * 0.72, 0.04, 0.06, CHROME, 1);            // strip krom bawah lampu
     for (const s of [-1, 1]) {
       p(s * W * 0.32, 0.30, -L / 2 - 0.10, 0.22, 0.14, 0.1, DARK, 5);            // knalpot (v16: lebih besar + keluar)
-      p(s * W * 0.32, 0.30, -L / 2 - 0.16, 0.14, 0.10, 0.04, [0.7, 0.7, 0.72], 1); // ujung knalpot
+      p(s * W * 0.32, 0.30, -L / 2 - 0.16, 0.14, 0.10, 0.04, [0.30, 0.30, 0.33], 1); // R36-EXH: ujung knalpot [0,7] kebaca lampu kotak kecil di bawah bumper (probe: cyan) — baja gelap
     }
     qB(0, 0.52, -L / 2 - 0.15, 0.5, 0.14, WHITE, 5);                            // plat nomor
     // Plat BERTEKS (v2): strip biru kiri + 4 bar karakter + bingkai atas/bawah.
@@ -1053,9 +1231,25 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       p(lx, y, z, w, h, 0.06, colM, m, -noseRx);
     };
     pitched(0, 0.68, W * 0.6, 0.16, DARK, 5);                                    // grill
+    if (spec.kind === 'sedan') {
+      // R36V2-CHROME: bilah krom melintang di grill (Accord) — quad di
+      // bidang bevel, 0,015 di depan muka grill (2 tris).
+      quadOut(at(-W * 0.30, 0.655, bevZ(0.655) + 0.075), at(W * 0.30, 0.655, bevZ(0.655) + 0.075),
+        at(W * 0.30, 0.705, bevZ(0.705) + 0.075), at(-W * 0.30, 0.705, bevZ(0.705) + 0.075), [0, 0.9, 0.4], CHROME, 1);
+    }
     for (const s of [-1, 1]) {
       pitched(s * W * 0.3, 0.82, 0.55, 0.16, HEADLIGHT, 4);                       // headlight (v16: lebih besar — 0,45->0,55, 0,13->0,16)
       if (hi) pitched(s * W * 0.3, 0.60, 0.55, 0.05, [1.0, 0.95, 0.8], 4);       // DRL
+    }
+    if (spec.kind === 'sport' && hi) {
+      // R36V2-HERO-LED: strip LED diagonal tajam di atas headlight
+      // (Huracan Y-LED — low-poly: satu diagonal per sisi, putih mat 4,
+      // 0,015 di depan muka headlight; 4 tris).
+      for (const s of [-1, 1]) {
+        const y0 = 0.76, y1 = 0.90, x0 = s * W * 0.14, x1 = s * W * 0.44, hw = 0.028;
+        quadOut(at(x0, y0 - hw, bevZ(y0) + 0.075), at(x1, y1 - hw, bevZ(y1) + 0.075),
+          at(x1, y1 + hw, bevZ(y1) + 0.075), at(x0, y0 + hw, bevZ(y0) + 0.075), [0, 0.9, 0.4], [1.0, 0.98, 0.9], 4);
+      }
     }
     p(0, 0.45, L / 2 + 0.05, W * 0.72, 0.2, 0.14, DARK, 5);                      // bumper depan (v16: W*0,72 — ban depan kebaca; v15 W*0,88)
   }

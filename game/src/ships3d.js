@@ -122,6 +122,15 @@ const DARK = [0.05, 0.05, 0.07];
 const ORANGE = [1.0, 0.45, 0.10];
 const RED = [0.85, 0.12, 0.15];
 const POOL = [0.15, 0.50, 0.85];
+// R36 CRUISE — palet PHANTOM CLASS (target Juna 18:00 WIB): lambung GELAP
+// + strip neon cyan/pink, dek gelap berlapis, sekoci gelap + trim pink.
+const HULL = [0.04, 0.05, 0.10];   // lambung gelap (biru-hitam)
+const HULLLO = [0.02, 0.03, 0.08]; // bawah lambung (lunas)
+const DECKD = [0.13, 0.14, 0.18];  // sisi dek gelap
+const DECKT = [0.34, 0.35, 0.38];  // atap dek abu terang (baca berlapis)
+const PINK = [1.0, 0.16, 0.62];    // neon magenta
+const CYAN = [0.05, 0.85, 1.0];    // neon cyan (lebih terang dari TEAL)
+const POOLB = [0.10, 0.70, 1.0];   // kolam biru terang
 const M = { paint: 1, glass: 2, emissive: 4, matte: 5, shadow: 9 };
 
 // ---------------------------------------------------------------------------
@@ -228,41 +237,49 @@ const st = (L, W, zf, hwf, hwBf, yBot, yDeck, cLo, cUp, cDeck) => ({
 
 // ---------------------------------------------------------------------------
 // Kapal pesiar — lambung loft 6 stasiun, 3 dek, cerobong, sekoci, kolam.
+// R36 CRUISE: lambung GELAP + strip neon cyan/pink (emissive), dek gelap
+// berlapis + rim neon per dek, sekoci gelap + trim pink, kolam menyala.
 // ---------------------------------------------------------------------------
 export function drawCruiseShip(B, G, cx, cz, yaw, len, wid) {
   const { P, D } = frame(cx, cz, yaw);
   const L = len, W = wid;
   const hull = [
-    st(L, W, -0.50, 0.30, 0.16, 0.10, 1.50),
-    st(L, W, -0.30, 0.50, 0.40, 0.00, 1.60),
-    st(L, W, 0.00, 0.50, 0.43, 0.00, 1.65),
-    st(L, W, +0.25, 0.50, 0.43, 0.00, 1.75),
-    st(L, W, +0.40, 0.36, 0.28, 0.08, 1.95),
-    st(L, W, +0.50, 0.00, 0.00, 0.40, 2.40),
+    st(L, W, -0.50, 0.30, 0.16, 0.10, 1.50, HULLLO, HULL, DECKD),
+    st(L, W, -0.30, 0.50, 0.40, 0.00, 1.60, HULLLO, HULL, DECKD),
+    st(L, W, 0.00, 0.50, 0.43, 0.00, 1.65, HULLLO, HULL, DECKD),
+    st(L, W, +0.25, 0.50, 0.43, 0.00, 1.75, HULLLO, HULL, DECKD),
+    st(L, W, +0.40, 0.36, 0.28, 0.08, 1.95, HULLLO, HULL, DECKD),
+    st(L, W, +0.50, 0.00, 0.00, 0.40, 2.40, HULLLO, HULL, DECKD),
   ];
   loft(B, P, D, hull);
-  for (const s of [1, -1]) stripe(B, P, D, hull, s, 0.22, 0.18, TEAL, M.paint);
-  winRow(B, P, D, hull, 1.08, -0.38 * L, +0.22 * L, 1.7, 0.34, 0.34, 0); // porthole lambung (tengah saja — haluan/buritan melengkung)
+  // Strip neon ganda di lambung: cyan (bawah) + pink (atas), emissive.
+  for (const s of [1, -1]) stripe(B, P, D, hull, s, 0.22, 0.18, CYAN, M.emissive);
+  for (const s of [1, -1]) stripe(B, P, D, hull, s, 0.52, 0.12, PINK, M.emissive);
+  winRow(B, P, D, hull, 1.08, -0.38 * L, +0.22 * L, 1.7, 0.34, 0.34, 6); // porthole lambung (tengah saja — haluan/buritan melengkung)
   // Dek 1 (utama) + anjungan miring, Dek 2, Dek 3 — makin sempit ke atas.
   const d1 = [
-    st(L, W, -0.36, 0.44, 0.44, 1.60, 2.95, WHITE, WHITE, WHITE),
-    st(L, W, +0.26, 0.44, 0.44, 1.65, 2.95, WHITE, WHITE, WHITE),
-    st(L, W, +0.36, 0.42, 0.42, 1.70, 2.55, WHITE, WHITE, WHITE),
-    st(L, W, +0.40, 0.38, 0.38, 1.72, 2.30, WHITE, WHITE, WHITE),
+    st(L, W, -0.36, 0.44, 0.44, 1.60, 2.95, DECKD, DECKD, DECKT),
+    st(L, W, +0.26, 0.44, 0.44, 1.65, 2.95, DECKD, DECKD, DECKT),
+    st(L, W, +0.36, 0.42, 0.42, 1.70, 2.55, DECKD, DECKD, DECKT),
+    st(L, W, +0.40, 0.38, 0.38, 1.72, 2.30, DECKD, DECKD, DECKT),
   ];
   loft(B, P, D, d1);
   const d2 = [
-    st(L, W, -0.28, 0.37, 0.37, 2.95, 4.05, WHITE, WHITE, WHITE),
-    st(L, W, +0.20, 0.37, 0.37, 2.95, 4.05, WHITE, WHITE, WHITE),
-    st(L, W, +0.24, 0.33, 0.33, 2.95, 3.80, WHITE, WHITE, WHITE),
+    st(L, W, -0.28, 0.37, 0.37, 2.95, 4.05, DECKD, DECKD, DECKT),
+    st(L, W, +0.20, 0.37, 0.37, 2.95, 4.05, DECKD, DECKD, DECKT),
+    st(L, W, +0.24, 0.33, 0.33, 2.95, 3.80, DECKD, DECKD, DECKT),
   ];
   loft(B, P, D, d2);
   const d3 = [
-    st(L, W, -0.20, 0.29, 0.29, 4.05, 5.00, WHITE, WHITE, WHITE),
-    st(L, W, +0.12, 0.29, 0.29, 4.05, 5.00, WHITE, WHITE, WHITE),
-    st(L, W, +0.16, 0.25, 0.25, 4.05, 4.75, WHITE, WHITE, WHITE),
+    st(L, W, -0.20, 0.29, 0.29, 4.05, 5.00, DECKD, DECKD, DECKT),
+    st(L, W, +0.12, 0.29, 0.29, 4.05, 5.00, DECKD, DECKD, DECKT),
+    st(L, W, +0.16, 0.25, 0.25, 4.05, 4.75, DECKD, DECKD, DECKT),
   ];
   loft(B, P, D, d3);
+  // Rim neon di tepi atas tiap dek (cyan/pink/cyan, bergantian).
+  for (const s of [1, -1]) stripe(B, P, D, d1, s, 0.12, 0.10, CYAN, M.emissive);
+  for (const s of [1, -1]) stripe(B, P, D, d2, s, 0.12, 0.10, PINK, M.emissive);
+  for (const s of [1, -1]) stripe(B, P, D, d3, s, 0.12, 0.10, CYAN, M.emissive);
   winRow(B, P, D, d1, 2.45, -0.33 * L, +0.22 * L, 1.05, 0.55, 0.50, 5);
   winRow(B, P, D, d2, 3.55, -0.25 * L, +0.17 * L, 1.05, 0.55, 0.50, 5);
   winRow(B, P, D, d3, 4.55, -0.17 * L, +0.09 * L, 1.05, 0.55, 0.45, 4);
@@ -272,32 +289,38 @@ export function drawCruiseShip(B, G, cx, cz, yaw, len, wid) {
   // Sayap anjungan (bridge wings) kiri-kanan.
   for (const s of [1, -1]) {
     const w = P(s * 0.47 * W, 2.55, +0.30 * L);
-    boxR(B, w[0], w[1], w[2], 0.5, 0.22, 1.4, yaw, 0, WHITE, M.matte);
+    boxR(B, w[0], w[1], w[2], 0.5, 0.22, 1.4, yaw, 0, DECKT, M.matte);
   }
-  // Cerobong: putih + pita teal, miring ke buritan.
-  frustum(B, P, D, -0.08 * L, 5.00, 6.25, 1.05, 1.50, 0.87, 1.20, 0, -0.36, WHITE, M.matte, false);
-  frustum(B, P, D, -0.08 * L, 6.25, 6.90, 0.87, 1.20, 0.78, 1.05, -0.36, -0.55, TEAL, M.paint, true);
+  // Cerobong: badan GELAP + pita pink neon TIPIS di atas (0.35 — pita 0.65
+  // di v1 terbaca balok pink raksasa di crop 3x), miring ke buritan.
+  frustum(B, P, D, -0.08 * L, 5.00, 6.55, 1.05, 1.50, 0.87, 1.20, 0, -0.45, HULL, M.matte, false);
+  frustum(B, P, D, -0.08 * L, 6.55, 6.90, 0.87, 1.20, 0.78, 1.05, -0.45, -0.55, PINK, M.emissive, true);
   // Tiang radar + kubah di atap dek 3; kolam renang di atap dek 3.
   const m0 = P(0, 5.75, +0.10 * L);
-  boxR(B, m0[0], m0[1], m0[2], 0.16, 1.5, 0.16, yaw, 0, WHITE, M.matte);
+  boxR(B, m0[0], m0[1], m0[2], 0.16, 1.5, 0.16, yaw, 0, DECKT, M.matte);
   const m1 = P(0, 6.45, +0.10 * L);
-  boxR(B, m1[0], m1[1], m1[2], 1.3, 0.10, 0.28, yaw, 0, WHITE, M.matte);
+  boxR(B, m1[0], m1[1], m1[2], 1.3, 0.10, 0.28, yaw, 0, DECKT, M.matte);
   const m2 = P(0, 5.20, -0.02 * L);
-  boxR(B, m2[0], m2[1], m2[2], 0.5, 0.4, 0.5, yaw, 0, WHITE, M.matte);
-  quadAuto(B, P(-1.0, 5.03, -0.08 * L - 1.3), P(1.0, 5.03, -0.08 * L - 1.3),
-    P(1.0, 5.03, -0.08 * L + 1.3), P(-1.0, 5.03, -0.08 * L + 1.3), POOL, M.matte, [0, 1, 0]);
+  boxR(B, m2[0], m2[1], m2[2], 0.5, 0.4, 0.5, yaw, 0, DECKT, M.matte);
+  // Kolam di atap dek 3, sisi BURITAN (z -0.165L): posisi lama (-0.08L)
+  // TERTUTUP TOTAL oleh alas cerobong (jejak cerobong z -3.58..-0.58
+  // menelan kolam z -3.38..-0.78 — bug R27b, kolam tidak pernah kelihatan).
+  quadAuto(B, P(-1.0, 5.03, -0.165 * L - 0.7), P(1.0, 5.03, -0.165 * L - 0.7),
+    P(1.0, 5.03, -0.165 * L + 0.7), P(-1.0, 5.03, -0.165 * L + 0.7), POOLB, M.emissive, [0, 1, 0]);
   // Tiang haluan + bendera merah kecil.
   const b0 = P(0, 2.90, +0.44 * L);
-  boxR(B, b0[0], b0[1], b0[2], 0.12, 1.1, 0.12, yaw, 0, WHITE, M.matte);
+  boxR(B, b0[0], b0[1], b0[2], 0.12, 1.1, 0.12, yaw, 0, DECKT, M.matte);
   quadAuto(B, P(0.06, 3.20, +0.44 * L), P(0.06, 3.20, +0.40 * L),
     P(0.06, 3.50, +0.40 * L), P(0.06, 3.50, +0.44 * L), RED, M.matte, D(1, 0, 0));
-  // Sekoci oranye-putih (3 per sisi, menggantung di sisi dek 1).
+  // Sekoci ABU TERANG + trim pink neon (3 per sisi, menggantung di sisi
+  // dek 1, DITURUNKAN 0.25: di v1 badan GELAP tak terbaca di lambung gelap,
+  // dan atap pink-nya menempel persis di garis rim cyan dek 1).
   for (const s of [1, -1]) {
     for (const zf of [-0.22, -0.02, +0.18]) {
-      const c = P(s * 3.02, 2.55, zf * L);
-      boxR(B, c[0], c[1], c[2], 0.55, 0.42, 1.7, yaw, 0, WHITE, M.matte);
-      const t = P(s * 3.02, 2.80, zf * L);
-      boxR(B, t[0], t[1], t[2], 0.57, 0.12, 1.7, yaw, 0, ORANGE, M.matte);
+      const c = P(s * 3.02, 2.30, zf * L);
+      boxR(B, c[0], c[1], c[2], 0.55, 0.42, 1.7, yaw, 0, DECKT, M.matte);
+      const t = P(s * 3.02, 2.55, zf * L);
+      boxR(B, t[0], t[1], t[2], 0.57, 0.12, 1.7, yaw, 0, PINK, M.emissive);
     }
   }
   // Bayangan kontak lembut di air (elips mat 9 — di-split ke bucket SH).

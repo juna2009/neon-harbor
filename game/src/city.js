@@ -5,7 +5,7 @@ const ROOF_COLORS = [
   ['#4a7fb5', '#7a5fb5', '#3f8f9f', '#5a6b8a'],
   ['#3f8f6f', '#e8e4d8', '#4a9db5', '#c98a3d'],
 ];
-const CAR_COLORS = ['#d8d8d8', '#c0392b', '#2e86c1', '#f39c12', '#27ae60', '#8e44ad', '#e67e22'];
+const CAR_COLORS = ['#d8d8d8', '#c0392b', '#1f8a9e', '#f39c12', '#27ae60', '#8e44ad', '#e67e22'];
 export const DISTRICTS = [
   { name: 'Old Town', x: 0, y: 0, w: 1120, h: WORLD_H, ground: '#8a7648', accent: '#ffd23e' },
   { name: 'Downtown', x: 1120, y: 0, w: 640, h: WORLD_H, ground: '#4b5563', accent: '#ff4d9d' },

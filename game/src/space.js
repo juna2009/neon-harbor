@@ -655,6 +655,9 @@ export function drawNightGrade(ctx, w, h) {
 }
 
 export function drawJet(ctx, jet, time) {
+  // JET R36: NH-77 HARBOR WRAITH top-down — abu gelap stealth, kanopi
+  // gelembung, twin tail, garis neon cyan (dulu: anak panah abu-biru polos
+  // tanpa sirip/kanopi). Sama dgn webgl2.js plane() + city3d.js plane3d().
   ctx.save();
   ctx.translate(jet.x, jet.y);
   ctx.rotate(jet.angle);
@@ -663,15 +666,35 @@ export function drawJet(ctx, jet, time) {
   ctx.beginPath();
   ctx.moveTo(-20, -4); ctx.lineTo(-20 - 14 * flick, 0); ctx.lineTo(-20, 4);
   ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#3a4350';
+  // Swept wings (dark stealth).
+  ctx.fillStyle = '#23272e';
+  ctx.beginPath(); ctx.moveTo(2, -4); ctx.lineTo(-12, -22); ctx.lineTo(-16, -22); ctx.lineTo(-8, -2); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(2, 4); ctx.lineTo(-12, 22); ctx.lineTo(-16, 22); ctx.lineTo(-8, 2); ctx.closePath(); ctx.fill();
+  // Twin tail fins (splayed, cyan tips).
+  ctx.fillStyle = '#23272e';
+  ctx.beginPath(); ctx.moveTo(-14, -4); ctx.lineTo(-24, -13); ctx.lineTo(-25, -5); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-14, 4); ctx.lineTo(-24, 13); ctx.lineTo(-25, 5); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#05d9e8';
+  ctx.beginPath(); ctx.moveTo(-22, -11); ctx.lineTo(-24, -13); ctx.lineTo(-25, -11); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-22, 11); ctx.lineTo(-24, 13); ctx.lineTo(-25, 11); ctx.closePath(); ctx.fill();
+  // Fuselage: dark stealth dart + darker nose tip.
+  ctx.fillStyle = '#2b2f36';
   ctx.beginPath();
   ctx.moveTo(28, 0); ctx.lineTo(8, -6); ctx.lineTo(-18, -5); ctx.lineTo(-20, 0);
   ctx.lineTo(-18, 5); ctx.lineTo(8, 6);
   ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#5a6b8a';
-  ctx.beginPath(); ctx.moveTo(2, -4); ctx.lineTo(-12, -22); ctx.lineTo(-16, -22); ctx.lineTo(-8, -2); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(2, 4); ctx.lineTo(-12, 22); ctx.lineTo(-16, 22); ctx.lineTo(-8, 2); ctx.closePath(); ctx.fill();
-  label(ctx, 'HAF', -2, 0, 8, '#ffd23e');
+  ctx.fillStyle = '#1e2126';
+  ctx.beginPath(); ctx.moveTo(28, 0); ctx.lineTo(20, -3); ctx.lineTo(20, 3); ctx.closePath(); ctx.fill();
+  // Cyan cheatlines along the fuselage sides.
+  ctx.strokeStyle = '#05d9e8'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(22, -4.5); ctx.lineTo(-16, -4.5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(22, 4.5); ctx.lineTo(-16, 4.5); ctx.stroke();
+  // Bubble canopy: glass blue + sky streak.
+  ctx.fillStyle = '#7db9eb';
+  ctx.beginPath(); ctx.ellipse(12, 0, 9, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(220,240,255,0.9)';
+  ctx.beginPath(); ctx.ellipse(13, -1, 5, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+  label(ctx, 'HAF', -8, 0, 8, '#ffd23e');
   ctx.restore();
 }
 

@@ -47,7 +47,7 @@ function lookAt(e, t, up) {
 
 // ---- shaders (GLSL ES 1.00 — jalan di konteks webgl DAN webgl2) ----
 // Material: 0 gedung(jendela) 1 cat 2 kaca 3 jalan 4 emissive 5 matte
-//           6 trotoar 7 glow(additif) 8 smear(additif) 9 contact shadow 10 air
+//           6 trotoar 7 glow(additif) 8 smear(additif) 9 contact shadow 10 air 11 bayangan tanah lunak berarah (R36 POSTFX)
 const VS = `
 attribute vec3 aP; attribute vec3 aN; attribute vec2 aU; attribute vec3 aC; attribute float aM;
 uniform mat4 uP, uV;
@@ -67,7 +67,21 @@ uniform float uWinLit; uniform vec3 uWinTint; uniform float uNeon;
 uniform vec3 uWaterDeep; uniform vec3 uWaterSky; uniform float uExposure;
 uniform vec2 uWinCell; uniform float uWinGlass; uniform float uWinWarm; // SIANG v2: jendela
 uniform float uContrast; uniform float uShadowK; uniform float uRoadTex; uniform float uFogK; // SIANG v2: kontras/bayangan/jalan/kabut
+uniform vec3 uGradeLift; uniform vec3 uGradeGain; uniform float uGradeGamma; uniform vec2 uRes; uniform float uTime; // R36 POSTFX
 float h21(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+// R36 POSTFX: ACES (highlight tidak pecah) + lift/gamma/gain per TOD +
+// vignette (fokus tengah) + grain film (sembunyikan banding). Dipakai di
+// ekor jalur utama + air + emissive; glow/smear/shadow overlay dibiarkan.
+vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }
+vec3 postfx(vec3 c){
+  c = aces(c);
+  c = pow(max(c+uGradeLift,0.0),vec3(uGradeGamma))*uGradeGain;
+  vec2 uv = gl_FragCoord.xy/uRes;
+  float d = length((uv-0.5)*vec2(1.2,1.0));
+  c *= 1.0-0.30*smoothstep(0.55,0.95,d);
+  c += (h21(gl_FragCoord.xy+fract(uTime)*61.7)-0.5)*0.02;
+  return clamp(c,0.0,1.0);
+}
 void main(){
   vec3 N = normalize(vN);
   vec3 V = normalize(uCam - vW);
@@ -94,6 +108,10 @@ void main(){
     if (wtype > 1.5) { wx0 = 0.14; wx1 = 0.86; wy0 = 0.16; wy1 = 0.84; } // R2: curtain lebih kecil, frame lebih lebar
     else if (wtype > 0.5) { wx0 = 0.06; wx1 = 0.94; wy0 = 0.38; wy1 = 0.66; }
     float win = step(wx0, cell.x) * step(cell.x, wx1) * step(wy0, cell.y) * step(cell.y, wy1);
+    if (wtype > 0.5) { // R36-BLD: ribbon + curtain dulu pita/panel kaca
+      float mx = fract(vU.x / 1.5); // tiang vertikal tiap 1.5 unit: pita
+      win *= step(0.08, mx) * step(mx, 0.92); // jadi deretan jendela
+    }
     float lit = step(uWinLit, h21(id));
     vec3 warm = mix(vec3(1.0, 0.72, 0.32), vec3(1.0, 0.42, 0.55), fract(id.x * 0.37 + id.y * 0.13));
     vec3 wc = mix(vec3(0.75, 0.88, 1.05), warm, uWinWarm); // SIANG v2: jendela menyala = pantulan langit
@@ -159,9 +177,9 @@ void main(){
     float f = 1.0 - exp(-dist * 0.011);
     vec3 col = base * uNeon; // TOD: neonGain preset (sore 2.2 = lama)
     col = mix(col, uHz, clamp(f, 0.0, 0.85) * 0.25);
-    gl_FragColor = vec4(col * (1.0 - uDark * 0.4), 1.0);
+    gl_FragColor = vec4(postfx(col * (1.0 - uDark * 0.4)), 1.0);
     return;
-  } else if (vM > 9.5) { // air: warna akhir SENDIRI (early return) — R26: lewat lighting umum, multiply hangat sunset mengubah biru dalam jadi oranye seperti aspal. Di sini: biru dalam dominan + jalur matahari + glitter + fog, tanpa warm multiply.
+  } else if (vM > 9.5 && vM < 10.5) { // air: warna akhir SENDIRI (early return) — R26: lewat lighting umum, multiply hangat sunset mengubah biru dalam jadi oranye seperti aspal. Di sini: biru dalam dominan + jalur matahari + glitter + fog, tanpa warm multiply.
     float fr = pow(1.0 - max(dot(N, V), 0.0), 3.0);
     vec3 deep = uWaterDeep; // TOD
     vec3 skyc = uWaterSky; // TOD
@@ -178,7 +196,7 @@ void main(){
     wcol = mix(wcol, uHz, clamp(f, 0.0, 0.85));
     wcol *= (1.0 - uDark * 0.75);
     wcol *= (0.35 + 0.65 * uDay) * uExposure;
-    gl_FragColor = vec4(wcol, 1.0);
+    gl_FragColor = vec4(postfx(wcol), 1.0);
     return;
   }
   if (vM > 6.5 && vM < 7.5) { // glow quad: alpha radial dari UV
@@ -192,6 +210,13 @@ void main(){
   }
   if (vM > 8.5 && vM < 9.5) { // contact shadow: elips gelap
     float a = smoothstep(0.5, 0.12, length((vU - 0.5) * vec2(1.0, 2.4))) * uShadowK; // SIANG v2: bayangan kontak lebih gelap di siang (0.75; sore 0.5 = lama)
+    gl_FragColor = vec4(0.0, 0.0, 0.0, a);
+    return;
+  }
+  if (vM > 10.5 && vM < 11.5) { // R36 POSTFX: bayangan tanah lunak berarah (groundShadow) — alpha bergradasi: penuh di pangkal (dinding), 0 di ujung; tepi samping lembut
+    float along = clamp((vU.y - 0.5) / 0.35, 0.0, 1.0); // 0 pangkal (dinding) -> 1 ujung jauh
+    float side = 1.0 - smoothstep(0.08, 0.5, abs(vU.x - 0.5));
+    float a = (1.0 - smoothstep(0.75, 1.0, along)) * side * uShadowK * 0.85; // penuh di sepanjang bayangan, baru memudar di 25% ujung (fade kuadrat ke nol membuat bayangan panjang hilang sebelum sampai kamera)
     gl_FragColor = vec4(0.0, 0.0, 0.0, a);
     return;
   }
@@ -212,8 +237,26 @@ void main(){
   col = mix(col, col + vec3(1.2, 0.7, 0.4) * 0.8, emit * uWinWarm); // SIANG v2b: boost hangat ikut preset (siang 0.1; sore/malam 1 = lama)
   float f = 1.0 - exp(-dist * 0.011 * uFogK); // SIANG v2: udara jernih (siang 0.45; sore 1 = lama)
   col = mix(col, uHz, clamp(f, 0.0, 0.85)); // TOD: fog ikut palet
+  // R36-RED (item 14): cat merah (hero #e33e5f) digeser ke pink di siang —
+  // ambient langit biru + Fresnel/specular putih + fog pucat menaikkan G/B
+  // sampai mendekati R (B/R 0,98 di siang vs 0,36 di sore; G/R 0,93 vs
+  // 0,44). Clamp HARUS di warna akhir: versi sebelum fog hanya menurunkan
+  // B 235->191 (fog biru mengembalikan pink). Rasio 0,50 untuk cat yang
+  // dasarnya merah-dominan — merah tetap merah, shading tetap hidup.
+  // Hanya mat 1 (cat); lampu (mat 4), kaca (mat 2), gedung (mat 0) tak
+  // tersentuh. Di sore clamp tidak mengikat (B/R sudah <0,55).
+  if (vM > 0.5 && vM < 1.5 && vC.r > vC.g * 1.8 && vC.r > vC.b * 1.5) {
+    // R36-RED2: col.r bisa >1 (tanpa tonemapping, R terpotong di layar)
+    // sehingga clamp terhadap col.r mentah membiarkan B sampai 0,70 —
+    // di layar B/R tetap 0,71 (pink). Clamp terhadap R yang SUDAH
+    // dijepit 1,0: B/G akhir <= 0,50 mutlak -> di layar merah penuh.
+    // (Catatan: assignment komponen col.g/col.b sempat dicurigai, tapi
+    // probe membuktikan keduanya identik — penyebabnya HDR di atas.)
+    float rC = min(col.r, 1.0);
+    col = vec3(col.r, min(col.g, rC * 0.50), min(col.b, rC * 0.50));
+  }
   col *= (1.0 - uDark * 0.75);
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(postfx(col), 1.0);
 }`;
 const SKYV = `
 attribute vec2 aP; varying vec2 vU;
@@ -228,7 +271,20 @@ uniform vec2 uSunPos; uniform vec3 uSunDisc; uniform vec3 uSunGlow; uniform floa
 uniform float uStars; uniform vec3 uCloud; uniform float uCloudK; uniform float uSmog; uniform float uSkyDim;
 uniform float uSunK; // SIANG v2 + R27c: intensitas/kode matahari (siang 1.1 = noon, sore 0.9 = sunset, lain 1.0)
 uniform float uAsp; // R26b: aspek layar (matahari/bulan bulat)
+uniform vec3 uGradeLift; uniform vec3 uGradeGain; uniform float uGradeGamma; uniform vec2 uRes; uniform float uTime; // R36 POSTFX
 float h21(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+// R36 POSTFX: sama seperti FS utama (ACES + grade + vignette + grain) supaya
+// langit dan geometri punya satu kurva filmis yang sama.
+vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14),0.0,1.0); }
+vec3 postfx(vec3 c){
+  c = aces(c);
+  c = pow(max(c+uGradeLift,0.0),vec3(uGradeGamma))*uGradeGain;
+  vec2 uv = gl_FragCoord.xy/uRes;
+  float d = length((uv-0.5)*vec2(1.2,1.0));
+  c *= 1.0-0.30*smoothstep(0.55,0.95,d);
+  c += (h21(gl_FragCoord.xy+fract(uTime)*61.7)-0.5)*0.02;
+  return clamp(c,0.0,1.0);
+}
 void main(){
   float y = vU.y;
   vec3 c = mix(uSky0, uSky1, smoothstep(0.42, 0.55, y));
@@ -239,7 +295,7 @@ void main(){
   float d = length(vec2((vU.x - S.x) * uAsp, vU.y - S.y)); // R26b: jarak koreksi aspek
   float noon = step(1.05, uSunK); // R27a: 1 hanya siang (sunK siang 1.1, lain 1.0)
   float sunset = step(0.85, uSunK) * (1.0 - step(0.95, uSunK)); // R27c: 1 hanya sore (sunK sore 0.9) — matahari sunset diperkecil + glow dikurangi (VIDEO-REVIEW #2: blown-out), pola yang sama seperti noon R27a tapi lebih ringan supaya sunset tetap dramatis
-  c += uSunGlow * exp(-d * mix(mix(7.0, 12.0, sunset), 18.0, noon)) * mix(mix(0.9, 0.55, sunset), 0.35, noon) * uSunK;
+  c += uSunGlow * exp(-d * mix(mix(7.0, 12.0, sunset), 18.0, noon)) * mix(mix(0.9, 0.55, sunset), 0.52, noon) * uSunK; // R36-ROADS item 11: halo siang 0.35->0.52 (matahari siang polos) — sunset/pagi/malam tak berubah
   c += uSunDisc * smoothstep(mix(mix(mix(0.045, 0.041, noon), 0.032, sunset), 0.020, uMoon), mix(mix(0.038, 0.027, sunset), 0.014, uMoon), d) * uSunK; // TOD: bulan lebih kecil
   c += uSunGlow * exp(-abs(vU.y - S.y) * 90.0) * exp(-abs(vU.x - S.x) * 5.0) * mix(mix(0.4, 0.22, sunset), 0.15, noon) * uSunK * (1.0 - uMoon); // TOD: bulan tanpa streak
   float smog = exp(-abs(y - 0.47) * 22.0) * uSmog; // TOD: pagi berkabut, siang jernih
@@ -253,7 +309,7 @@ void main(){
     c += vec3(0.9, 0.95, 1.0) * st * uStars * smoothstep(0.55, 0.85, y);
   }
   c = mix(c * uSkyDim + vec3(0.02, 0.02, 0.08), c, smoothstep(0.15, 0.75, uDay)); // TOD: palet gelap jangan digelapkan 2x
-  gl_FragColor = vec4(c, 1.0);
+  gl_FragColor = vec4(postfx(c), 1.0);
 }`;
 
 // ---- compile helpers (dibuat per renderer — gl di-closure) ----
@@ -524,11 +580,9 @@ function car(B, G, cx, cz, yaw, len, wid, paint, police, SHB) { // SIANG v2: SHB
   }
   flat(SHB || G, cx, 0.06, cz, wid + 0.7, len + 0.9, [0, 0, 0], 9); // contact shadow (bucket SH = blending normal; di G aditif hitam = 0 — lihat INTEGRATION.md §6)
 }
-// Perahu — lambung LOFT melengkung (bukan balok): 6 stasiun, haluan tirus ke
-// satu titik + sheer naik ke stem, sisi-V (lunas lebih sempit dari sheer),
-// dek ikut menyempit, rub rail putih ikut lekuk sheer. Visual +25% (len/wid
-// di sini saja — footprint/kolisi di boats.js TIDAK berubah).
-// opts: {driver} hero/sipil, {pol} polisi (lambung sama, biru + light bar).
+// VIPER R36: hero boat = NH-90 VIPER (target Juna 18:00 WIB) — lambung hitam
+// + trim neon cyan, kokpit terbuka 2 kursi, twin hydrojet (bukan outboard).
+// Hanya hero (opts.hero); sipil + polisi TIDAK berubah. Post-cut: 0 byte dossier.
 function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
   len *= 1.25; wid *= 1.25;
   const fwd = [Math.sin(yaw), Math.cos(yaw)];
@@ -544,8 +598,11 @@ function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
   };
   const Q = (a, b, c, d, n, col, m) => quad(B, a, b, c, d, n, [[0, 0], [1, 0], [1, 1], [0, 1]], col, m);
   const pol = opts && opts.pol;
+  const hero = opts && opts.hero && !pol;
+  const CY = [0.10, 0.85, 1.0]; // neon cyan VIPER
+  if (hero) paint = [0.05, 0.06, 0.09]; // lambung hitam (cat m=1: glossy + Fresnel)
   const nb = [-fwd[0], 0, -fwd[1]];
-  const dk = [0.92, 0.92, 0.9], wt = [0.95, 0.95, 0.93];
+  const dk = hero ? [0.15, 0.17, 0.21] : [0.92, 0.92, 0.9], wt = hero ? CY : [0.95, 0.95, 0.93];
   const dk2 = paint.map((v) => v * 0.45);
   // stasiun: [z/len, setengah-lebar, y sheer, y lunas, lunas/shear]
   const S = [[-0.5, 1, 0.92, 0.16, 0.68], [-0.28, 1, 0.92, 0.12, 0.68], [0, 0.97, 0.96, 0.12, 0.68], [0.24, 0.85, 1.04, 0.2, 0.7], [0.4, 0.6, 1.18, 0.36, 0.72], [0.5, 0.04, 1.36, 0.6, 0.8]];
@@ -557,7 +614,13 @@ function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
         [rgt[0] * sg, -0.35, rgt[1] * sg], paint, 1); // sisi lambung miring-V
       Q(at(sg * a[1] * wid / 2, a[2] - 0.02, a[0] * len), at(sg * b[1] * wid / 2, b[2] - 0.02, b[0] * len),
         at(sg * b[1] * wid / 2, b[2] + 0.07, b[0] * len), at(sg * a[1] * wid / 2, a[2] + 0.07, a[0] * len),
-        [rgt[0] * sg, 0, rgt[1] * sg], wt, 5); // rub rail putih ikut sheer
+        [rgt[0] * sg, 0, rgt[1] * sg], wt, hero ? 4 : 5); // rub rail ikut sheer (VIPER: neon cyan, emissive)
+      if (hero) { // garis neon cyan di sisi lambung (waterline), ikut lekuk loft
+        const sxAt = (st, y) => { const f = (y - st[3]) / (st[2] - st[3]); return st[1] * wid / 2 * (st[4] + (1 - st[4]) * f) + 0.03; };
+        Q(at(sg * sxAt(a, 0.3), 0.3, a[0] * len), at(sg * sxAt(b, 0.3), 0.3, b[0] * len),
+          at(sg * sxAt(b, 0.38), 0.38, b[0] * len), at(sg * sxAt(a, 0.38), 0.38, a[0] * len),
+          [rgt[0] * sg, 0, rgt[1] * sg], CY, 4);
+      }
     }
     Q(at(-a[1] * wid / 2, a[2], a[0] * len), at(a[1] * wid / 2, a[2], a[0] * len),
       at(b[1] * wid / 2, b[2], b[0] * len), at(-b[1] * wid / 2, b[2], b[0] * len), [0, 1, 0], dk, 5); // dek
@@ -566,10 +629,18 @@ function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
   }
   Q(at(-0.68 * wid / 2, 0.16, -len / 2), at(0.68 * wid / 2, 0.16, -len / 2),
     at(wid / 2, 0.92, -len / 2), at(-wid / 2, 0.92, -len / 2), nb, paint, 1); // transom
-  p(0, 0.86, -len / 2 - 0.02, wid * 0.9, 0.08, 0.06, wt, 5); // strip putih transom
+  p(0, 0.86, -len / 2 - 0.02, wid * 0.9, 0.08, 0.06, wt, hero ? 4 : 5); // strip transom (VIPER: cyan)
+  if (hero) p(0, 0.32, -len / 2 - 0.02, wid * 0.85, 0.07, 0.06, CY, 4); // garis cyan bawah transom
   p(0, 1.45, len * 0.48, 0.14, 0.45, 0.14, pol ? wt : paint, 1); // stem peak
   p(0, 1.15, -0.7, wid * 0.55, 0.45, len * 0.22, [0.12, 0.13, 0.16], 2); // konsol + kaca
   pp(0, 1.38, -0.42, wid * 0.5, 0.5, 0.06, [0.10, 0.16, 0.28], 2, -0.5); // kaca depan miring
+  if (hero) { // VIPER kokpit terbuka: kursi penumpang + sandaran driver + setir
+    p(-0.78, 1.12, -1.7, 0.55, 0.5, 0.35, [0.10, 0.11, 0.14], 5); // kursi penumpang
+    p(-0.78, 1.42, -1.7, 0.55, 0.1, 0.35, CY, 4); // strip cyan kursi penumpang
+    p(0, 1.12, -2.05, 0.7, 0.55, 0.25, [0.10, 0.11, 0.14], 5); // sandaran kursi driver
+    p(0, 1.44, -2.05, 0.7, 0.09, 0.25, CY, 4); // strip cyan sandaran driver
+    pp(0, 1.32, -1.08, 0.34, 0.34, 0.05, [0.08, 0.08, 0.10], 5, -0.6); // setir miring
+  }
   if (pol) { // light bar polisi di atap konsol (identitas dari belakang)
     p(0, 1.48, -0.7, 1.1, 0.22, 0.4, [0.08, 0.08, 0.10], 5);
     const l1 = at(-0.28, 1.48, -0.92), l2 = at(0.28, 1.48, -0.92);
@@ -581,14 +652,26 @@ function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
     const vs = at(0, 1.58, -1.9);
     billDir(B, vs[0], vs[1], vs[2], 0.3, 0.12, nb, [0.10, 0.10, 0.12], 5); // visor belakang
   }
-  for (const sx of [-0.32, 0.32]) { // motor tempel: kaki pendek (ujung = garis lunas, bukan roda) + cowl gede
+  if (hero) { // VIPER twin hydrojet: nosel tanam di transom + mulut cyan (tanpa outboard)
+    for (const sx of [-0.32, 0.32]) {
+      p(sx * wid, 0.42, -len / 2 - 0.22, 0.34, 0.3, 0.5, [0.07, 0.08, 0.10], 5); // badan nosel
+      p(sx * wid, 0.42, -len / 2 - 0.5, 0.36, 0.32, 0.05, CY, 4); // mulut nosel cyan menyala
+    }
+  } else for (const sx of [-0.32, 0.32]) { // motor tempel: kaki pendek (ujung = garis lunas, bukan roda) + cowl gede
     p(sx * wid, 0.38, -len / 2 - 0.15, 0.18, 0.4, 0.24, [0.15, 0.15, 0.17], 5);
     p(sx * wid, 0.95, -len / 2 - 0.12, 0.42, 0.42, 0.42, paint, 1);
     const bs = at(sx * wid, 0.55, -len / 2 - 0.34);
     billDir(B, bs[0], bs[1], bs[2], 0.3, 0.12, nb, wt, 5);
   }
-  const ps = at(0, 0.45, -len / 2 - 0.35);
-  billDir(G, ps[0], ps[1], ps[2], wid * 0.9, 0.4, nb, [0.9, 0.95, 1.0], 7); // sembur prop wash
+  if (hero) { // sembur twin hydrojet: dua semburan, satu per nosel
+    for (const sx of [-0.32, 0.32]) {
+      const pj = at(sx * wid, 0.45, -len / 2 - 0.35);
+      billDir(G, pj[0], pj[1], pj[2], wid * 0.38, 0.4, nb, [0.9, 0.95, 1.0], 7);
+    }
+  } else {
+    const ps = at(0, 0.45, -len / 2 - 0.35);
+    billDir(G, ps[0], ps[1], ps[2], wid * 0.9, 0.4, nb, [0.9, 0.95, 1.0], 7); // sembur prop wash
+  }
   // V-wake Kelvin (~19.5 deg) + buih + rooster tail (Canvas boat3d)
   const wc = [0.9, 0.95, 1.0];
   for (const sg of [-1, 1]) {
@@ -615,10 +698,19 @@ function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
     quad(G, [d0[0], 0.09, d0[2]], [d1[0], 0.09, d1[2]], [d2[0], 0.09, d2[2]], [d3[0], 0.09, d3[2]],
       [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], wc, 8);
   }
-  const r0 = at(-0.26, 0.5, -len / 2 - 0.25), r1 = at(0.26, 0.5, -len / 2 - 0.25);
-  const r2 = at(0.07, 0.9, -len / 2 - 0.95), r3 = at(-0.07, 0.9, -len / 2 - 0.95);
-  quad(G, [r0[0], 0.5, r0[2]], [r1[0], 0.5, r1[2]], [r2[0], 0.9, r2[2]], [r3[0], 0.9, r3[2]],
-    nb, [[0, 0], [1, 0], [1, 1], [0, 1]], wc, 8); // rooster tail miring
+  if (hero) { // twin rooster tail: dua semburan miring, satu per jet (pusat di nosel ±0.8)
+    for (const sg of [-1, 1]) {
+      const t0 = at(sg * 0.95, 0.5, -len / 2 - 0.25), t1 = at(sg * 0.65, 0.5, -len / 2 - 0.25);
+      const t2 = at(sg * 0.74, 0.9, -len / 2 - 0.95), t3 = at(sg * 0.86, 0.9, -len / 2 - 0.95);
+      quad(G, [t0[0], 0.5, t0[2]], [t1[0], 0.5, t1[2]], [t2[0], 0.9, t2[2]], [t3[0], 0.9, t3[2]],
+        nb, [[0, 0], [1, 0], [1, 1], [0, 1]], wc, 8);
+    }
+  } else {
+    const r0 = at(-0.26, 0.5, -len / 2 - 0.25), r1 = at(0.26, 0.5, -len / 2 - 0.25);
+    const r2 = at(0.07, 0.9, -len / 2 - 0.95), r3 = at(-0.07, 0.9, -len / 2 - 0.95);
+    quad(G, [r0[0], 0.5, r0[2]], [r1[0], 0.5, r1[2]], [r2[0], 0.9, r2[2]], [r3[0], 0.9, r3[2]],
+      nb, [[0, 0], [1, 0], [1, 1], [0, 1]], wc, 8); // rooster tail miring
+  }
 }
 // Gedung DEBOX R27b: massa prisma segi-8 (sudut chamfer, bukan balok) +
 // lantai atas setback (tinggi>=3) / lis atap (rendah) + rooftop props di
@@ -694,73 +786,294 @@ function lamp(B, G, x, z, k, dx, dz) {
   deboxBeam(B, x, 4.85, z, x + dx * 0.9, 5.15, z + dz * 0.9, 0.22, LAMP_STEEL, 5); // lengan naik
   deboxBeam(B, x + dx * 0.9, 5.15, z + dz * 0.9, hx2, 5.05, hz2, 0.22, LAMP_STEEL, 5); // lengan datar
   const ry = Math.atan2(dx, dz);
-  boxR(B, hx2, 4.95, hz2, 0.5, 0.28, 0.95, ry, 0, LAMP_STEEL, 5); // housing kepala
+  boxR(B, hx2, 4.95, hz2, 0.6, 0.34, 1.05, ry, 0, LAMP_STEEL, 5); // housing kepala (R36: 0.5->0.6, lebih kebaca)
   if (k === undefined) k = 1;
   if (k <= 0.02) return;
   const sc = (c) => [c[0] * k, c[1] * k, c[2] * k];
   const pc = (lx, lz) => { const q = rotY(lx, lz, ry); return [hx2 + q[0], 4.80, hz2 + q[1]]; };
   quad(B, pc(-0.35, -0.18), pc(0.35, -0.18), pc(0.35, 0.18), pc(-0.35, 0.18), // panel cahaya di bawah housing (menghadap bawah)
     [0, -1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], sc([1.0, 0.8, 0.45]), 4);
-  billDir(G, hx2, 4.95, hz2, 2.2, 1.1, [0, 0, -1], sc([1.0, 0.75, 0.4]), 7); // halo
+  billDir(G, hx2, 4.95, hz2, 1.3, 0.65, [0, 0, -1], sc([1.0, 0.75, 0.4]), 7); // halo (R36 item 9: 2.2x1.1->1.3x0.65 — halo besar + tiang tipis = kotak kuning melayang di kejauhan)
   flat(G, hx2, 0.08, hz2, 2.2, 2.2, sc([1.0, 0.7, 0.35]), 8); // kolam cahaya di tanah (bundar di bawah kepala — dulu 1.4x7 = streak laser)
 }
-// Palem DEBOX R27b: batang melengkung (3 segmen) + kanopi pelepah berlapis
-// (8 pelepah × 2 ruas menjuntai, bukan slab hijau) + tandan kelapa.
-function palm(B, x, z, sa) {
+// Palem R36: batang ramping melengkung (lebih tinggi + langsing) + kanopi
+// BERLAPIS — 2 lapis pelepah PITA VERTIKAL (bawah 8 pelepah panjang
+// menjuntai + atas 6 pelepah pendek menjulang, hijau lebih terang).
+// Dulu 1 lapis quad HORIZONTAL: dari chase-cam yang rendah, quad
+// horizontal kebaca garis tipis / kipas datar (item 6 daftar 17 aneh).
+// Pita vertikal (lebar di sumbu Y) kebaca daun penuh dari samping;
+// normal horizontal tegak lurus arah pelepah supaya shading matahari
+// R27c tetap jalan. Tanpa culling di WebGL2, semua pelepah tampil.
+function palm(B, x, z, sa, sc) { // R36 v3: sc = skala tinggi (1 normal; slot jauh >1 supaya mahkota muncul di atas palem dekat)
+  sc = sc || 1;
   const ang = hash2(Math.round(x), Math.round(z)) * Math.PI * 2;
   const lx = Math.cos(ang) * 0.9, lz = Math.sin(ang) * 0.9; // arah lengkung batang
-  const TRUNK = [0.23, 0.16, 0.11];
-  deboxBeam(B, x, 0, z, x + lx * 0.30, 1.6, z + lz * 0.30, 0.34, TRUNK, 5);
-  deboxBeam(B, x + lx * 0.30, 1.6, z + lz * 0.30, x + lx * 0.65, 3.1, z + lz * 0.65, 0.30, TRUNK, 5);
-  deboxBeam(B, x + lx * 0.65, 3.1, z + lz * 0.65, x + lx * 1.0, 4.4, z + lz * 1.0, 0.26, TRUNK, 5);
-  const tx = x + lx, tz = z + lz, ty = 4.5; // puncak batang
-  box(B, tx, ty, tz, 0.5, 0.5, 0.5, [0.10, 0.30, 0.14], 5); // mahkota
-  const GREENS = [[0.16, 0.46, 0.22], [0.11, 0.37, 0.17]];
-  for (let k = 0; k < 8; k += 1) {
+  const TRUNK = [0.45, 0.33, 0.20]; // R36 v3: cokelat terang (batang tipis gelap = tak kebaca di sore; dulu [0.34,0.24,0.15])
+  deboxBeam(B, x, 0, z, x + lx * 0.30, 1.8 * sc, z + lz * 0.30, 0.34 * sc, TRUNK, 5);
+  deboxBeam(B, x + lx * 0.30, 1.8 * sc, z + lz * 0.30, x + lx * 0.65, 3.5 * sc, z + lz * 0.65, 0.30 * sc, TRUNK, 5);
+  deboxBeam(B, x + lx * 0.65, 3.5 * sc, z + lz * 0.65, x + lx * 1.0, 5.0 * sc, z + lz * 1.0, 0.26 * sc, TRUNK, 5);
+  const tx = x + lx, tz = z + lz, ty = 5.1 * sc; // puncak batang (dulu 4.5)
+  box(B, tx, ty, tz, 0.5 * sc, 0.5 * sc, 0.5 * sc, [0.10, 0.30, 0.14], 5); // mahkota
+  const GREENS = [[0.22, 0.58, 0.28], [0.16, 0.48, 0.22]]; // R36: hijau lebih terang (dulu 0.16/0.11 = hitam di sore)
+  const LIGHT = [0.30, 0.68, 0.34]; // lapis atas: hijau muda kena matahari
+  // Satu pelepah = 2 ruas pita vertikal (A->M naik, M->P menjuntai).
+  // dx,dz = arah horizontal pelepah; nn = normal MIRING KE ATAS
+  // ([-dz, 0.9, dx]) — normal horizontal murni bikin pelepah yang
+  // menghadap kamera (membelakangi matahari) kena half-Lambert 0.25 +
+  // ambient tanah = hampir hitam di sore (probe v1: frond ~[0.05,0.07,0.04]).
+  // Normal miring menarik ambient langit + komponen-Y matahari seperti
+  // pelepah lama, tapi geometri tetap pita vertikal (kebaca daun).
+  const frond = (dx, dz, L, rise, drop, w0, col) => {
+    const nn = norm([-dz, 0.9, dx]);
+    const fs = 1 - sa.w * (1 - (dx * sa.x + dz * sa.z)) / 4; // R36: lantai 0.8 (dulu /2 = 0.6, dobel-gelap dgn shader)
+    const c = [col[0] * fs, col[1] * fs, col[2] * fs];
+    const M = [tx + dx * L * 0.55, ty + rise, tz + dz * L * 0.55];
+    const P = [tx + dx * L, ty + drop, tz + dz * L];
+    const rib = (A, Bp, wA, wB) => quad(B,
+      [A[0], A[1] - wA, A[2]], [A[0], A[1] + wA, A[2]],
+      [Bp[0], Bp[1] + wB, Bp[2]], [Bp[0], Bp[1] - wB, Bp[2]],
+      nn, [[0, 0], [1, 0], [1, 1], [0, 1]], c, 5);
+    rib([tx, ty, tz], M, w0, w0 * 0.8);
+    rib(M, P, w0 * 0.8, 0.05);
+  };
+  for (let k = 0; k < 8; k += 1) { // lapis bawah: 8 pelepah panjang menjuntai
     const a = (k / 8) * Math.PI * 2 + hash2(Math.round(x), k) * 0.5;
-    const dx = Math.cos(a), dz = Math.sin(a);
-    const px = -dz, pz = dx; // tegak lurus pelepah (lebar)
-    const L = 1.5 + hash2(k, Math.round(z)) * 0.6; // panjang pelepah bervariasi
-    const M = [tx + dx * L * 0.55, ty + 0.45, tz + dz * L * 0.55]; // ruas naik
-    const P = [tx + dx * L, ty - 0.85, tz + dz * L]; // ujung menjuntai
-    const g0 = GREENS[k % 2], fs = 1 - sa.w * (1 - (dx * sa.x + dz * sa.z)) / 2; // R27c: hadap matahari terang, membelakangi gelap
-    const col = [g0[0] * fs, g0[1] * fs, g0[2] * fs];
-    const frond = (A, Bp, wA, wB) => {
-      const nn = norm([dx * 0.8, 1, dz * 0.8]); // R27c: 1 normal/frond, atas+keluar
-      quad(B, [A[0] - px * wA, A[1], A[2] - pz * wA], [A[0] + px * wA, A[1], A[2] + pz * wA],
-        [Bp[0] + px * wB, Bp[1], Bp[2] + pz * wB], [Bp[0] - px * wB, Bp[1], Bp[2] - pz * wB],
-        nn, [[0, 0], [1, 0], [1, 1], [0, 1]], col, 5);
-    };
-    frond([tx, ty, tz], M, 0.30, 0.24);
-    frond(M, P, 0.24, 0.05);
+    const L = 1.7 + hash2(k, Math.round(z)) * 0.6;
+    frond(Math.cos(a), Math.sin(a), L * sc, 0.5 * sc, -1.0 * sc, 0.30 * sc, GREENS[k % 2]);
+  }
+  for (let k = 0; k < 6; k += 1) { // lapis atas: 6 pelepah pendek menjulang (offset setengah langkah)
+    const a = (k / 6) * Math.PI * 2 + Math.PI / 6 + hash2(Math.round(x), k + 20) * 0.4;
+    const L = 1.2 + hash2(k + 9, Math.round(z)) * 0.4;
+    frond(Math.cos(a), Math.sin(a), L * sc, 0.95 * sc, -0.1 * sc, 0.26 * sc, k % 2 ? LIGHT : GREENS[0]);
   }
   for (let i = 0; i < 3; i += 1) // tandan kelapa di bawah mahkota
-    box(B, tx + (i - 1) * 0.22, ty - 0.35, tz + 0.1, 0.2, 0.2, 0.2, [0.45, 0.30, 0.12], 5);
+    box(B, tx + (i - 1) * 0.22 * sc, ty - 0.35 * sc, tz + 0.1 * sc, 0.2 * sc, 0.2 * sc, 0.2 * sc, [0.45, 0.30, 0.12], 5);
 }
-// HELI R27b: putih-biru, disc, profil, skid+fin.
+// R36 PANTAI: payung pantai — tiang TINGGI + kanopi piramida 4 sisi
+// warna-warni (2 warna selang-seling, seperti payung di karimbu-0.webp)
+// + bayangan alas. Tinggi sengaja di atas atap mobil (kanopi ~3,6) supaya
+// dari chase-cam yang jauh payung tetap muncul di atas konvoi.
+function beachUmbrella(B, x, z, c1, c2) {
+  box(B, x, 1.6, z, 0.14, 3.2, 0.14, [0.85, 0.82, 0.75], 5); // tiang
+  flat(B, x, 0.045, z, 3.4, 3.4, [0.45, 0.36, 0.24], 5); // bayangan alas
+  const T = 0.32, R2 = 2.2, ty = 3.6, by = 2.6;
+  const top = [[x - T, ty, z - T], [x + T, ty, z - T], [x + T, ty, z + T], [x - T, ty, z + T]];
+  const bot = [[x - R2, by, z - R2], [x + R2, by, z - R2], [x + R2, by, z + R2], [x - R2, by, z + R2]];
+  const cols = [c1, c2, c1, c2];
+  for (let k = 0; k < 4; k += 1) {
+    const a = top[k], b = top[(k + 1) % 4], c = bot[(k + 1) % 4], d = bot[k];
+    const mx = (c[0] + d[0]) / 2 - x, mz = (c[2] + d[2]) / 2 - z;
+    quad(B, a, b, c, d, norm([mx, 0.85, mz]), [[0, 0], [1, 0], [1, 1], [0, 1]], cols[k], 5);
+  }
+  box(B, x, 3.64, z, 0.16, 0.14, 0.16, [0.2, 0.2, 0.2], 5); // kenop puncak
+}
+// R36 PANTAI: kursi pantai — dudukan + sandaran tegak + handuk warna.
+// Semua box axis-aligned (tanpa rotasi) supaya tidak ada risiko miring.
+function beachChair(B, x, z, towel) {
+  box(B, x, 0.35, z, 1.1, 0.22, 0.7, [0.75, 0.72, 0.65], 5); // dudukan
+  box(B, x - 0.55, 0.75, z, 0.18, 0.9, 0.7, [0.75, 0.72, 0.65], 5); // sandaran
+  box(B, x, 0.49, z, 0.95, 0.06, 0.6, towel, 5); // handuk
+}
+// R36 PANTAI: perahu nelayan di pasir — lambung kayu + bibir putih +
+// haluan runcing + kokpit gelap + tiang + layar gulung. Beda dari speedboat
+// boat() (tanpa wake/motor) dan dari perahu moored (di darat, bukan di air).
+// alongX: lambung searah sumbu X (kalau false, searah Z).
+function fishBoat(B, x, z, alongX) {
+  const WOOD = [0.52, 0.34, 0.16], WOOD2 = [0.42, 0.26, 0.12], WT = [0.92, 0.90, 0.85];
+  const w = alongX ? 4.6 : 1.6, d = alongX ? 1.6 : 4.6;
+  const bw = alongX ? 4.0 : 1.7, bd = alongX ? 1.7 : 4.0;
+  const hx = alongX ? 1.6 : 0, hz = alongX ? 0 : 1.6; // haluan runcing
+  box(B, x, 0.35, z, w, 0.7, d, WOOD, 5); // lambung
+  box(B, x, 0.72, z, bw, 0.16, bd, WT, 5); // bibir putih
+  box(B, x + hx, 1.05, z + hz, 0.9, 0.5, 0.9, WOOD2, 5); // haluan runcing
+  box(B, x - hx * 0.75, 0.55, z - hz * 0.75, 1.2, 0.5, 1.6, [0.16, 0.18, 0.22], 5); // kokpit gelap
+  box(B, x, 1.6, z - 0.3, 0.12, 2.6, 0.12, [0.35, 0.25, 0.15], 5); // tiang
+  box(B, x, 2.4, z + 0.4, 0.08, 1.4, 1.1, [0.85, 0.75, 0.55], 5); // layar gulung
+}
+// Pohon rindang R36: batang pendek + kanopi BULAT berlapis (3 gumpal hijau
+// bertumpuk, bukan satu kubus) — variasi di trotoar selain palem.
+function shadeTree(B, x, z, sa, sc) { // R36 v3: sc = skala (sama dgn palm)
+  sc = sc || 1;
+  const ang = hash2(Math.round(x), Math.round(z)) * Math.PI * 2;
+  const lx = Math.cos(ang) * 0.4, lz = Math.sin(ang) * 0.4;
+  const TRUNK = [0.45, 0.33, 0.20]; // R36 v3: sama dgn palem
+  deboxBeam(B, x, 0, z, x + lx * 0.5, 1.6 * sc, z + lz * 0.5, 0.42 * sc, TRUNK, 5);
+  deboxBeam(B, x + lx * 0.5, 1.6 * sc, z + lz * 0.5, x + lx, 2.9 * sc, z + lz, 0.34 * sc, TRUNK, 5);
+  const tx = x + lx, tz = z + lz;
+  const fs = 1 - sa.w * 0.15;
+  const G1 = [0.25 * fs, 0.60 * fs, 0.31 * fs], G2 = [0.31 * fs, 0.70 * fs, 0.37 * fs], G3 = [0.19 * fs, 0.50 * fs, 0.25 * fs]; // R36 v4: lebih terang lagi (sore: gumpal gelap vs fasad gelap = tak kebaca)
+  box(B, tx, 3.6 * sc, tz, 3.0 * sc, 1.6 * sc, 3.0 * sc, G1, 5); // gumpal utama (R36: lebih besar supaya kebaca dari chase-cam)
+  box(B, tx + 0.8 * sc, 4.3 * sc, tz - 0.4 * sc, 1.9 * sc, 1.1 * sc, 1.9 * sc, G2, 5); // gumpal atas (terang)
+  box(B, tx - 0.8 * sc, 3.1 * sc, tz + 0.5 * sc, 1.8 * sc, 1.1 * sc, 1.8 * sc, G3, 5); // gumpal bawah (gelap)
+  box(B, tx, 5.0 * sc, tz, 1.2 * sc, 0.8 * sc, 1.2 * sc, G2, 5); // pucuk
+}
+// HELI R36v2 (revisi target NHPD-01): badan BIRU GELAP + kaca kokpit besar,
+// fenestron (rotor ekor tertutup) ganti rotor ekor terbuka, kamera + searchlight
+// di hidung, teks "POLICE" + "NHPD-01" prosedural (pixel-font 5x7, m=4),
+// strip neon cyan, badge emas. Rotor utama + skid dari v1 dipertahankan.
+// vs v1: badan putih-biru -> navy gelap; rotor ekor terbuka -> fenestron;
+// tanpa teks -> POLICE/NHPD-01; tanpa kamera hidung -> turret kamera.
 function heli(B,G,x,z,rotor,t,v){
  const y=14,yw=Math.atan2(v[0],v[1])+1.5708;
  const F=[Math.sin(yw),Math.cos(yw)],R=[Math.cos(yw),-Math.sin(yw)];
  const at=(a,b,c)=>[x+R[0]*a+F[0]*c,y+b,z+R[1]*a+F[1]*c];
  const p=(a,b,c,w,h,d,c2,m)=>{const q=at(a,b,c);boxR(B,q[0],q[1],q[2],w,h,d,yw,0,c2,m);};
- const W=[0.88,0.9,0.94],U=[0.13,0.32,0.78],L=[0.78,0.8,0.84],K=[0.55,0.8,1];
- p(0,0.1,0,2.2,1.3,3.8,W,1);
- p(0,-0.55,0,2,0.5,3.6,U,4);
- p(0,-0.1,0,2.32,0.34,3.9,U,4);
- p(0,0.9,0,1.8,0.35,3,W,1);
- p(0,0,2.25,1.9,1,1,W,1);
- p(0,0.25,0.9,2.34,0.85,1.9,K,4);
- p(0,0.35,-3.6,0.55,0.55,3.2,W,1);
- p(0,0.6,-5,0.25,1.2,1,U,4);
+ const N=[0.10,0.17,0.38],N2=[0.14,0.22,0.45],C=[0.10,0.85,0.95],L=[0.78,0.8,0.84],D=[0.05,0.08,0.15],S=[0.55,0.8,1],K=[0.15,0.15,0.18],GD=[0.85,0.65,0.25],WT=[0.95,0.96,1];
+ // badan BIRU GELAP (dulu putih-biru) + pita navy
+ p(0,0.1,0,2.2,1.3,3.8,N,1);
+ p(0,-0.55,0,2,0.5,3.6,N2,5);
+ p(0,-0.1,0,2.32,0.34,3.9,N2,5);
+ p(0,0.9,0.25,2.1,0.35,3.5,N,1); // atap
+ p(0,-0.15,2.3,1.7,0.8,0.6,N,1); // hidung (mengecil — kaca diperbesar ke depan)
+ // kaca kokpit BESAR membungkus kabin sampai depan hidung (dulu 1.9, kini 2.3)
+ p(0,0.25,1.0,2.34,0.9,2.3,D,4);
+ // kilau langit di kaca depan + tiang tengah kaca depan (pembagi windshield)
+ p(0,0.55,2.16,1.7,0.14,0.06,S,4);
+ p(0,0.25,2.16,0.06,0.8,0.05,K,5);
+ // ekor: boom navy + sirip vertikal + stabilizer horizontal
+ p(0,0.35,-3.3,0.55,0.55,2.6,N,1); // boom berakhir di -4.6: tidak menembus kipas fenestron
+ p(0,0.75,-4.9,0.3,0.35,1.0,N,1); // kerucut ekor tipis: boom -> fenestron (kipas tetap kelihatan)
+ p(0,1.45,-5.3,0.22,0.9,0.6,N,1); // sirip di atas fenestron
  p(0,0.55,-4.6,2.4,0.1,0.6,L,5);
- const q=at(0.42,0.95,-5);
- billDir(G,q[0],q[1],q[2],1.7,1.7,[R[0],0,R[1]],[0.9,0.92,0.95],7);
+ // FENESTRON (ganti rotor ekor terbuka v1): cincin 8 segmen + kipas 5 bilah
+ // putar di dalam. Segmen: sumbu panjang = tangensial (rx = sudut posisi).
+ const fc=at(0,0.8,-5.1);
+ for(let k=0;k<8;k+=1){const th=k*0.7854,sq=at(0,0.8+0.72*Math.cos(th),-5.1+0.72*Math.sin(th));
+   boxR(B,sq[0],sq[1],sq[2],0.32,0.32,0.62,yw,th,N,1);}
+ boxR(B,fc[0],fc[1],fc[2],0.14,0.3,0.3,yw,0,K,5); // hub kipas
+ const spin=t*9;
+ for(let k=0;k<5;k+=1)boxR(B,fc[0],fc[1],fc[2],0.08,1.05,0.14,yw,spin+k*1.2566,L,4);
+ // tiang rotor utama + 2 bilah silang (v1, dipertahankan)
+ p(0,1.18,0,0.3,0.35,0.3,K,5);
  boxR(B,x,y+1.35,z,1.1,0.14,13.5,rotor,0,L,4);
+ boxR(B,x,y+1.35,z,1.1,0.14,13.5,rotor+1.5708,0,L,4);
  flat(G,x,y+1.5,z,13,13,[0.72,0.78,0.86],7);
- for(const s of[-1,1])p(s*0.85,-1.25,0,0.16,0.16,4.4,L,5);
- for(const s of[-1,1])for(const q2 of[-1,1])p(s*0.85,-0.95,q2*1.2,0.14,0.6,0.14,L,5);
+ // skid (v1, dipertahankan)
+ for(const s of[-1,1])p(s*0.85,-1.25,0,0.2,0.2,4.4,K,5);
+ for(const s of[-1,1])for(const q2 of[-1,1])p(s*0.85,-0.95,q2*1.2,0.16,0.6,0.16,K,5);
+ // hidung: lensa searchlight (v1) + turret kamera baru di bawah hidung
  p(0,-0.95,1.2,0.5,0.3,0.5,[0.1,0.1,0.12],5);
- if(Math.sin(t*6)>0)p(0,1.2,0,0.5,0.25,0.5,[1,0.1,0.1],4);
+ p(0,-1.05,1.2,0.34,0.12,0.34,[1,0.85,0.5],4); // lensa lampu sorot hangat
+ p(0,-0.7,2.05,0.12,0.4,0.12,K,5); // dudukan kamera
+ p(0,-0.95,2.05,0.4,0.3,0.4,K,5); // turret kamera hidung
+ p(0,-0.95,2.26,0.22,0.18,0.06,[0.85,0.95,1],4); // lensa kamera
+ if(Math.sin(t*6)>0)p(0,1.98,-5.3,0.3,0.2,0.3,[1,0.1,0.1],4); // beacon di puncak sirip
+ // strip neon cyan di sisi badan + boom (gaya referensi; strip badan dipendek
+ // supaya tidak menabrak badge di c=-1.55; strip boom di bawah teks NHPD-01)
+ for(const s of[-1,1]){
+   const q1=at(s*1.22,0.5,0.45);boxR(B,q1[0],q1[1],q1[2],0.04,0.08,2.7,yw,0,C,4);
+   const q2=at(s*0.30,0.12,-3.3);boxR(B,q2[0],q2[1],q2[2],0.05,0.06,2.6,yw,0,C,4);
+ }
+ // teks prosedural 5x7 (m=4, putih): "POLICE" di badan + "NHPD-01" di boom.
+ // Piksel = billDir per sisi (dir = s: huruf maju ke hidung di sisi +R,
+ // ke ekor di sisi -R, supaya terbaca lurus dari tiap sisi).
+ const FONT={P:[14,17,17,30,16,16,16],O:[14,17,17,17,17,17,14],L:[16,16,16,16,16,16,31],I:[14,4,4,4,4,4,14],C:[14,17,16,16,16,17,14],E:[31,16,16,30,16,16,31],N:[17,25,21,19,17,17,17],H:[17,17,17,31,17,17,17],D:[30,17,17,17,17,17,30],'0':[14,17,19,21,25,17,14],'1':[4,12,4,4,4,4,14],'-':[0,0,0,14,0,0,0]};
+ const txt=(str,px,a0,bTop,c0)=>{const tot=(str.length*6-1)*px;
+   for(const s of[-1,1]){const dir=-s,nrm=[s*R[0],0,s*R[1]],cS=c0-dir*tot/2;
+     for(let i=0;i<str.length;i+=1){const g=FONT[str[i]];if(!g)continue;
+       for(let r=0;r<7;r+=1)for(let k=0;k<5;k+=1){if(!((g[r]>>(4-k))&1))continue;
+         const q=at(s*a0,bTop-r*px,cS+dir*(i*6+k)*px);
+         billDir(B,q[0],q[1],q[2],px*0.92,px*0.92,nrm,WT,4);}}}};
+ txt('POLICE',0.09,1.22,0.095,-0.1);
+ txt('NHPD-01',0.055,0.31,0.56,-3.3);
+ // badge emas (roundel, belah ketupat) di pintu belakang, di celah strip cyan
+ for(const s of[-1,1]){const q=at(s*1.12,0.42,-1.55);
+   boxR(B,q[0],q[1],q[2],0.04,0.42,0.42,yw,0.7854,GD,5);
+   const q2=at(s*1.15,0.42,-1.55);
+   boxR(B,q2[0],q2[1],q2[2],0.03,0.24,0.24,yw,0.7854,N2,5);}
+}
+// JET R36 — jet tempur NH-77 HARBOR WRAITH (HAF, o.jet) + HA-1 hero (o null).
+// Patokan: gambar target Juna 18:00 WIB (abu gelap stealth, kanopi gelembung,
+// twin tail, garis neon cyan, roda pendarat detail). Skala S = 0.1 (1 px game
+// = 0.1 unit): badan 6.0 x 6.0, sama seperti plane3d() di city3d.js (fallback
+// Canvas 2D) — satu model, dua renderer. Sebelum R36, webgl2.js TIDAK
+// menggambar pesawat sama sekali: saat inPlane hero tampil sebagai pejalan
+// kaki dan jet HAF tidak ada (shot jets/takeoff/planehigh baseline).
+// B = bucket opaque, G = bucket glow/shadow (mat 7/9). Murah: ~70 tris per
+// pesawat (frame ~19k tris) — frame time tidak bergerak.
+// altU = ketinggian dlm unit GL (alt meter * 0.12, sama dgn city3d.js).
+function plane(B,G,x,z,yaw,altU,thr,t,o){
+ const jet=!!(o&&o.jet);
+ const y0=altU+0.55; // alas badan (tinggi roda saat parkir)
+ const F=[Math.sin(yaw),Math.cos(yaw)],R=[Math.cos(yaw),-Math.sin(yaw)];
+ const at=(a,b,c)=>[x+R[0]*a+F[0]*c,y0+b,z+R[1]*a+F[1]*c];
+ const p=(a,b,c,w,h,d,c2,m)=>{const q=at(a,b,c);boxR(B,q[0],q[1],q[2],w,h,d,yaw,0,c2,m);};
+ const g=(a,c,y,w,h,d,c2,m)=>{boxR(B,x+R[0]*a+F[0]*c,y,z+R[1]*a+F[1]*c,w,h,d,yaw,0,c2,m);};
+ const q4=(B2,c4,n,c2,m)=>quad(B2,c4[0],c4[1],c4[2],c4[3],n,[[0,0],[1,0],[1,1],[0,1]],c2,m);
+ const BODY=jet?[0.28,0.30,0.34]:[0.97,0.98,0.99];
+ const WING=jet?[0.22,0.24,0.27]:[0.84,0.87,0.90];
+ const FIN=jet?[0.32,0.34,0.38]:[0.84,0.87,0.90];
+ const REAR=jet?[0.42,0.45,0.49]:[0.94,0.95,0.97];
+ const GLASS=[0.07,0.11,0.18],DARK=[0.05,0.05,0.06],CYAN=[0.05,0.85,0.95];
+ const ORANGE=[0.95,0.45,0.12],TIRE=[0.03,0.03,0.03],HUB=[0.55,0.57,0.60];
+ // Badan: anak panah bertingkat (hidung meruncing) + tutup belakang terang.
+ p(0,0.45,0,1.5,0.9,4.4,BODY,1);
+ p(0,0.4,2.55,0.95,0.62,0.9,BODY,1);
+ if(!jet)p(0,0.38,2.95,0.45,0.36,0.3,ORANGE,1); // ujung hidung oranye (HA-1)
+ p(0,0.45,-2.25,1.4,0.8,0.1,REAR,1);
+ p(0,0.95,-1.2,0.5,0.14,2.4,DARK,5); // spine punggung kanopi -> ekor
+ // Kanopi gelembung: kaca GELAP (mat 4 emissive — mat 2/kaca malah jadi
+ // kotak PINK: shader kaca mencampur ke warna matahari di sudut miring,
+ // dan dari chase-cam belakang semua muka kanopi itu sudut miring).
+ // Bingkai gelap di bawah, kaca lebih rendah + pendek, kilau langit tipis
+ // di tepi atas-belakang (garis terang, bukan bidang — pelajaran heli R36).
+ p(0,0.93,1.0,1.12,0.18,1.8,DARK,5);
+ p(0,1.06,1.0,1.0,0.42,1.5,GLASS,4);
+ q4(B,[at(-0.5,1.28,0.35),at(0.5,1.28,0.35),at(0.5,1.28,0.28),at(-0.5,1.28,0.28)],[0,1,0],[0.65,0.85,1.0],4);
+ for(const s of[-1,1]){
+  const UP=[0,1,0],OUT=[R[0]*s,0,R[1]*s],BACK=[-F[0],0.1,-F[1]],LEAD=[F[0],0.25,F[1]];
+  // Sayap sapu + dihedral (ujung naik 0.5): atas, leading, trailing, ujung.
+  q4(B,[at(s*0.5,0.55,0.9),at(s*3.0,1.05,-1.9),at(s*3.0,1.05,-1.3),at(s*0.5,0.55,-1.1)],UP,WING,1);
+  q4(B,[at(s*0.5,0.45,0.9),at(s*3.0,0.95,-1.9),at(s*3.0,1.05,-1.9),at(s*0.5,0.55,0.9)],LEAD,WING,1);
+  q4(B,[at(s*0.5,0.45,-1.1),at(s*3.0,0.95,-1.3),at(s*3.0,1.05,-1.3),at(s*0.5,0.55,-1.1)],BACK,WING,1);
+  q4(B,[at(s*3.0,0.95,-1.9),at(s*3.0,0.95,-1.3),at(s*3.0,1.05,-1.3),at(s*3.0,1.05,-1.9)],OUT,WING,1);
+  if(jet)q4(B,[at(s*0.5,0.57,0.9),at(s*3.0,1.07,-1.9),at(s*3.0,1.07,-1.78),at(s*0.5,0.57,0.78)],UP,CYAN,4); // garis neon cyan di leading edge
+  p(s*3.0,1.0,-1.6,0.18,0.16,0.18,s<0?[1,0.15,0.12]:[0.2,0.9,0.35],4); // lampu ujung sayap
+  // Stabilizer horizontal (dihedral kecil).
+  q4(B,[at(s*0.5,0.7,-2.2),at(s*1.7,1.0,-3.0),at(s*1.7,1.0,-2.8),at(s*0.5,0.7,-2.2)],UP,WING,1);
+  q4(B,[at(s*0.5,0.62,-2.2),at(s*1.7,0.92,-2.8),at(s*1.7,1.0,-2.8),at(s*0.5,0.7,-2.2)],BACK,WING,1);
+  // Twin tail: sirip meruncing + miring keluar (cant) — dua sisi supaya
+  // pencahayaan benar dari kiri maupun kanan (pelajaran PLANE-41 city3d:
+  // sirip tegak lurus terbaca tiang/papan dari belakang).
+  const f1=[at(s*0.55,0.7,-2.2),at(s*0.55,0.7,-3.3),at(s*1.2,1.75,-3.9),at(s*1.1,1.75,-3.7)];
+  q4(B,f1,[R[0]*s,0.35,R[1]*s],FIN,1);
+  q4(B,[f1[3],f1[2],f1[1],f1[0]],[-R[0]*s,0.35,-R[1]*s],FIN,1);
+  if(jet){ // ujung sirip cyan (dua sisi)
+   const tip=[at(s*1.08,1.72,-3.7),at(s*1.18,1.72,-3.9),at(s*1.18,1.78,-3.9),at(s*1.08,1.78,-3.7)];
+   q4(B,tip,[R[0]*s,0.4,R[1]*s],CYAN,4);
+   q4(B,[tip[3],tip[2],tip[1],tip[0]],[-R[0]*s,0.4,-R[1]*s],CYAN,4);
+  }
+  // Cheatline sisi badan: cyan neon (jet) / gelap (hero, sama dgn city3d).
+  q4(B,[at(s*0.77,0.35,2.4),at(s*0.77,0.35,-2.4),at(s*0.77,0.5,-2.4),at(s*0.77,0.5,2.4)],OUT,jet?CYAN:DARK,jet?4:5);
+  // Nozzle ganda: tabung gelap menonjol + inti panas KECIL di mulutnya
+  // (inti 0.24 dulu terbaca 2 JENDELA oranye — pelajaran JETFIX city3d).
+  p(s*0.5,0.45,-2.5,0.55,0.55,0.6,DARK,5);
+  p(s*0.5,0.45,-2.82,0.16,0.16,0.06,ORANGE,4);
+  if(thr>0.25){ // afterburner: 2 glow bersilang per nozzle (mat 7 aditif)
+   const fl=2.4*thr*(0.75+0.25*Math.sin(t*31+x));
+   const c2=[1.0,0.62,0.30];
+   q4(G,[at(s*0.5-0.22,0.45,-2.8),at(s*0.5+0.22,0.45,-2.8),at(s*0.5,0.45,-2.8-fl),at(s*0.5,0.45,-2.8)],UP,c2,7);
+   q4(G,[at(s*0.5,0.24,-2.8),at(s*0.5,0.66,-2.8),at(s*0.5,0.45,-2.8-fl),at(s*0.5,0.45,-2.8)],OUT,c2,7);
+  }
+ }
+ // Roda pendarat saat parkir/taxi (alt < 2 m): strut + ban + hub.
+ // Roda utama di a=±0.85 — menjorok keluar dari lambung (±0.75) supaya
+ // terbaca dari belakang (dulu ±0.65 = tersembunyi di balik badan).
+ if(altU<0.25){
+  g(0,1.9,0.28,0.14,0.56,0.14,DARK,5);
+  g(0,1.9,0.17,0.18,0.34,0.32,TIRE,5);
+  g(0,1.9,0.17,0.22,0.14,0.34,HUB,5);
+  for(const s of[-1,1]){
+   g(s*0.85,-1.4,0.28,0.14,0.56,0.14,DARK,5);
+   g(s*0.85,-1.4,0.18,0.18,0.36,0.36,TIRE,5);
+   g(s*0.85,-1.4,0.18,0.22,0.15,0.38,HUB,5);
+  }
+ }
+ // Bayangan kontak (mat 9 -> bucket SH via splitBucketInto), alt rendah saja.
+ if(altU<5){
+  const sh=(a,c)=>[x+R[0]*a+F[0]*c,0.06,z+R[1]*a+F[1]*c];
+  q4(G,[sh(-2.4,-3.6),sh(2.4,-3.6),sh(2.4,3.6),sh(-2.4,3.6)],[0,1,0],[0,0,0],9);
+ }
 }
 // Orang jalan kaki: kaki melangkah + badan + lengan + kepala + rambut/topi.
 // opt: {skin, pants, hat, build, walkPhase, kind} — kind: 'police' (seragam +
@@ -812,6 +1125,15 @@ const BRIDGE_POS = { x: 2400, y: 1680, top: 1640, bottom: 1720 }; // dari drawbr
 const WATER_X = 2448;
 function heroOf(state) {
   const p = state.player;
+  // JET R36: pesawat = kendaraan seperti mobil/perahu — kamera chase + pusat
+  // 'near' mengikuti PESAWAT, bukan pemain. WAJIB: di mode shot, world tidak
+  // di-step (main.js runShot hanya paint 2x), jadi p.x/p.y TIDAK tersinkron
+  // ke pesawat (pemain tetap di spawn 480,480) — tanpa ini kamera duduk di
+  // tengah kota sementara pesawatnya di spaceport (shot jets/takeoff/
+  // planehigh baseline: hanya pejalan kaki di jalan). Sama dgn city3d.js
+  // drawChase3D (hero = p.plane saat inPlane). Di live play setara: stepSpace
+  // menyinkronkan p.x/p.y/p.angle ke pesawat tiap tick.
+  if (p.inPlane && p.plane) return p.plane;
   if (p.inCar && p.car) return p.car;
   if (p.inBoat && p.boat) return p.boat;
   return p;
@@ -840,18 +1162,23 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     return { dx: -sx2 / sl2, dz: -sz2 / sl2, len: sl2 / tod.sun.y };
   })();
   const sunA = { x: -shDir.dx, z: -shDir.dz, w: 1 - tod.sun.y / 1.5 }; // R27c PALM: azimuth + bobot matahari
+  const DIRSH = tod.bldShadow || tod.sun.y < 0.6; // R36 POSTFX: bayangan tanah berarah juga saat matahari rendah (sore 0.30, pagi 0.18) — bukan cuma siang
   const groundShadow = (cx, cz, w, d, h) => {
-    // Quad gelap di tanah dari tengah gedung ke arah bayangan; setengah yang
-    // di dalam gedung tersembunyi (depth test); ujung jauh memudar (UV v 0.5->0.85).
-    const L = h * shDir.len + Math.max(w, d) * 0.5;
+    // Quad gelap di tanah dari DINDING gedung ke arah bayangan (pangkal di
+    // dinding, bukan di tengah — setengah dalam gedung tersembunyi + fade
+    // UV mulai dari 0 tepat di dinding; kalau pangkal di tengah, bayangan
+    // yang kelihatan sudah mulai di tengah fade = nyaris tak terlihat).
+    const len = Math.min(h * shDir.len, 60); // R36 POSTFX: panjang bayangan (dibatasi 60u)
+    const edge = (Math.abs(shDir.dx) * w * 0.5 + Math.abs(shDir.dz) * d * 0.5) * 0.9; // pusat->dinding searah bayangan (kotak axis-aligned; 0.9 = pangkal sedikit di dalam dinding)
     const px2 = -shDir.dz, pz2 = shDir.dx;
     const hw2 = Math.max(w, d) * 0.45;
-    const bx2 = cx + shDir.dx * (L / 2), bz2 = cz + shDir.dz * (L / 2);
-    quad(SH, [bx2 - px2 * hw2 - shDir.dx * L / 2, 0.03, bz2 - pz2 * hw2 - shDir.dz * L / 2],
-      [bx2 + px2 * hw2 - shDir.dx * L / 2, 0.03, bz2 + pz2 * hw2 - shDir.dz * L / 2],
-      [bx2 + px2 * hw2 + shDir.dx * L / 2, 0.03, bz2 + pz2 * hw2 + shDir.dz * L / 2],
-      [bx2 - px2 * hw2 + shDir.dx * L / 2, 0.03, bz2 - pz2 * hw2 + shDir.dz * L / 2],
-      [0, 1, 0], [[0, 0.5], [1, 0.5], [1, 0.85], [0, 0.85]], [0, 0, 0], 9);
+    const nx = cx + shDir.dx * edge, nz = cz + shDir.dz * edge;
+    const fx = cx + shDir.dx * (edge + len), fz = cz + shDir.dz * (edge + len);
+    quad(SH, [nx - px2 * hw2, 0.03, nz - pz2 * hw2],
+      [nx + px2 * hw2, 0.03, nz + pz2 * hw2],
+      [fx + px2 * hw2, 0.03, fz + pz2 * hw2],
+      [fx - px2 * hw2, 0.03, fz - pz2 * hw2],
+      [0, 1, 0], [[0, 0.5], [1, 0.5], [1, 0.85], [0, 0.85]], [0, 0, 0], 11); // R36 POSTFX: material 11 = bayangan lunak berarah (bukan 9 elips)
   };
   const city = state.city;
   const hero = heroOf(state);
@@ -876,6 +1203,19 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   // Tanah: bidang gelap di bawah seluruh area pandang (tanpa ini, antar-jalan
   // berlubang dan langit oranye terlihat menembus ke bawah horizon).
   flat(OP, hx0 * S, -0.1, hy0 * S, 340, 340, [0.11, 0.13, 0.10], 5);
+
+  // JET R36: landasan 09 minimal (spaceport TIDAK digambar webgl2.js —
+  // tanpa ini pesawat parkir terbaca di tengah jalan kota). Hanya aspal +
+  // garis tengah + lampu tepi; hangar/menara/pad = pekerjaan spaceport
+  // terpisah. Rect = SPACEPORT.runway space.js (x 2220-2300, y 520-780).
+  if (near(2260, 650, 500)) {
+    flat(OP, 226, 0.04, 65, 8, 26, [0.12, 0.12, 0.14], 5);
+    for (let dz = -11; dz <= 11; dz += 4) flat(OP, 226, 0.06, 65 + dz, 0.35, 1.8, [0.85, 0.85, 0.80], 5);
+    for (let dz = -12; dz <= 12; dz += 4) {
+      flat(OP, 222.4, 0.06, 65 + dz, 0.3, 0.3, [1.0, 0.8, 0.25], 4);
+      flat(OP, 229.6, 0.06, 65 + dz, 0.3, 0.3, [1.0, 0.8, 0.25], 4);
+    }
+  }
 
   // Jalan: segmen di sekitar hero (u = sepanjang jalan, v = melintang, untuk marka).
   const roadCol = [0.10, 0.09, 0.11], walkCol = [0.22, 0.20, 0.24];
@@ -910,6 +1250,117 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     roadSeg(Math.max(0, hx0 - 1500), ry, Math.min(WATER_X, hx0 + 1500), ry, false); // R26: jalan berhenti di tepi air (WATER_X) — dulu sampai 2560, aspal + marka masuk ke laut dan menembus permukaan air (boat3d: perahu terbaca jalan di darat)
   }
 
+  // R36-ROADS (Juna 17:18: "tambahin zebracross dan detail lainnya") — VISUAL ONLY:
+  // lebar jalan, lajur dan collision TIDAK berubah. Marka di y 0.01 (di atas aspal
+  // -0.05) supaya tidak z-fight; prop di trotoar saja, tidak pernah menutupi koin.
+  const MARK_W = [0.88, 0.88, 0.86]; // putih marka (sedikit redup biar tidak blown)
+  const DARK_RD = [0.06, 0.06, 0.08]; // retak (nyaris hitam, kecil — aman)
+  const TRACK_RD = [0.14, 0.14, 0.16]; // bekas ban: HANYA sedikit lebih gelap dari aspal [0.20,0.21,0.24] — dulu DARK_RD 0.06 kebaca dua slab hitam di dasar layar (dekat kamera, lebar)
+  // Zebra + garis stop di tiap persimpangan yang terlihat (4 lengan penuh).
+  // Strip membujur (sejajar lalu lintas, standar zebra): 9 strip per lengan.
+  const zebraV = (rx, ry, side) => {
+    const cz = (ry + side * 52) * S;
+    for (let k = -4; k <= 4; k += 1) flat(OP, (rx + k * 9) * S, 0.01, cz, 0.45, 3.5, MARK_W, 5);
+    flat(OP, rx * S, 0.01, (ry + side * 57) * S, 8.0, 0.5, MARK_W, 5); // garis stop
+  };
+  const zebraH = (rx, ry, side) => {
+    const cx = (rx + side * 52) * S;
+    for (let k = -4; k <= 4; k += 1) flat(OP, cx, 0.01, (ry + k * 9) * S, 3.5, 0.45, MARK_W, 5);
+    flat(OP, (rx + side * 57) * S, 0.01, ry * S, 0.5, 8.0, MARK_W, 5); // garis stop
+  };
+  for (const rx of city.roadsV) {
+    for (const ry of city.roadsH) {
+      if (!near(rx, ry, R) || !vis(rx, ry, 130)) continue;
+      for (const sd of [1, -1]) { zebraV(rx, ry, sd); zebraH(rx, ry, sd); }
+    }
+  }
+  // Jalan hero + arahnya (untuk tekstur & prop dekat kamera, camera-relative
+  // seperti lampu/palem fallback — posisi dunia, bukan state, jadi tidak
+  // mengganggu gameplay/collision).
+  const hFwdX = cam.fwd[0], hFwdZ = cam.fwd[1];
+  const hEW = Math.abs(hFwdX) >= Math.abs(hFwdZ);
+  const hRoad = hEW
+    ? city.roadsH.reduce((a, b) => Math.abs(b - hy0) < Math.abs(a - hy0) ? b : a)
+    : city.roadsV.reduce((a, b) => Math.abs(b - hx0) < Math.abs(a - hx0) ? b : a);
+  const hLat = hEW ? (hRoad - hy0) * S * hFwdX : -(hRoad - hx0) * S * hFwdZ; // lateral sumbu jalan thd hero (kanan = (-fz, fx))
+  const atFU = (fwdU, latU) => [hx0 * S + hFwdX * fwdU + (-hFwdZ) * (hLat + latU), hy0 * S + hFwdZ * fwdU + hFwdX * (hLat + latU)]; // (maju, lateral) unit -> [x, z] unit
+  const propClear = (fwdU, latU) => { // prop tidak boleh menutupi koin/hydrant (item 2)
+    const q = atFU(fwdU, latU), px = q[0] / S, pz = q[1] / S;
+    for (const cl of state.collectibles || []) if (!cl.taken && Math.hypot(cl.x - px, cl.y - pz) < 60) return false;
+    for (const hd of state.hydrants || []) if (Math.hypot(hd.x - px, hd.y - pz) < 50) return false;
+    return true;
+  };
+  // Bekas ban di lajur hero + manhole + tambalan + retak + panah lajur.
+  // R36-ROADS item 17: bekas ban dari fwd -6 (di BELAKANG hero, dasar layar)
+  // supaya foreground bawah tidak hamparan kosong — bukan cuma fwd 4..60.
+  for (const lat of [-2.2, 2.2]) {
+    const a = atFU(-6, lat), b = atFU(60, lat), mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, ln = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (hEW) flat(OP, mx, 0.0, mz, ln, 0.9, TRACK_RD, 5); else flat(OP, mx, 0.0, mz, 0.9, ln, TRACK_RD, 5);
+  }
+  const mh = atFU(24, 2.6); flat(OP, mh[0], 0.0, mh[1], 1.3, 1.3, [0.09, 0.09, 0.10], 5); // manhole lajur kanan
+  const ptc = atFU(38, -2.4); flat(OP, ptc[0], 0.0, ptc[1], 3.2, 2.2, [0.08, 0.08, 0.09], 5); // tambalan aspal
+  const ck0 = atFU(48, -3.2), ck1 = atFU(52, -1.2); // retak diagonal
+  quad(OP, [ck0[0] - 0.12, 0.0, ck0[1]], [ck0[0] + 0.12, 0.0, ck0[1]], [ck1[0] + 0.12, 0.0, ck1[1]], [ck1[0] - 0.12, 0.0, ck1[1]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], DARK_RD, 5);
+  { // panah lajur (putih, searah jalan): batang + kepala segitiga
+    const sc = atFU(28.4, 0), hb = atFU(30.4, 0), ht = atFU(32.0, 0);
+    if (hEW) { flat(OP, sc[0], 0.01, sc[1], 2.4, 0.5, MARK_W, 5); quad(OP, [ht[0], 0.01, ht[1]], [hb[0], 0.01, hb[1] - 0.8], [hb[0], 0.01, hb[1] + 0.8], [ht[0], 0.01, ht[1]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], MARK_W, 5); }
+    else { flat(OP, sc[0], 0.01, sc[1], 0.5, 2.4, MARK_W, 5); quad(OP, [ht[0], 0.01, ht[1]], [hb[0] - 0.8, 0.01, hb[1]], [hb[0] + 0.8, 0.01, hb[1]], [ht[0], 0.01, ht[1]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], MARK_W, 5); }
+  }
+  // Ubin trotoar: sambungan melintang tiap ~12 unit di kedua trotoar.
+  // R36-ROADS item 17: dari fwd -6 (dasar layar, di belakang hero).
+  for (let f = -6; f <= 66; f += 12) for (const lat of [-4.8, 4.8]) {
+    const j = atFU(f, lat);
+    if (hEW) flat(OP, j[0], 0.03, j[1], 0.14, 0.7, [0.16, 0.15, 0.17], 5);
+    else flat(OP, j[0], 0.03, j[1], 0.7, 0.14, [0.16, 0.15, 0.17], 5);
+  }
+  // Halte bus (bangku + rambu) di trotoar kanan, tempat sampah di kiri.
+  if (propClear(16, 4.7)) {
+    const bn = atFU(16, 4.7), bb = atFU(16, 4.95), yaw = hEW ? 0 : Math.PI / 2;
+    boxR(OP, bn[0], 0.55, bn[1], 1.9, 0.14, 0.55, yaw, 0, [0.45, 0.32, 0.20], 5); // bangku: dudukan kayu
+    boxR(OP, bb[0], 0.95, bb[1], 1.9, 0.6, 0.1, yaw, 0, [0.40, 0.28, 0.18], 5); // sandaran
+    boxR(OP, bn[0], 0.25, bn[1], 0.12, 0.5, 0.5, yaw, 0, [0.15, 0.15, 0.16], 5); // kaki
+  }
+  if (propClear(19, 4.7)) {
+    const sg = atFU(19, 4.7);
+    box(OP, sg[0], 1.4, sg[1], 0.12, 2.8, 0.12, LAMP_STEEL, 5); // tiang rambu halte
+    if (hEW) box(OP, sg[0], 2.5, sg[1], 0.95, 0.65, 0.08, [0.12, 0.35, 0.85], 5);
+    else box(OP, sg[0], 2.5, sg[1], 0.08, 0.65, 0.95, [0.12, 0.35, 0.85], 5); // panel biru halte
+  }
+  if (propClear(24, -4.7)) {
+    const tb = atFU(24, -4.7);
+    box(OP, tb[0], 0.48, tb[1], 0.55, 0.95, 0.55, [0.10, 0.28, 0.14], 5); // tempat sampah hijau
+    box(OP, tb[0], 1.0, tb[1], 0.6, 0.1, 0.6, [0.08, 0.22, 0.11], 5); // tutup
+  }
+  // Lampu lalu lintas di persimpangan pertama di depan hero (sudut yang tidak
+  // dipakai lampu jalan: lampu di (rx-48,ry+48)/(rx+48,ry-48), ini (rx+48,ry+48)).
+  {
+    let best = null;
+    for (const rx of city.roadsV) for (const ry of city.roadsH) {
+      if (hEW && ry !== hRoad) continue;
+      if (!hEW && rx !== hRoad) continue;
+      const fw = hEW ? (rx - hx0) * S * hFwdX : (ry - hy0) * S * hFwdZ;
+      if (fw > 15 && fw < 120 && (!best || fw < best[0])) best = [fw, rx, ry];
+    }
+    if (best) {
+      const rx = best[1], ry = best[2], px = (rx + 48) * S, pz = (ry + 48) * S;
+      box(OP, px, 2.6, pz, 0.35, 5.2, 0.35, LAMP_STEEL, 5); // tiang
+      if (hEW) { deboxBeam(OP, px, 5.0, pz, px, 5.3, pz - 1.5, 0.18, LAMP_STEEL, 5); box(OP, px, 4.9, pz - 1.5, 0.5, 1.3, 0.5, [0.08, 0.08, 0.09], 5); }
+      else { deboxBeam(OP, px, 5.0, pz, px - 1.5, 5.3, pz, 0.18, LAMP_STEEL, 5); box(OP, px - 1.5, 4.9, pz, 0.5, 1.3, 0.5, [0.08, 0.08, 0.09], 5); }
+      const hy = hEW ? pz - 1.5 : pz, hx2 = hEW ? px : px - 1.5; // kepala: merah menyala (atas), muka menghadap hero (arah datang = -fwd) — lampu menonjol 0.03 dari muka kepala
+      if (hEW) {
+        const lx = hx2 - 0.28 * hFwdX;
+        box(OP, lx, 5.25, hy, 0.08, 0.3, 0.3, [1.0, 0.15, 0.10], 4);
+        box(OP, lx, 4.9, hy, 0.08, 0.3, 0.3, [0.35, 0.25, 0.05], 4);
+        box(OP, lx, 4.55, hy, 0.08, 0.3, 0.3, [0.05, 0.30, 0.08], 4);
+      } else {
+        const lz = hy - 0.28 * hFwdZ;
+        box(OP, hx2, 5.25, lz, 0.3, 0.3, 0.08, [1.0, 0.15, 0.10], 4);
+        box(OP, hx2, 4.9, lz, 0.3, 0.3, 0.08, [0.35, 0.25, 0.05], 4);
+        box(OP, hx2, 4.55, lz, 0.3, 0.3, 0.08, [0.05, 0.30, 0.08], 4);
+      }
+    }
+  }
+
 
   // Gedung (dekat hero saja) + taman + pohon.
   // Cull: gedung yang terlalu dekat dengan kamera dihilangkan (seperti
@@ -918,7 +1369,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   let bi = 0;
   for (const b of city.buildings) {
     const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-    if (!near(cx, cy, R + 200) || !vis(cx, cy, Math.hypot(b.w, b.h) / 2 + (tod.bldShadow ? 400 : 0))) { bi++; continue; }
+    if (!near(cx, cy, R + 200) || !vis(cx, cy, Math.hypot(b.w, b.h) / 2 + (DIRSH ? 400 : 0))) { bi++; continue; }
     // GEDUNG: cull by jarak TERDEKAT fasad ke kamera (AABB), bukan pusat gedung.
     // Pusat 16 unit tapi fasad 1 unit dari kamera = tembok raksasa (VB-13).
     const bMinX = b.x * S, bMaxX = (b.x + b.w) * S, bMinZ = b.y * S, bMaxZ = (b.y + b.h) * S;
@@ -926,7 +1377,7 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     const ddz = Math.max(bMinZ - camZ, 0, camZ - bMaxZ);
     if (Math.hypot(ddx, ddz) < 12) { bi++; continue; }
     bld(OP, GL, b, bi, tod.facK);
-    if (tod.bldShadow) groundShadow(cx * S, cy * S, b.w * S, b.h * S, (b.height || 2) * 6.5); // SIANG v2: bayangan gedung di tanah
+    if (DIRSH) groundShadow(cx * S, cy * S, b.w * S, b.h * S, (b.height || 2) * 6.5); // R36 POSTFX: bayangan gedung sore/pagi juga (dulu cuma siang)
     bi++;
   }
   for (const pk of city.parks || []) {
@@ -934,9 +1385,131 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     flat(OP, (pk.x + pk.w / 2) * S, 0.03, (pk.y + pk.h / 2) * S, pk.w * S, pk.h * S, [0.12, 0.30, 0.16], 5);
   }
   for (const tr of city.trees || []) {
-    if (!near(tr.x, tr.y, 1200) || !vis(tr.x, tr.y, tod.bldShadow ? 130 : 40)) continue;
-    palm(OP, tr.x * S, tr.y * S, sunA);
-    if (tod.bldShadow) groundShadow(tr.x * S, tr.y * S, 1.2, 1.2, 4.4); // SIANG v2: bayangan palem
+    if (!near(tr.x, tr.y, 1200) || !vis(tr.x, tr.y, DIRSH ? 130 : 40)) continue;
+    const scT = 0.9 + hash2(Math.round(tr.x), Math.round(tr.y)) * 0.35; // R36 v3: tinggi palem taman bervariasi (alami)
+    palm(OP, tr.x * S, tr.y * S, sunA, scT);
+    if (DIRSH) groundShadow(tr.x * S, tr.y * S, 1.2, 1.2, 5.1 * scT); // SIANG v2: bayangan palem (R36: mahkota naik 4.4->5.1)
+  }
+  // R36 POHON TEPI JALAN: city.trees HANYA ada di dalam taman (16% blok) —
+  // dari chase-cam mereka sembunyi di balik gedung, jadi shot chase/title
+  // kelihatan tanpa pohon sama sekali (probe seed 7: 0 pohon di koridor
+  // x 1400..2400, y 960..1280). 5 pohon staged di trotoar jalan yang
+  // sedang dilalui hero, relatif-kamera seperti lampu city3d.js (JF4):
+  // batang di ±48 px dari garis tengah jalan (tepi trotoar; aspal 44,
+  // fasad 50), TIDAK di lajur. Posisi dijepit ke TENGAH BLOK (along ≡ 8
+  // mod 16 unit; persimpangan tiap 16 unit) supaya tidak menabrak tiang
+  // lampu di sudut persimpangan (±48,±48) — jarak min 32 px. Slot
+  // k=2 = pohon rindang, sisanya palem; sisi selang-seling, tapi kalau
+  // ada pejalan kaki / koin Harbor Token dalam 20 px dari titik rencana,
+  // GESER dulu sepanjang jalan (±4 unit, tetap di sisi yang sama) — balik
+  // sisi HANYA kalau dua geseran itu juga bentrok (v2: balik sisi bikin
+  // 4/5 pohon menumpuk di utara, di layar jadi 1 palem saja; probe kotak
+  // magenta membuktikan semua slot dirender, mereka cuma kolinear).
+  // Skala naik dgn slot (1.0 -> 1.28): palem jauh lebih tinggi supaya
+  // mahkotanya muncul di ATAS palem dekat. Lewati slot <12 unit dari
+  // kamera (batang di depan lensa) dan di luar daratan (x>2420 / x<30).
+  {
+    const fx2 = cam.fwd[0], fz2 = cam.fwd[1];
+    const rx2 = -fz2, rz2 = fx2; // kanan layar
+    const camAlong = cam.eye[0] * fx2 + cam.eye[2] * fz2;
+    const roadLat = (() => { // lateral garis tengah jalan terdekat hero
+      if (Math.abs(fx2) >= Math.abs(fz2)) {
+        const roadY = city.roadsH.reduce((a, b) => Math.abs(b - hy0) < Math.abs(a - hy0) ? b : a);
+        return (roadY * S - cam.eye[2]) * fx2 - (hx0 * S - cam.eye[0]) * fz2;
+      }
+      const roadX = city.roadsV.reduce((a, b) => Math.abs(b - hx0) < Math.abs(a - hx0) ? b : a);
+      return (hy0 * S - cam.eye[2]) * fx2 - (roadX * S - cam.eye[0]) * fz2;
+    })();
+    const mod16 = (a) => ((a % 16) + 16) % 16;
+    let a0 = camAlong + 20;
+    a0 += (8 - mod16(a0) + 16) % 16; // tengah blok pertama ≥20 unit di depan kamera
+    const clash = (wx, wy) => {
+      for (const pd of state.peds || []) if (pd.alive !== false && Math.hypot(pd.x - wx, pd.y - wy) < 20) return true;
+      for (const cl of state.collectibles || []) if (!cl.taken && Math.hypot(cl.x - wx, cl.y - wy) < 25) return true;
+      return false;
+    };
+    const spot = (a, side) => { // posisi dunia (unit) utk along a & sisi side
+      const la = roadLat + side * 4.8;
+      return [(cam.eye[0] + fx2 * (a - camAlong) + rx2 * la) / S,
+              (cam.eye[2] + fz2 * (a - camAlong) + rz2 * la) / S];
+    };
+    for (let k = 0; k < 5; k += 1) {
+      let along = a0 + k * 16;
+      let side = k % 2 === 0 ? -1 : 1; // selang-seling kiri/kanan
+      let [wx, wy] = spot(along, side);
+      if (wx < 30 || wx > 2420 || wy < 30 || wy > 1890) continue;
+      if (clash(wx, wy)) { // geser dulu (+4 lalu -4 unit), baru balik sisi
+        let ok = false;
+        for (const da of [4, -4]) {
+          const [ax, ay] = spot(along + da, side);
+          if (!clash(ax, ay)) { along += da; wx = ax; wy = ay; ok = true; break; }
+        }
+        if (!ok) {
+          side = -side;
+          [wx, wy] = spot(along, side);
+          if (clash(wx, wy)) continue; // dua sisi bentrok -> lewati slot
+        }
+      }
+      const wxu = cam.eye[0] + fx2 * (along - camAlong) + rx2 * (roadLat + side * 4.8);
+      const wyu = cam.eye[2] + fz2 * (along - camAlong) + rz2 * (roadLat + side * 4.8);
+      if (Math.hypot(wxu - cam.eye[0], wyu - cam.eye[2]) < 12) continue;
+      const scK = 1 + k * 0.12; // R36 v4: jauh = lebih tinggi (0.07 kurang: mahkota jauh tetap di depan fasad)
+      if (k === 2) shadeTree(OP, wxu, wyu, sunA, scK);
+      else palm(OP, wxu, wyu, sunA, scK);
+      if (DIRSH) groundShadow(wxu, wyu, 1.2, 1.2, (k === 2 ? 4.8 : 5.1) * scK);
+    }
+  }
+
+  // R36 PANTAI: garis pantai timur (x 2340..2448) — pasir + payung +
+  // kursi + palem + perahu nelayan + ombak. VISUAL SAJA: tidak menyentuh
+  // collision/lajur/misi. Pasir HANYA di luar koridor jalan (y<1072 /
+  // y>1168) supaya tidak menutup aspal; prop di x<=2410, y 940..1300 —
+  // jauh dari Harbor Token terdekat (2240,1600 / 2446,526 / 2410,1720).
+  // Gate hx0>1300: dari koridor chase (hero ~1587) pantai kelihatan di
+  // ujung jalan; di luar itu tidak digambar (hemat frame time). Air di
+  // sini digambar sendiri (blok air asli baru jalan kalau hx0>2250) supaya
+  // buih ombak tidak melayang di atas bidang tanah gelap.
+  if (hx0 > 1300 && near(2390, 1120, 1750) && vis(2390, 1120, 700)) {
+    const SAND = [0.76, 0.64, 0.42], SAND_D = [0.62, 0.50, 0.32], SAND_L = [0.86, 0.74, 0.52];
+    if (hx0 <= 2250) flat(OP, 250.4, 0.0, 112.0, 11.2, 94.0, [0.05, 0.20, 0.32], 10); // air pantai (x 2448..2560, y 650..1590)
+    flat(OP, 239.4, 0.03, 100.8, 10.8, 13.2, SAND, 5); // pasir utara jalan
+    flat(OP, 239.4, 0.03, 123.2, 10.8, 13.2, SAND, 5); // pasir selatan jalan
+    flat(OP, 239.4, 0.03, 84.0, 10.8, 20.0, SAND, 5); // pasir lanjut utara
+    flat(OP, 239.4, 0.03, 140.0, 10.8, 20.0, SAND, 5); // pasir lanjut selatan
+    for (let i = 0; i < 10; i += 1) { // bercak tone pasir (utara/selatan, JANGAN di koridor jalan)
+      const pz = (i % 2 ? 74 : 118) + hash2(i, 5) * 32;
+      flat(OP, 234.5 + hash2(i, 3) * 9, 0.04, pz, 1.6 + hash2(i, 9) * 2.4, 1.2 + hash2(i, 11) * 2.0, hash2(i, 7) < 0.5 ? SAND_D : SAND_L, 5);
+    }
+    for (let i = 0; i < 14; i += 1) { // jejak kaki berpasangan di pasir
+      const pz = (i % 2 ? 96 : 118) + hash2(i, 17) * 10;
+      const px = 235 + hash2(i, 13) * 8.5;
+      flat(OP, px, 0.045, pz, 0.35, 0.18, SAND_D, 5);
+      flat(OP, px + 0.5, 0.045, pz + 0.35, 0.35, 0.18, SAND_D, 5);
+    }
+    // ombak: 2 baris buih di garis pantai, bergeser pelan dengan t.
+    for (let r = 0; r < 2; r += 1) {
+      for (let i = 0; i < 8; i += 1) {
+        const wz = 76 + i * 9 + r * 4.5;
+        const wx = 245.3 + r * 1.2 + Math.sin(t * 0.9 + i * 1.3 + r * 2.0) * 0.45;
+        flat(OP, wx, 0.05, wz, 1.1, 3.2 + hash2(i, r) * 2.4, [0.88, 0.92, 0.95], 8);
+      }
+    }
+    // 4 payung warna-warni + 4 kursi (posisi = proyeksi layar chase seed 7:
+    // payung di x 540..717, y ~385; mahkota palem y ~364).
+    beachUmbrella(OP, 238.0, 101.0, [1.0, 0.35, 0.30], [0.95, 0.95, 0.90]); // koral/putih
+    beachUmbrella(OP, 238.0, 123.0, [0.10, 0.80, 0.80], [1.0, 0.85, 0.20]); // teal/kuning
+    beachUmbrella(OP, 240.0, 108.0, [1.0, 0.55, 0.15], [0.95, 0.95, 0.90]); // oranye/putih
+    beachUmbrella(OP, 240.0, 116.0, [1.0, 0.40, 0.60], [1.0, 0.85, 0.20]); // pink/kuning
+    beachChair(OP, 241.5, 101.5, [1.0, 0.35, 0.30]);
+    beachChair(OP, 241.5, 122.5, [0.10, 0.80, 0.80]);
+    beachChair(OP, 236.5, 108.5, [1.0, 0.85, 0.20]);
+    beachChair(OP, 236.5, 115.5, [1.0, 0.40, 0.60]);
+    palm(OP, 236.0, 99.0, sunA); // palem pantai utara (palm() R27b di base ini; R36-pohon menambah sc opsional)
+    palm(OP, 236.0, 125.0, sunA); // palem pantai selatan
+    palm(OP, 237.0, 96.0, sunA); // palem pantai ujung utara (membingkai pantai)
+    palm(OP, 237.0, 128.0, sunA); // palem pantai ujung selatan
+    fishBoat(OP, 241.0, 118.0, false); // perahu nelayan di pasir (lambung searah Z)
+    fishBoat(OP, 239.0, 98.0, true); // perahu nelayan kedua (lambung searah X)
   }
 
   // Air + dermaga + marina (kalau hero dekat pelabuhan).
@@ -998,7 +1571,10 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     }
   } else if (p.inBoat && p.boat) {
     const b = p.boat;
-    boat(OP, GL, b.x * S, b.y * S, yawOf(b), (b.length || 54) * S, (b.width || 20) * S, hx(b.color || '#e8e4d8'), { driver: true });
+    boat(OP, GL, b.x * S, b.y * S, yawOf(b), (b.length || 54) * S, (b.width || 20) * S, hx(b.color || '#e8e4d8'), { driver: true, hero: true }); // VIPER R36: perahu hero = NH-90 VIPER
+  } else if (p.inPlane && p.plane) { // JET R36: HA-1 (dulu: person jalan kaki)
+    const pl = p.plane;
+    plane(OP, GL, pl.x * S, pl.y * S, yawOf(pl), (pl.alt || 0) * 0.12, pl.throttle || 0, t, null);
   } else {
     person(OP, p.x * S, p.y * S, yawOf(p), [0.95, 0.8, 0.2], { kind: 'player' });
   }
@@ -1011,12 +1587,19 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   const CAR_TYPE = { bus: 'bus', fire: 'fire', medic: 'medic', apc: 'apc', hatchback: 'hatchback', sedanL: 'sedanL', pickup: 'pickup', hatch: 'hatchback', sedan: 'sedanL', van: 'sedanL', taxi: 'sedanL' };
   const drawCar = (c, police, unit) => {
     if (!c || c.alive === false) return;
+    // R36V2-DOUBLE: mobil pemain digambar 2x — sekali sebagai hero
+    // (line 999, tipe 'hero') dan sekali lagi di sini sebagai traffic/
+    // parked (CAR_TYPE[body], cat sama, bentuk nyaris sama). Sejak R26
+    // tak terlihat (warna/bentuk sama, hanya z-fight samar); papan TAXI
+    // R36V2 membongkarnya: hero pemain mendadak beratribut taksi
+    // (parked[0] kebetulan body 'taxi'). Lewati mobil pemain di sini.
+    if (p.inCar && p.car === c) return;
     if (!near(c.x, c.y, R) || !vis(c.x, c.y, 100)) return; // R27c-TUNE: 60->100 (bus/APC ~110px, setengah diagonal ~60-70px > 60)
     let type;
     if (police) type = (unit && unit.emergency && (c.body === 'fire' || c.body === 'medic')) ? c.body : 'police';
     else type = CAR_TYPE[c.body] || 'sedanL';
     const lod = distPx(c.x, c.y, hx0, hy0) < 250 ? undefined : 'low';
-    drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, tl: tlGain });
+    drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, taxi: c.body === 'taxi', tl: tlGain }); // R36V2-TAXI: papan TAXI + strip kotak (cars3d.js) — digabung R38 tlGain
   };
   for (const c of state.traffic.cars || []) drawCar(c, false);
   for (const c of state.traffic.parked || []) drawCar(c, false);
@@ -1056,13 +1639,31 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   if (hl && hl.active) {
     heli(OP, GL, hl.x * S, hl.y * S, hl.rotor || 0, t, cam.fwd);
     flat(GL, hx0 * S, 0.07, hy0 * S, 12, 12, [1.0, 0.9, 0.6], 7);
+    // R36: searchlight VERTIKAL di bawah heli (ganti stub miring yang
+    // terbaca streak putih lepas): 2 quad silang sempit + kolam di kaki
+    // beam. Sempit (0.5 -> 1.6) supaya tidak jadi segitiga raksasa (JETFIX-3).
     const rx2 = cam.fwd[1], rz2 = -cam.fwd[0];
-    const dx = hx0 * S - hl.x * S, dz = hy0 * S - hl.y * S, dl = Math.hypot(dx, dz) || 1;
-    const ex = hl.x * S + dx / dl * 1.5 + rx2 * 4, ez = hl.y * S + dz / dl * 1.5 + rz2 * 4;
-    quad(GL, [hl.x * S - rx2 * 0.45, 13.1, hl.y * S - rz2 * 0.45], [hl.x * S + rx2 * 0.45, 13.1, hl.y * S + rz2 * 0.45],
-      [ex + rx2, 9.5, ez + rz2], [ex - rx2, 9.5, ez - rz2],
-      [cam.fwd[0], 0, cam.fwd[1]], [[0, 0], [1, 0], [1, 1], [0, 1]], [1.0, 0.9, 0.6], 7);
+    const hx = hl.x * S, hz = hl.y * S, fx = cam.fwd[0], fz = cam.fwd[1];
+    quad(GL, [hx - rx2 * 0.5, 13.2, hz - rz2 * 0.5], [hx + rx2 * 0.5, 13.2, hz + rz2 * 0.5],
+      [hx + rx2 * 1.6, 0.3, hz + rz2 * 1.6], [hx - rx2 * 1.6, 0.3, hz - rz2 * 1.6],
+      [fx, 0, fz], [[0, 0], [1, 0], [1, 1], [0, 1]], [1.0, 0.9, 0.6], 7);
+    quad(GL, [hx - fx * 0.5, 13.2, hz - fz * 0.5], [hx + fx * 0.5, 13.2, hz + fz * 0.5],
+      [hx + fx * 1.6, 0.3, hz + fz * 1.6], [hx - fx * 1.6, 0.3, hz - fz * 1.6],
+      [rx2, 0, rz2], [[0, 0], [1, 0], [1, 1], [0, 1]], [1.0, 0.9, 0.6], 7);
+    flat(GL, hx, 0.08, hz, 7, 7, [1.0, 0.9, 0.6], 7);
   }
+
+  // JET R36: jet tempur HAF (Misi 13, 6 bintang) — NH-77 HARBOR WRAITH.
+  // Terbang 4 m di bawah hero (sama dgn city3d.js plane3d) supaya sayapnya
+  // tidak segaris dgn sayap hero (pelajaran PLANE-41/VB-41).
+  if (state.space && state.space.jets && state.space.jets.length && p.inPlane && p.plane) {
+    const heroAlt = p.plane.alt || 0;
+    for (const j of state.space.jets) {
+      if (!near(j.x, j.y, 400) || !vis(j.x, j.y, 40)) continue;
+      plane(OP, GL, j.x * S, j.y * S, yawOf(j), Math.max(0, heroAlt - 4) * 0.12, 1, t, { jet: true });
+    }
+  }
+
 
   // Perahu (bukan hero) + UFO + pejalan kaki + collectible.
   for (const b of state.boats || []) {
@@ -1100,8 +1701,16 @@ function buildFrame(state, cam, OP, SH, GL, t) {
   }
 
   // DEBOX R27b: hydrant merah (silinder + kubah + tutup samping) — dulu tidak digambar di 3D.
+  // R36-ROADS item 2: SATU hydrant di peta duduk 5,7 px dari koin (sudut persimpangan
+  // yang sama: hydrant +42/+42, koin +46/+46 — probe seed 7: koin (1486,206) vs hydrant
+  // (1482,202)) sehingga dari sudut chase hydrant menutupi setengah koin. Hydrant yang
+  // <40 px dari koin TIDAK digambar (visual saja — gameplay burst di world.js tetap di
+  // posisi asli; hanya 1 dari 8 hydrant yang kena aturan ini).
   for (const hd of state.hydrants || []) {
     if (!near(hd.x, hd.y, 1200) || !vis(hd.x, hd.y, 25)) continue;
+    let coinNear = false;
+    for (const cl of state.collectibles || []) { if (!cl.taken && Math.hypot(cl.x - hd.x, cl.y - hd.y) < 40) { coinNear = true; break; } }
+    if (coinNear) continue;
     const hx2 = hd.x * S, hz2 = hd.y * S;
     const hring = deboxRingCircle(0.32, 8);
     deboxPoly(OP, hx2, 0, hz2, hring, 0.75, [0.85, 0.28, 0.26], 5);
@@ -1147,8 +1756,15 @@ function updateCamera(state, dt, cam) {
     cam.z += (tz - cam.z) * Math.min(1, dt * 8);
   }
   cam.hx = hero.x; cam.hy = hero.y;
-  cam.eye = [cam.x, 4.4, cam.z];
-  cam.target = [hero.x * S + fx * 40, 2.2, hero.y * S + fz * 40];
+  // JET R36: saat terbang, kamera naik mengikuti ketinggian pesawat
+  // (skala sama dgn city3d.js drawChase3D: alt meter * 0.12) — kalau tidak,
+  // pesawat di alt 150-340 m berada jauh di atas frustum dan tak terlihat
+  // (itulah kenapa shot jets/planehigh baseline hanya menampilkan pejalan
+  // kaki di jalan). Saat di darat altU = 0: perilaku lama, byte-identik.
+  const pl = state.player.inPlane && state.space ? state.space.plane : null;
+  const altU = pl ? (pl.alt || 0) * 0.12 : 0;
+  cam.eye = [cam.x, 4.4 + altU, cam.z];
+  cam.target = [hero.x * S + fx * 40, 2.2 + altU, hero.y * S + fz * 40];
   cam.fwd = [fx, fz];
 }
 
@@ -1180,6 +1796,9 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     uWinWarm: gl.getUniformLocation(P, 'uWinWarm'), uContrast: gl.getUniformLocation(P, 'uContrast'),
     uShadowK: gl.getUniformLocation(P, 'uShadowK'), uRoadTex: gl.getUniformLocation(P, 'uRoadTex'),
     uFogK: gl.getUniformLocation(P, 'uFogK'),
+    uGradeLift: gl.getUniformLocation(P, 'uGradeLift'), uGradeGain: gl.getUniformLocation(P, 'uGradeGain'),
+    uGradeGamma: gl.getUniformLocation(P, 'uGradeGamma'), uRes: gl.getUniformLocation(P, 'uRes'),
+    uTime: gl.getUniformLocation(P, 'uTime'), // R36 POSTFX
   };
   const skyU = {
     day: gl.getUniformLocation(PS, 'uDay'),
@@ -1191,6 +1810,9 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     cloud: gl.getUniformLocation(PS, 'uCloud'), cloudK: gl.getUniformLocation(PS, 'uCloudK'),
     smog: gl.getUniformLocation(PS, 'uSmog'), skyDim: gl.getUniformLocation(PS, 'uSkyDim'),
     sunK: gl.getUniformLocation(PS, 'uSunK'), asp: gl.getUniformLocation(PS, 'uAsp'),
+    gradeLift: gl.getUniformLocation(PS, 'uGradeLift'), gradeGain: gl.getUniformLocation(PS, 'uGradeGain'),
+    gradeGamma: gl.getUniformLocation(PS, 'uGradeGamma'), res: gl.getUniformLocation(PS, 'uRes'),
+    time: gl.getUniformLocation(PS, 'uTime'), // R36 POSTFX
   };
   const OP = newBucket(), SH = newBucket(), GL = newBucket(), GLSH = newBucket(), GL2 = newBucket();
   const bufOP = makeBufSet(), bufSH = makeBufSet(), bufGL = makeBufSet(), bufGLSH = makeBufSet(), bufGL2 = makeBufSet();
@@ -1231,8 +1853,14 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   let VW = W, VH = H;
 
+  // R36 POSTFX (b): supersampling shot-only — jalur runShot membawa
+  // `?shot=` di URL, jadi resize memaksa ss=2 di situ saja (render
+  // 2560x1600, screenshot viewport 1280x800 mendownscale otomatis = SSAA).
+  // Live (tanpa ?shot=) tetap ss=1 / DPR; resize dari cinematic.js yang
+  // memanggil resize(w,h,ratio) tiap frame tidak bisa menurunkan ss shot.
+  const SHOT_SS = (typeof location !== 'undefined' && /(?:\?|&)shot=/.test(location.search)) ? 2 : 1;
   function resize(w, h, ss) {
-    ss = ss || 1;
+    ss = SHOT_SS > 1 ? SHOT_SS : (ss || 1);
     VW = w; VH = h;
     glCanvas.width = Math.round(w * ss);
     glCanvas.height = Math.round(h * ss);
@@ -1276,6 +1904,8 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     gl.uniform1f(skyU.moon, U.moon); gl.uniform1f(skyU.stars, U.stars);
     gl.uniform3fv(skyU.cloud, new Float32Array(U.cloud)); gl.uniform1f(skyU.cloudK, U.cloudK);
     gl.uniform1f(skyU.smog, U.smog); gl.uniform1f(skyU.skyDim, U.skyDim); gl.uniform1f(skyU.sunK, U.sunK); gl.uniform1f(skyU.asp, VW / VH);
+    gl.uniform3fv(skyU.gradeLift, new Float32Array(U.gradeLift)); gl.uniform3fv(skyU.gradeGain, new Float32Array(U.gradeGain));
+    gl.uniform1f(skyU.gradeGamma, U.gradeGamma); gl.uniform2f(skyU.res, glCanvas.width, glCanvas.height); gl.uniform1f(skyU.time, t); // R36 POSTFX
     gl.bindBuffer(gl.ARRAY_BUFFER, skyBuf);
     const sa = gl.getAttribLocation(PS, 'aP');
     gl.vertexAttribPointer(sa, 2, gl.FLOAT, false, 0, 0); gl.enableVertexAttribArray(sa);
@@ -1296,6 +1926,8 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo — HUD asli d
     gl.uniform2fv(A.uWinCell, new Float32Array(U.winCell)); gl.uniform1f(A.uWinGlass, U.winGlass);
     gl.uniform1f(A.uWinWarm, U.winWarm); gl.uniform1f(A.uContrast, U.contrast);
     gl.uniform1f(A.uShadowK, U.shadowK); gl.uniform1f(A.uRoadTex, U.roadTex); gl.uniform1f(A.uFogK, U.fogK);
+    gl.uniform3fv(A.uGradeLift, new Float32Array(U.gradeLift)); gl.uniform3fv(A.uGradeGain, new Float32Array(U.gradeGain));
+    gl.uniform1f(A.uGradeGamma, U.gradeGamma); gl.uniform2f(A.uRes, glCanvas.width, glCanvas.height); gl.uniform1f(A.uTime, t); // R36 POSTFX
     drawBuf(bufOP);
     // contact shadow (normal blend — SH + elips material 9 hasil belah-G)
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);

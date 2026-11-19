@@ -196,7 +196,17 @@ export function presetForHour(hour) {
 // `sunCol` dipakai ulang untuk SEMUA tint hangat (cat Fresnel, streak kaca,
 // streak jalan, air, ambient sun, spec, rim) — satu warna matahari menggeser
 // seluruh suhu frame, sesuai bible §2.1 (satu pasangan komplementer dominan).
+// R36 POSTFX: color grade per TOD (lift/gamma/gain) — palet sudah ada di
+// PRESETS; grade diturunkan dari nama preset (blend -> netral, jangan tebak).
+const GRADE = {
+  pagi: { lift: [0.01, 0.01, 0.02], gain: [1.02, 1.00, 1.04], gamma: 1.05 },
+  siang: { lift: [0.00, 0.00, 0.00], gain: [1.04, 1.03, 1.00], gamma: 0.98 },
+  sore: { lift: [0.015, 0.005, 0.01], gain: [1.06, 1.00, 0.94], gamma: 0.95 },
+  malam: { lift: [0.02, 0.02, 0.035], gain: [0.98, 1.00, 1.06], gamma: 1.08 },
+};
+const _g = (name) => GRADE[name] || { lift: [0, 0, 0], gain: [1, 1, 1], gamma: 1 };
 export function webglUniforms(p) {
+  const g = _g(p.name);
   return {
     sunY: p.sun.y, sunCol: p.sun.col, sunDisc: p.sun.disc, sunGlow: p.sun.glow,
     sunPos: p.sun.pos, moon: p.moon,
@@ -211,6 +221,8 @@ export function webglUniforms(p) {
     winCell: p.winCell, winGlass: p.winGlass, winWarm: p.winWarm,
     contrast: p.contrast, shadowK: p.shadowK, roadTex: p.roadTex,
     fogK: p.fogK, sunK: p.sunK,
+    // R36 POSTFX: grade per TOD (0 byte dossier — file post-cut)
+    gradeLift: g.lift, gradeGain: g.gain, gradeGamma: g.gamma,
   };
 }
 
