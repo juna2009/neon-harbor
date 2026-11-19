@@ -51,20 +51,46 @@ function car(o){const{x,z,w,h,l,c}=o,zb=z-l/2,zf=z+l/2,dep=zb-camZ,t=hz(dep);
   Q([x-w/2+.5,h*.55,zb-.06],[x+w/2-.5,h*.55,zb-.06],[x+w/2-.6,h*.9,zb-.06],[x-w/2+.6,h*.9,zb-.06],mix([70,90,130],t),dep);
   Q([x-w/2,h,zb],[x+w/2,h,zb],[x+w/2*.82,h*.8,zf],[x-w/2*.82,h*.8,zf],sh(c,1.15,t),dep);
   const sx=x>0?x-w/2:x+w/2;
-  Q([sx,0,zb],[sx,0,zf],[sx,h*.92,zf],[sx,h,zb],sh(c,.95,t),dep);
+  // R32-FIN: sisi atas dulu h*.92 di depan — lebih tinggi dari tepi depan
+  // atap (h*.8) sementara atap menyempit (w*.82), jadi sudut depan-atas
+  // flank mencuat di atas garis atap dan kebaca duri/sirip hitam (probe:
+  // sisi dicat magenta = duri ikut magenta). Samakan dengan atap (h*.8).
+  Q([sx,0,zb],[sx,0,zf],[sx,h*.8,zf],[sx,h,zb],sh(c,.95,t),dep);
+  // R32-SIDE: sisi mobil dulu satu bidang datar polos — dari samping kebaca
+  // kotak/kontainer (parkir biru/merah di title). Kaca samping + roda
+  // samping + garis pintu di bidang flank (offset 0.06 keluar; urutan
+  // insert = urutan cat, jadi menimpa bidang bodi).
+  const so=sx+(x>0?-0.06:0.06);
+  Q([so,h*.55,zb+l*.12],[so,h*.55,zb+l*.5],[so,h*.76,zb+l*.5],[so,h*.86,zb+l*.12],mix([70,90,130],t),dep); // kaca samping
+  for (const az of [zb+l*.22,zb+l*.78]) { // roda samping (as roda depan/belakang)
+    Q([so,.02,az-.55],[so,.02,az+.55],[so,.62,az+.55],[so,.62,az-.55],'#0a0a0e',dep);
+    Q([so,.2,az-.22],[so,.2,az+.22],[so,.45,az+.22],[so,.45,az-.22],'#6a6f76',dep); // hub roda samping
+  }
+  Q([so,h*.12,zb+l*.52-.035],[so,h*.12,zb+l*.52+.035],[so,h*.55,zb+l*.52+.035],[so,h*.55,zb+l*.52-.035],'rgba(0,0,0,.45)',dep); // garis pintu
+  Q([so,h*.58,zb+l*.42],[so,h*.58,zb+l*.48],[so,h*.64,zb+l*.48],[so,h*.64,zb+l*.42],'#14141a',dep); // gagang pintu
   const tl=o.pol?[[255,60,60],[60,120,255]]:[[255,70,90],[255,70,90]];
   if(o.hero){Q([x-w/2+.2,h-.06,zb-.08],[x+w/2-.2,h-.06,zb-.08],[x+w/2-.2,h+.1,zb-.08],[x-w/2+.2,h+.1,zb-.08],mix([255,90,140],t),dep);
     Q([x-w/2+.3,h*.44,zb-.07],[x+w/2-.3,h*.44,zb-.07],[x+w/2-.3,h*.49,zb-.07],[x-w/2+.3,h*.49,zb-.07],'rgba(0,0,0,.5)',dep);
     Q([x-w/2+.2,h*.84,zb-.07],[x+w/2-.2,h*.84,zb-.07],[x+w/2-.2,h*.88,zb-.07],[x-w/2+.2,h*.88,zb-.07],'rgba(0,0,0,.4)',dep);
-    Q([x-w/2-.5,h*.8,zb-.3],[x-w/2-.1,h*.8,zb-.3],[x-w/2-.1,h*.95,zb-.3],[x-w/2-.5,h*.95,zb-.3],mix([20,22,30],t),dep);
-    Q([x+w/2+.1,h*.8,zb-.3],[x+w/2+.5,h*.8,zb-.3],[x+w/2+.5,h*.95,zb-.3],[x+w/2+.1,h*.95,zb-.3],mix([20,22,30],t),dep);
+    // R32-MIRROR: spion dulu menggantung — tepi dalam 0.1 dari bodi + z 0.3
+    // di belakang muka belakang = celah kosong kebaca melayang (probe:
+    // spion dicat hijau = persegi hijau terlepas). Tempelkan: tepi dalam
+    // menumpang bodi 0.06, z lebih dekat ke muka belakang.
+    Q([x-w/2-.34,h*.8,zb-.12],[x-w/2+.06,h*.8,zb-.12],[x-w/2+.06,h*.95,zb-.12],[x-w/2-.34,h*.95,zb-.12],mix([20,22,30],t),dep);
+    Q([x+w/2-.06,h*.8,zb-.12],[x+w/2+.34,h*.8,zb-.12],[x+w/2+.34,h*.95,zb-.12],[x+w/2-.06,h*.95,zb-.12],mix([20,22,30],t),dep);
     Q([x-.25,h+.02,zb-.4],[x+.25,h+.02,zb-.4],[x+.25,h+.22,zb-.4],[x-.25,h+.22,zb-.4],mix([20,22,30],t),dep);}
   Q([x-w/2+.3,.55,zb-.06],[x-w/2+1.1,.55,zb-.06],[x-w/2+1.1,.85,zb-.06],[x-w/2+.3,.85,zb-.06],mix(tl[0],t),dep);
   Q([x+w/2-1.1,.55,zb-.06],[x+w/2-.3,.55,zb-.06],[x+w/2-.3,.85,zb-.06],[x+w/2-1.1,.85,zb-.06],mix(tl[1],t),dep);
   Q([x-w/2+.1,0,zb-.05],[x-w/2+1.2,0,zb-.05],[x-w/2+1.2,.75,zb-.05],[x-w/2+.1,.75,zb-.05],'#0a0a0e',dep);
   Q([x+w/2-1.2,0,zb-.05],[x+w/2-.1,0,zb-.05],[x+w/2-.1,.75,zb-.05],[x+w/2-1.2,.75,zb-.05],'#0a0a0e',dep);
-  Q([x-w/2+.35,.15,zb-.08],[x-w/2+.95,.15,zb-.08],[x-w/2+.95,.6,zb-.08],[x-w/2+.35,.6,zb-.08],'#8a8f98',dep);
-  Q([x+w/2-.95,.15,zb-.08],[x+w/2-.35,.15,zb-.08],[x+w/2-.35,.6,zb-.08],[x+w/2-.95,.6,zb-.08],'#8a8f98',dep);
+  // R32-HUB: hub abu-abu pucat (#8a8f98) di bawah belakang kebaca lampu
+  // depan di belakang mobil (probe: hub dicat cyan = dua kotak cyan).
+  // Gelapkan jadi gunmetal + titik terang kecil di tengah: kebaca velg/ban,
+  // bukan lampu. Lampu belakang yang benar = strip merah di atasnya.
+  Q([x-w/2+.35,.15,zb-.08],[x-w/2+.95,.15,zb-.08],[x-w/2+.95,.6,zb-.08],[x-w/2+.35,.6,zb-.08],'#4a4f57',dep);
+  Q([x+w/2-.95,.15,zb-.08],[x+w/2-.35,.15,zb-.08],[x+w/2-.35,.6,zb-.08],[x+w/2-.95,.6,zb-.08],'#4a4f57',dep);
+  Q([x-w/2+.55,.28,zb-.09],[x-w/2+.75,.28,zb-.09],[x-w/2+.75,.48,zb-.09],[x-w/2+.55,.48,zb-.09],'#c8ccd4',dep);
+  Q([x+w/2-.75,.28,zb-.09],[x+w/2-.55,.28,zb-.09],[x+w/2-.55,.48,zb-.09],[x+w/2-.75,.48,zb-.09],'#c8ccd4',dep);
   if(o.pol){Q([x-1,h+.05,zb-.4],[x-.1,h+.05,zb-.4],[x-.1,h+.35,zb-.4],[x-1,h+.35,zb-.4],'#ff4040',dep);
     Q([x+.1,h+.05,zb-.4],[x+1,h+.05,zb-.4],[x+1,h+.35,zb-.4],[x+.1,h+.35,zb-.4],'#4080ff',dep);}}
 function sign(sd,z0,z1,txt,col){const b=B.find(b=>(b.x>0)===(sd>0)&&b.z>z0&&b.z<z1);if(!b)return;
@@ -1740,7 +1766,24 @@ export function drawChase3D(ctx, state) {
   // collectibles
   for (const c of state.collectibles) {
     if (c.taken || !inRange(c.x, c.y, 90, 90)) continue;
-    box3(c.x * CS, 0.4, c.y * CS, 1.1, 1.1, 1.1, t * 2, '#ffd23e', Math.hypot(c.x * CS - ccX, c.y * CS - ccZ));
+    // R32-COIN (fallback canvas): kotak kuning berputar DIHAPUS (Juna:
+    // "jelek banget") — koin emas bulat + $ (sama seperti WebGL2). Koin
+    // digambar screen-space via ops (depth-sorted) + bayangan kontak di
+    // tanah supaya kebaca diletakkan, bukan melayang.
+    flatQuad(c.x - 8, c.y - 8, c.x + 8, c.y + 8, 0.03, 'rgba(0,0,0,0.3)');
+    const cp = cP(c.x * CS, 0.9, c.y * CS);
+    if (cp) {
+      const cr = cl(520 / cp[2], 6, 30);
+      ops.push({ d: cp[2], f() {
+        x.save();
+        x.beginPath(); x.arc(cp[0], cp[1], cr, 0, 7); x.fillStyle = '#ffd23e'; x.fill();
+        x.lineWidth = Math.max(1, cr * 0.14); x.strokeStyle = '#a67c00'; x.stroke();
+        x.beginPath(); x.arc(cp[0], cp[1], cr * 0.68, 0, 7); x.fillStyle = '#e8b93c'; x.fill();
+        x.fillStyle = '#7a5a00'; x.font = 'bold ' + Math.round(cr * 0.95) + 'px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.fillText('$', cp[0], cp[1] + cr * 0.05);
+        x.restore();
+      } });
+    }
     // BOAT-FIX (VB-26): the harbour token at (2446,1166) sat 2 px from the
     // water with no shadow or base, reading as a floating yellow cube on
     // the dock. Near-water tokens sit on a wooden crate with a contact

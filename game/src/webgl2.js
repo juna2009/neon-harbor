@@ -433,6 +433,56 @@ function deboxBeam(B, ax, ay, az, bx, by, bz, w, col, m) {
   boxR(B, (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, w, w, len, ry, rx, col, m);
 }
 
+// R32-COIN: token = koin emas BULAT menghadap kamera (billboard), bukan
+// kotak kuning berputar (Juna: "jelek banget"). Cakram emas mengkilap +
+// cincin dalam + simbol $ + ring glow aditif di sekelilingnya. Selalu
+// bundar dari sudut mana pun karena muka koin mengikuti kamera.
+// nrm = normal muka koin (ke arah kamera); G = bucket glow (mat 7 aditif).
+function coinToken(B, G, cx, cy, cz, R, nrm, t) {
+  const nl = Math.hypot(nrm[0], nrm[2]) || 1;
+  const n = [nrm[0] / nl, 0, nrm[2] / nl];
+  const rgt = [-n[2], 0, n[0]]; // kanan kamera (cross(n, up))
+  const bob = Math.sin(t * 2) * 0.08;
+  const C = [cx, cy + bob, cz];
+  const N = 20, TH = 0.05; // ketebalan koin (setengah)
+  const GOLD = [1.0, 0.85, 0.35], GOLD_DK = [0.82, 0.62, 0.18], RIM = [0.85, 0.65, 0.2], DOLLAR = [0.5, 0.34, 0.06];
+  const rimPt = (a, rad, off) => [C[0] + rgt[0] * Math.cos(a) * rad + n[0] * off, C[1] + Math.sin(a) * rad, C[2] + rgt[2] * Math.cos(a) * rad + n[2] * off];
+  const fan = (B2, rad, off, front, col, m) => {
+    const nrm2 = front ? n : [-n[0], 0, -n[2]];
+    const base = B2.p.length / 3;
+    push(B2, [C[0] + n[0] * off, C[1], C[2] + n[2] * off], nrm2, [0.5, 0.5], col, m);
+    for (let i = 0; i < N; i += 1) push(B2, rimPt((i / N) * Math.PI * 2, rad, off), nrm2, [0, 0], col, m);
+    for (let i = 0; i < N; i += 1) {
+      if (front) B2.i.push(base, base + 1 + i, base + 1 + ((i + 1) % N));
+      else B2.i.push(base, base + 1 + ((i + 1) % N), base + 1 + i);
+    }
+  };
+  fan(B, R, TH, true, GOLD, 4); // muka depan
+  fan(B, R * 0.72, TH + 0.02, true, GOLD_DK, 4); // cincin dalam (lebih gelap)
+  fan(B, R, -TH, false, GOLD, 4); // muka belakang (polos)
+  for (let i = 0; i < N; i += 1) { // pelek tebal koin
+    const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) % N) / N * Math.PI * 2;
+    quad(B, rimPt(a0, R, TH), rimPt(a1, R, TH), rimPt(a1, R, -TH), rimPt(a0, R, -TH), rgt, [[0, 0], [1, 0], [1, 1], [0, 1]], RIM, 4);
+  }
+  // simbol $ di muka depan: S (5 batang) + garis vertikal tengah
+  const gq = (u0, v0, u1, v1) => {
+    const P = (u, v, off) => [C[0] + rgt[0] * u + n[0] * off, C[1] + v, C[2] + rgt[2] * u + n[2] * off];
+    quad(B, P(u0, v0, TH + 0.04), P(u1, v0, TH + 0.04), P(u1, v1, TH + 0.04), P(u0, v1, TH + 0.04), n, [[0, 0], [1, 0], [1, 1], [0, 1]], DOLLAR, 4);
+  };
+  const s = R * 0.55; // setengah lebar $ (diskalakan dgn radius koin)
+  gq(-s, s * 0.76, s, s); // batang atas S
+  gq(-s, s * 0.14, -s * 0.55, s * 0.76); // kaki kiri atas S
+  gq(-s, -s * 0.12, s, s * 0.12); // batang tengah S
+  gq(s * 0.55, -s * 0.76, s, -s * 0.14); // kaki kanan bawah S
+  gq(-s, -s, s, -s * 0.76); // batang bawah S
+  gq(-s * 0.12, -s * 1.15, s * 0.12, s * 1.15); // garis vertikal $
+  // ring glow: annulus aditif di belakang koin (tidak menutupi muka koin)
+  for (let i = 0; i < N; i += 1) {
+    const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) % N) * Math.PI * 2;
+    quad(G, rimPt(a0, R * 1.08, -0.03), rimPt(a1, R * 1.08, -0.03), rimPt(a1, R * 1.55, -0.03), rimPt(a0, R * 1.55, -0.03), n, [[0, 0], [1, 0], [1, 1], [0, 1]], [1.0, 0.9, 0.55], 7);
+  }
+}
+
 // ---- builder objek (koordinat dunia WebGL: X = game x*S, Z = game y*S, Y = atas) ----
 const DARK = [0.05, 0.04, 0.06];
 // Mobil: (cx, cz) pusat, yaw = PI/2 - angle game, len/wid dalam unit.
@@ -1027,7 +1077,9 @@ function buildFrame(state, cam, OP, SH, GL, t) {
     // Alas silinder emas + tiang tipis menambatkannya ke tanah.
     deboxPoly(OP, cl.x * S, 0, cl.y * S, deboxRingCircle(1.0, 10), 0.14, [0.72, 0.55, 0.1], 4);
     deboxBeam(OP, cl.x * S, 0.1, cl.y * S, cl.x * S, 1.0, cl.y * S, 0.1, [1.0, 0.8, 0.2], 4);
-    boxR(OP, cl.x * S, 1.0, cl.y * S, 0.9, 0.9, 0.9, t * 1.5, 0.6, [1.0, 0.8, 0.2], 4);
+    // R32-COIN: kotak kuning berputar DIHAPUS (Juna: "jelek banget") —
+    // koin emas bulat menghadap kamera + $ + ring glow (lihat coinToken).
+    coinToken(OP, GL, cl.x * S, 1.0, cl.y * S, 0.7, [-cam.fwd[0], 0, -cam.fwd[1]], t);
   }
 
   // DEBOX R27b: hydrant merah (silinder + kubah + tutup samping) — dulu tidak digambar di 3D.
