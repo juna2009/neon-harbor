@@ -1,5 +1,5 @@
 import { CAR, PLAYER, STEP, UFO_DURATION, UFO_HOUR, WANTED, WEAPONS, WORLD_H, WORLD_W } from './config.js';
-import { WATER_X, buildCity, collides, districtAt, moveCircle, onRoad } from './city.js';
+import { WATER_X, buildCity, buildingAt, collides, districtAt, moveCircle, onRoad } from './city.js';
 import { createBullets, fireWeapon, stepBullets } from './combat.js';
 import { BOAT_ACCEL, BOAT_MAX_SPEED, boatHitsObstacle as hit, createBoats, nearestBoat, stepBoats } from './boats.js';
 import { claimPinkTaxi, completeMission, createArmored, createCollectibles, createMissionState, createPizza, createRace, createTaxi, createWeaponPickups, loadCheckpoint, maxCarHp, repairAtGarage, resprayAtGarage, saveCheckpoint, targetForMission, updateArmored, updateMission, updatePickups, updatePizza, updateRace, updateTaxi } from './missions.js';
@@ -398,10 +398,8 @@ export function createWorld(rng, savedMission, sp) {
   function addFloater(x, y, value, color) {
     state.floaters.push({ x, y, value, color: color || '#7be382', life: 1.4 });
   }
-  // R34: oriented-box (SAT) push between two cars. Returns the minimum
-  // translation to apply to `a` to separate the boxes, or null when they do
-  // not touch. The old fixed 40u circle let two sedans (46u long) overlap
-  // by 6u and vans (54u) by 14u — bumpers visibly interpenetrating.
+  // R34: SAT push between two cars — min translation to separate `a`, or
+  // null when not touching (old 40u circle let bumpers interpenetrate).
   function obbPush(a, b) {
     const dx = b.x - a.x, dy = b.y - a.y;
     const aL = (a.length || 46) / 2 + 2, aW = (a.width || 22) / 2 + 2;
@@ -474,9 +472,7 @@ export function createWorld(rng, savedMission, sp) {
     const wet = (state.weather && state.weather.heavy)
       || state.wet.some((w) => Math.hypot(car.x - w.x, car.y - w.y) < w.r);
     const steerFactor = (state.upgrades.slicks ? 1.25 : 1) * (wet ? 0.55 : 1) * (car.crew === 'jax' ? 1.15 : 1); // R35-F1
-    // R34: taper acceleration near top speed (was flat to the cap, so the
-    // car surged then sat on the limiter) and soften the coast decay (1.4/s
-    // braked hard on lift-off, making cruise speed yo-yo).
+    // R34: taper accel near top speed; soften coast decay (was 1.4/s).
     if (throttle > 0) {
       const fwd = Math.min(1, Math.max(0, car.speed) / topSpeed);
       car.speed += CAR.accel * tireFactor * accelFactor * (1 - 0.55 * fwd) * dt;
@@ -486,11 +482,8 @@ export function createWorld(rng, savedMission, sp) {
       car.speed -= car.speed * 0.85 * dt;
     }
     car.speed = Math.max(-CAR.maxReverse, Math.min(topSpeed, car.speed));
-    // R34: smooth the steering — binary input went to full lock in one step,
-    // so turns snapped like a robot. car.steerS ramps toward the input; the
-    // turn rate eases off at very low speed (no pivot) and at top speed
-    // (no twitch). car.lean is the body roll into the turn, exposed for the
-    // renderer (R32's cars3d/city car3d) to consume.
+    // R34: steerS ramps to input (no snap); turn eases off at very low and
+    // top speed. car.lean = body roll for the renderer.
     car.steerS = (car.steerS || 0) + (steer - (car.steerS || 0)) * Math.min(1, 7 * dt);
     const spd = Math.abs(car.speed);
     let turnScale = 1;
@@ -520,11 +513,24 @@ export function createWorld(rng, savedMission, sp) {
     }
     car.x = Math.max(cr, Math.min(WORLD_W - cr, car.x));
     car.y = Math.max(cr, Math.min(WORLD_H - cr, car.y));
+    // Wedge-freeze B-01: an overlapping car could never drive out (every
+    // move still collides, speed *-0.25/frame). Push out along the smallest
+    // penetration axis (peds' resolve); gated on collides() so a door gap
+    // is never pushed. Car always ends the frame outside the building.
+    for (let i = 0; i < 4; i += 1) {
+      const b = collides(city, car.x, car.y, cr) ? buildingAt(city, car.x, car.y, cr) : null;
+      if (!b) break;
+      const l = car.x - (b.x - cr), r = b.x + b.w + cr - car.x;
+      const t = car.y - (b.y - cr), u = b.y + b.h + cr - car.y;
+      const m = Math.min(l, r, t, u);
+      if (m === l) car.x = b.x - cr;
+      else if (m === r) car.x = b.x + b.w + cr;
+      else if (m === t) car.y = b.y - cr;
+      else car.y = b.y + b.h + cr;
+    }
     hitScenery(car);
-    // R34: gas pumps are solid — the car must not pass through them. (A
-    // hard hit explodes the pump first, via hitScenery above, so this push
-    // only applies while the pump is still alive; the radius matches the
-    // explosion trigger so a fast hit still detonates instead of stopping.)
+    // R34: gas pumps are solid (alive only; a hard hit explodes first via
+    // hitScenery, so a fast hit still detonates instead of stopping).
     for (const pump of state.gasStation.pumps) {
       if (!pump.alive) continue;
       const pdx = car.x - pump.x, pdy = car.y - pump.y;
@@ -550,16 +556,14 @@ export function createWorld(rng, savedMission, sp) {
       if (!ped.alive) continue;
       const pdx = ped.x - car.x, pdy = ped.y - car.y;
       const pd = Math.hypot(pdx, pdy);
-      // R27c: run over only peds on the road surface — the 26u radius
-      // reaches onto the sidewalk (lane 14-24u, walk line 40u from centre).
+      // R27c: run over only peds on the road (26u radius reaches sidewalk).
       if (pd < 26 && Math.abs(car.speed) > 80 && onRoad(city, ped.x, ped.y)) {
         ped.alive = false;
         addWanted(state, 1);
         state.events.pedDown = true;
       } else {
-        // R34: a living ped is solid — the car must not pass through their
-        // body. At low speed (or off-road, where a run-over is never
-        // scored) the car shoves the ped aside instead; they walk away.
+        // R34: a living ped is solid — at low speed (or off-road) the car
+        // shoves the ped aside instead; they walk away.
         const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
         const along = pdx * fx + pdy * fy, side = -pdx * fy + pdy * fx;
         const halfL = (car.length || 46) / 2 + 5, halfW = (car.width || 22) / 2 + 5;
