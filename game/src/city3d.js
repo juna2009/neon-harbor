@@ -1,5 +1,6 @@
 import { WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
+import { shoreX } from './districts.js'; // A-WORLD: garis pantai berlekuk (lekuk maks 12u — lihat districts.js)
 import { BRIDGE } from './drawbridge.js';
 import { PRESETS } from './timeofday.js';
 import { drawMarket3D } from './market.js'; // R35-F9: night market stalls + string lights (post-cut)
@@ -990,6 +991,14 @@ function vQuad(cx, cz, a, fOff, rOff, w, y0, y1, col, dep) {
 // must be painted first even when its near edge is closer than a car on it.
 function flatQuad(x0, y0, x1, y1, h, col) {
   QW([[x0 * CS, h, y0 * CS], [x1 * CS, h, y0 * CS], [x1 * CS, h, y1 * CS], [x0 * CS, h, y1 * CS]], col, 'far');
+}
+// A-WORLD: trapesium datar — tepi kiri/kanan boleh beda di ujung atas/bawah
+// (x0a,x1a di y0; x0b,x1b di y1). Dipakai garis pantai: baris yang
+// bersebelahan berbagi nilai shoreX yang sama persis di tepi bersama → ubin
+// tanpa celah. Persegi (revisi pertama) meninggalkan intrusi darat sampai
+// 6,3u × 320u ke dalam air antar-baris — terukur, bukan tebakan.
+function flatTrap(x0a, x1a, y0, x0b, x1b, y1, h, col) {
+  QW([[x0a * CS, h, y0 * CS], [x1a * CS, h, y0 * CS], [x1b * CS, h, y1 * CS], [x0b * CS, h, y1 * CS]], col, 'far');
 }
 // thin horizontal strip facing up (rim light): center (cx, cz), w along right,
 // th along forward, at height y
@@ -2126,14 +2135,17 @@ export function drawChase3D(ctx, state) {
       const cxp = gx + 160, cyp = gy + 160;
       if (!inRange(cxp, cyp, 175, 135)) continue;
       const td = Math.hypot(cxp * CS - ccX, cyp * CS - ccZ);
-      // round 20: the shoreline tile (2240–2560) straddles WATER_X — its
-      // centre is on land, so the whole 320 px tile used to render as
-      // land and swallowed the 112 px water strip: a boat read as
-      // driving on grass. Split it: land west of the shore, water east.
-      // Near-field only (tile centre < 80 units from the camera): the
-      // verified chase3d frame's shoreline tile sits ~95 units ahead,
-      // fogged, and must render exactly as before (sha 07be0b55…).
-      const straddle = td < 80 && gx < WATER_X && gx + 320 > WATER_X;
+      // A-WORLD: belah tile di shoreX — TRAPESIUM (tepi = shoreX di KEDUA
+      // ujung baris, gy dan gy+320): baris yang bersebelahan berbagi nilai
+      // yang sama persis → garis pantai melengkung tanpa celah/intrusi.
+      // Hanya tile near-field (td<80) yang berubah — gate frame terverifikasi
+      // (sha 07be0b55, tile ~95u di depan) TIDAK kena.
+      const sx0 = shoreX(gy), sx1 = shoreX(gy + 320);
+      // Uji straddle pakai min/max sepanjang baris: garis pantai bisa masuk
+      // tile di tengah baris (sx0 di luar tapi sx1 di dalam) — uji satu titik
+      // (revisi pertama, shoreX(gy+160)) akan melewatkannya.
+      const sxMin = sx0 < sx1 ? sx0 : sx1, sxMax = sx0 < sx1 ? sx1 : sx0;
+      const straddle = td < 80 && gx < sxMax && gx + 320 > sxMin;
       if (straddle) {
         let ground = '#2f6b5a';
         for (const dd of city.districts) {
@@ -2144,8 +2156,8 @@ export function drawChase3D(ctx, state) {
         // edge, y 508-605). Use the Downtown slate already in this view so
         // bare land matches the road/sidewalk palette. Parks keep green.
         if (ground === '#2f6b5a') ground = '#4b5563';
-        flatQuad(gx, gy, WATER_X, gy + 320, 0, sh(hx3(ground), shadeK, hz(td)));
-        flatQuad(WATER_X, gy, gx + 320, gy + 320, -0.35, sh([29, 111, 158], shadeK, hz(td)));
+        flatTrap(gx, sx0, gy, gx, sx1, gy + 320, 0, sh(hx3(ground), shadeK, hz(td)));
+        flatTrap(sx0, gx + 320, gy, sx1, gx + 320, gy + 320, -0.35, sh([29, 111, 158], shadeK, hz(td)));
       } else if (cxp > WATER_X) {
         flatQuad(gx, gy, gx + 320, gy + 320, -0.35, sh([29, 111, 158], shadeK, hz(td)));
       } else {
@@ -2166,14 +2178,14 @@ export function drawChase3D(ctx, state) {
     if (!inRange(2390, gy + 160, 175, 135)) continue;
     const td2 = Math.hypot(2390 * CS - ccX, (gy + 160) * CS - ccZ);
     const sv = h2(gy, 3);
-    flatQuad(2330, gy, WATER_X, gy + 320, 0.05, sh([194 + sv * 16, 166 + sv * 10, 120 + sv * 8], shadeK, hz(td2)));
+    flatTrap(2330, shoreX(gy), gy, 2330, shoreX(gy + 320), gy + 320, 0.05, sh([194 + sv * 16, 166 + sv * 10, 120 + sv * 8], shadeK, hz(td2)));
     for (let i = 0; i < 3; i += 1) {
       const dx = 2340 + h2(gy, i * 7 + 1) * 90, dy = gy + 30 + h2(gy, i * 7 + 5) * 260;
       flatQuad(dx, dy, dx + 8, dy + 5, 0.06, sh([150, 120, 80], shadeK, hz(td2)));
     }
     for (let i = 0; i < 2; i += 1) {
       const fy = gy + 40 + i * 150 + h2(gy, i + 21) * 40;
-      flatQuad(WATER_X + 6, fy, WATER_X + 26, fy + 6, -0.3, 'rgba(255,255,255,0.35)');
+      flatQuad(shoreX(fy) + 6, fy, shoreX(fy) + 26, fy + 6, -0.3, 'rgba(255,255,255,0.35)');
     }
   }
   // R25: Harbor Aerospace spaceport ground (mission 13). The 2D game

@@ -1,4 +1,21 @@
 // game/src/districts.js — R35-F2: District Standing (7 districts).
+import { WATER_X } from './city.js'; // A-WORLD: batas pantai + split butuh WATER_X (city.js tidak import file ini — tidak ada siklus).
+// A-WORLD (Opsi A, 21:42 WIB): garis pantai berlekuk + batas Utara/Selatan
+// miring. Aturan keras pantai: tanah menonjol KE ARAH AIR saja (x>WATER_X),
+// tidak pernah ke darat — supaya tidak bentrok collision x=WATER_X.
+// Amplitudo MAKS 12u: perahu pemain di-clamp di WATER_X+16 (world.js:263),
+// perahu polisi di WATER_X+30 (police.js:68) — lekuk lebih besar membuat
+// perahu tampak kandas di pasir. Rentang [0,12]; minimap memakai eksagerasi
+// 4x dari fungsi yang sama (kartografi, bukan survei — lihat minimap.js).
+export function coastBulge(y) {
+  const a = 6 + 4 * Math.sin(y * 0.004 + 1.2) + 2 * Math.sin(y * 0.011 + 0.5);
+  return a < 0 ? 0 : a > 12 ? 12 : a;
+}
+export function shoreX(y) { return WATER_X + coastBulge(y); }
+// A-WORLD: batas Utara/Selatan miring (bukan y=960 lurus). Landmark TIDAK
+// pindah distrik (dicek): garage (480,1440) tetap OT-S, start (480,480)
+// tetap OT-N, casino (1440,800) tetap DT-N, gas (860,1500) tetap OT-S.
+export function splitY(x) { return 960 + (x - 1280) * 0.08; } // 858 di x=0 → 1040 di x=2280
 // Karimbu (rank #1) has district standing over 7 districts; Neon Harbor
 // only had the 3 city.js bands + heat. This module splits the same map
 // into 7 named districts WITHOUT touching city.js: the 3 x-bands
@@ -38,7 +55,7 @@ export const DEMO_SCORES = [45, -10, 10, -55, 0, 35, -40];
 export function district7At(x, y) {
   if (x >= 2280) return 6;
   const band = x < 1120 ? 0 : x < 1760 ? 2 : 4;
-  return band + (y >= 960 ? 1 : 0);
+  return band + (y >= splitY(x) ? 1 : 0);
 }
 export function standingLabel(score) {
   return score >= 30 ? 'FRIENDLY' : score <= -30 ? 'WARY' : 'NEUTRAL';

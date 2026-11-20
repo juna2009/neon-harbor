@@ -1,6 +1,6 @@
 import { ROAD_W, WORLD_H, WORLD_W } from './config.js';
 import { WATER_X } from './city.js';
-import { DISTRICT7, standingLabel, updateStanding } from './districts.js';
+import { DISTRICT7, standingLabel, updateStanding, splitY, shoreX, coastBulge } from './districts.js';
 import { drawMapBridge, drawMapGas, drawMapHydrant, drawMapMission, drawMapPlayer, drawMapWrench } from './ui-art.js';
 // Neon Harbor minimap — redrawn as a REAL MAP (BEAT-GHK A1, 2026-11-19).
 // Juna (13:27 WIB): "MAPNYA JELEK — isinya cuma kotak-kotak." The old map
@@ -28,14 +28,56 @@ function minimapShape() {
     return new URLSearchParams(window.location.search).get('minimap') === 'round' ? 'round' : 'square';
   } catch (e) { return 'square'; }
 }
-// District parcel tones (3 shades each, picked by block index so the city
-// never reads as one flat colour). Darker than the 3D ground tones: a map
-// this small needs contrast against the roads, not fidelity.
+// District parcel tones (A-WORLD: 5 shades each, picked by block index so
+// the city never reads as one flat colour). Darker than the 3D ground tones:
+// a map this small needs contrast against the roads, not fidelity.
 const BLOCK_TONES = [
-  ['#6a5c36', '#74683d', '#5d4f2e'], // Old Town (x < 1120): tan/olive
-  ['#3d434f', '#454c5a', '#353b46'], // Downtown (x < 1760): slate
-  ['#2d4a3c', '#345544', '#264233'], // Harbor: teal-green
+  ['#6a5c36', '#74683d', '#5d4f2e', '#7d7046', '#54452a'], // Old Town (x < 1120): tan/olive
+  ['#3d434f', '#454c5a', '#353b46', '#4e5563', '#2e333d'], // Downtown (x < 1760): slate
+  ['#2d4a3c', '#345544', '#264233', '#3a5f4a', '#1f3829'], // Harbor: teal-green
 ];
+// A-WORLD: garis pantai di peta — eksagerasi kartografi 4x dari lekuk dunia
+// nyata (coastBulge maks 12u = 0.75px di 160px, tidak terbaca). Peta adalah
+// representasi: lekuk 4x (maks 48u = 3px) membuat pantai terbaca bergelombang
+// seperti di dunia 3D, tanpa mengubah satu pun koordinat dunia.
+function mapShoreX(y) { return WATER_X + coastBulge(y) * 4; }
+// A-WORLD: poligon distrik — batas Utara/Selatan mengikuti splitY(x), tepi
+// timur Marina mengikuti shoreX(y) (dunia nyata, tanpa eksagerasi).
+// Sampling 8 titik per sisi; clamp ke y=960 supaya ubin North/South tidak
+// gap/overlap di garis belah. Mengembalikan titik-titik dalam koordinat peta.
+function districtPoly(i, x, y, sx, sy) {
+  const d = DISTRICT7[i];
+  const X = (wx) => x + wx * sx, Y = (wy) => y + wy * sy;
+  const pts = [];
+  if (i === 6) {
+    // Marina: strip penuh, tepi timur mengikuti pantai (dunia nyata).
+    pts.push([X(d.x), Y(d.y)]);
+    for (let k = 0; k <= 8; k++) {
+      const wy = d.y + (d.h * k) / 8;
+      pts.push([X(shoreX(wy)), Y(wy)]);
+    }
+    pts.push([X(d.x), Y(d.y + d.h)]);
+    return pts;
+  }
+  const north = i % 2 === 0;
+  const x0 = d.x, x1 = d.x + d.w, y0 = d.y, y1 = d.y + d.h;
+  if (north) {
+    // Utara: tepi bawah mengikuti splitY, clamp ke y1=960.
+    pts.push([X(x0), Y(y0)], [X(x1), Y(y0)]);
+    for (let k = 0; k <= 8; k++) {
+      const wx = x1 - ((x1 - x0) * k) / 8;
+      pts.push([X(wx), Y(Math.min(splitY(wx), y1))]);
+    }
+  } else {
+    // Selatan: tepi atas mengikuti splitY, clamp ke y0=960.
+    for (let k = 0; k <= 8; k++) {
+      const wx = x0 + ((x1 - x0) * k) / 8;
+      pts.push([X(wx), Y(Math.max(splitY(wx), y0))]);
+    }
+    pts.push([X(x1), Y(y1)], [X(x0), Y(y1)]);
+  }
+  return pts;
+}
 function districtOf(cx) { return cx < 1120 ? 0 : cx < 1760 ? 1 : 2; }
 function poly(c, pts) {
   c.beginPath(); c.moveTo(pts[0], pts[1]);
@@ -108,18 +150,31 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   ctx.fillStyle = '#20261f';
   ctx.fillRect(x, y, w, h);
   // ---- water: blue band east of the shore, pale shoreline, sand edge ----
-  const wx = x + WATER_X * sx;
-  const wg = ctx.createLinearGradient(wx, 0, x + w, 0);
+  // A-WORLD: tepi barat air + pasir mengikuti garis pantai bergelombang
+  // (mapShoreX, eksagerasi 4x) — bukan garis lurus x=WATER_X lagi.
+  const shorePts = [];
+  for (let k = 0; k <= 12; k++) shorePts.push([x + mapShoreX((WORLD_H * k) / 12) * sx, y + (h * k) / 12]);
+  const wg = ctx.createLinearGradient(x + WATER_X * sx, 0, x + w, 0);
   wg.addColorStop(0, '#1668a0'); wg.addColorStop(1, '#2fa8e0');
   ctx.fillStyle = wg;
-  ctx.fillRect(wx, y, x + w - wx, h);
-  ctx.fillStyle = '#b39b62'; // sand strip between last road and shore
-  ctx.fillRect(x + 2400 * sx, y, (WATER_X - 2400) * sx, h);
+  ctx.beginPath();
+  ctx.moveTo(shorePts[0][0], shorePts[0][1]);
+  for (let k = 1; k < shorePts.length; k++) ctx.lineTo(shorePts[k][0], shorePts[k][1]);
+  ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#b39b62'; // sand strip between last road and shore — tepi timur ikut lekuk
+  ctx.beginPath();
+  ctx.moveTo(x + 2400 * sx, y);
+  for (let k = 0; k < shorePts.length; k++) ctx.lineTo(shorePts[k][0], shorePts[k][1]);
+  ctx.lineTo(x + 2400 * sx, y + h); ctx.closePath(); ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(wx, y + h); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(shorePts[0][0], shorePts[0][1]);
+  for (let k = 1; k < shorePts.length; k++) ctx.lineTo(shorePts[k][0], shorePts[k][1]);
+  ctx.stroke();
   ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1;
-  for (const fy of [0.3, 0.62]) {
-    ctx.beginPath(); ctx.moveTo(wx + 2, y + h * fy); ctx.lineTo(x + w - 1.5, y + h * fy); ctx.stroke();
+  for (const fy of [0.25, 0.5, 0.75]) {
+    const wx2 = x + mapShoreX(WORLD_H * fy) * sx;
+    ctx.beginPath(); ctx.moveTo(wx2 + 2, y + h * fy); ctx.lineTo(wx2 + 8, y + h * fy); ctx.stroke();
   }
   // ---- city blocks: district parcels following the road grid ----
   const half = (ROAD_W / 2) * sx;
@@ -129,8 +184,11 @@ export function drawMinimap(ctx, state, x, y, w, h) {
       const bw = (roadsV[i + 1] - roadsV[i]) * sx - half * 2;
       const bh = (roadsH[j + 1] - roadsH[j]) * sy - half * 2;
       const tones = BLOCK_TONES[districtOf((roadsV[i] + roadsV[i + 1]) / 2)];
-      ctx.fillStyle = tones[(i * 7 + j * 13) % 3];
-      ctx.beginPath(); ctx.roundRect(bx + 0.5, by + 0.5, bw - 1, bh - 1, 2); ctx.fill();
+      ctx.fillStyle = tones[(i * 7 + j * 13) % 5];
+      // A-WORLD: inset + radius bervariasi per blok (hash deterministik) —
+      // parcel tidak lagi seragam kotak.
+      const ins = ((i * 7 + j * 13) % 4) * 0.4;
+      ctx.beginPath(); ctx.roundRect(bx + 0.5 + ins, by + 0.5 + ins, bw - 1 - ins * 2, bh - 1 - ins * 2, 1 + ((i * 3 + j * 5) % 3)); ctx.fill();
     }
   }
   // ---- gas-station lot: asphalt apron (its cell has no buildings) ----
@@ -140,7 +198,8 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   for (const park of city.parks || []) {
     const px = x + park.x * sx, py = y + park.y * sy, pw = park.w * sx, ph = park.h * sy;
     ctx.fillStyle = '#2f7a3d';
-    ctx.beginPath(); ctx.roundRect(px + 0.5, py + 0.5, Math.max(2, pw - 1), Math.max(2, ph - 1), 2); ctx.fill();
+    // A-WORLD: taman digambar sebagai elips (bukan kotak) — sinyal "bukan kotak" paling jelas di skala peta.
+    ctx.beginPath(); ctx.ellipse(px + pw / 2, py + ph / 2, Math.max(1.5, pw / 2), Math.max(1.5, ph / 2), 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#1d5c2a';
     const tx = px + pw / 2, ty = py + ph / 2;
     for (const [dx, dy] of [[-0.22, -0.18], [0.2, -0.12], [0, 0.22]]) {
@@ -160,7 +219,7 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   if (city.docks) ctx.fillRect(x + city.docks.x * sx, y + city.docks.y * sy, city.docks.w * sx, city.docks.h * sy);
   ctx.strokeStyle = '#8a6b45'; ctx.lineWidth = 2;
   for (const py of [200, 1560, 1640]) {
-    ctx.beginPath(); ctx.moveTo(x + 2420 * sx, y + py * sy); ctx.lineTo(x + w - 1, y + py * sy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + (mapShoreX(py) + 2) * sx, y + py * sy); ctx.lineTo(x + w - 1, y + py * sy); ctx.stroke();
   }
   // ---- roads as LINES: dark casing + asphalt + dashed centreline ----
   ctx.lineCap = 'round';
@@ -178,16 +237,22 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   // ---- R35-F2: district standing tint (Friendly green / Wary red wash
   // over each of the 7 districts, current district outlined + coded) ----
   for (let i = 0; i < 7; i++) {
-    const d = DISTRICT7[i];
     const lab = standingLabel(st7.scores[i]);
     if (lab !== 'NEUTRAL') {
       ctx.fillStyle = lab === 'FRIENDLY' ? 'rgba(47,191,113,0.20)' : 'rgba(255,90,60,0.22)';
-      ctx.fillRect(x + d.x * sx, y + d.y * sy, d.w * sx, d.h * sy);
+      // A-WORLD: tint mengikuti poligon distrik (batas miring + pantai),
+      // bukan persegi panjang.
+      const pp = districtPoly(i, x, y, sx, sy);
+      ctx.beginPath(); ctx.moveTo(pp[0][0], pp[0][1]);
+      for (let k = 1; k < pp.length; k++) ctx.lineTo(pp[k][0], pp[k][1]);
+      ctx.closePath(); ctx.fill();
     }
   }
-  const hd = DISTRICT7[here];
+  const hp = districtPoly(here, x, y, sx, sy);
   ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-  ctx.strokeRect(x + hd.x * sx + 0.5, y + hd.y * sy + 0.5, hd.w * sx - 1, hd.h * sy - 1);
+  ctx.beginPath(); ctx.moveTo(hp[0][0], hp[0][1]);
+  for (let k = 1; k < hp.length; k++) ctx.lineTo(hp[k][0], hp[k][1]);
+  ctx.closePath(); ctx.stroke();
   ctx.font = 'bold 7px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   for (let i = 0; i < 7; i++) {
@@ -235,12 +300,12 @@ export function drawMinimap(ctx, state, x, y, w, h) {
   for (const hd of state.hydrants) drawMapHydrant(ctx, x + hd.x * sx, y + hd.y * sy, 7);
   if (city.casino) {
     ctx.fillStyle = '#ffd23e';
-    star(ctx, x + city.casino.x * sx, y + city.casino.y * sy, 5, 4, 0); ctx.fill();
+    star(ctx, x + city.casino.x * sx, y + city.casino.y * sy, 6, 4, 0); ctx.fill();
     ctx.lineWidth = 1; ctx.strokeStyle = '#ffffff'; ctx.stroke();
   }
   if (city.lighthouse) {
     ctx.fillStyle = '#ffffff';
-    star(ctx, x + city.lighthouse.x * sx, y + city.lighthouse.y * sy, 5, 4, 0); ctx.fill();
+    star(ctx, x + city.lighthouse.x * sx, y + city.lighthouse.y * sy, 6, 4, 0); ctx.fill();
     ctx.lineWidth = 1; ctx.strokeStyle = '#ffd23e'; ctx.stroke();
   }
   if (state.bridge) drawMapBridge(ctx, x + 2400 * sx, y + 1680 * sy, 9, state.bridge.up);

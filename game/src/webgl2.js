@@ -8,6 +8,7 @@ import { drawCarRealistic } from './cars3d.js'; // R26: cars3d v15d di game/src/
 import { drawCruiseShips } from './ships3d.js'; // R27b: kapal pesiar + yacht (statis, visual saja)
 import { marketSite, marketStalls } from './market.js'; // R35-F9: night market (Pasar Malam) — geometri dari market.js
 import { activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
+import { shoreX } from './districts.js'; // A-WORLD: garis pantai berlekuk (lekuk maks 12u — lihat districts.js)
 // R41 Worker C (pintu+interior): dynamic import — 0 byte dossier (scanner
 // hanya baca static import). INT=null sampai modul termuat; semua hook di
 // bawah guard `if(INT)`, jadi game jalan normal sebelum/saat gagal muat.
@@ -1769,11 +1770,30 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // buih ombak tidak melayang di atas bidang tanah gelap.
   if (hx0 > 1300 && near(2390, 1120, 1750) && vis(2390, 1120, 700)) {
     const SAND = [0.76, 0.64, 0.42], SAND_D = [0.62, 0.50, 0.32], SAND_L = [0.86, 0.74, 0.52];
-    if (hx0 <= 2250) flat(OP, 250.4, 0.0, 112.0, 11.2, 94.0, [0.05, 0.20, 0.32], 10); // air pantai (x 2448..2560, y 650..1590)
-    flat(OP, 239.4, 0.03, 100.8, 10.8, 13.2, SAND, 15, [[0, 0], [10.8, 0], [10.8, 13.2], [0, 13.2]]); // R40: pasir 5 -> 15 + UV dunia
-    flat(OP, 239.4, 0.03, 123.2, 10.8, 13.2, SAND, 15, [[0, 0], [10.8, 0], [10.8, 13.2], [0, 13.2]]); // pasir selatan jalan
-    flat(OP, 239.4, 0.03, 84.0, 10.8, 20.0, SAND, 15, [[0, 0], [10.8, 0], [10.8, 20.0], [0, 20.0]]); // pasir lanjut utara
-    flat(OP, 239.4, 0.03, 140.0, 10.8, 20.0, SAND, 15, [[0, 0], [10.8, 0], [10.8, 20.0], [0, 20.0]]); // pasir lanjut selatan
+    // A-WORLD: air pantai + pasir mengikuti lekuk shoreX(y) (tanah menonjol
+    // ke air maks 12u). TRAPESIUM via quad() — BUKAN persegi flat(): tepi
+    // barat/timur tiap segmen = shoreX di KEDUA ujungnya, jadi segmen yang
+    // bersebelahan berbagi nilai shoreX(ey) yang sama persis → ubin tanpa
+    // celah. Persegi (revisi pertama) meninggalkan celah gelap sampai 3,9u
+    // di air / 5,5u di pasir antar-segmen — terukur, bukan tebakan.
+    // Celah koridor jalan (y 1072–1168) dipertahankan supaya pasir tidak
+    // menutup aspal — sama seperti 4 quad lama.
+    const WCOL = [0.05, 0.20, 0.32], WUV = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    if (hx0 <= 2250) {
+      for (let sy = 650; sy < 1590;) {
+        const ey = Math.min(sy + 120, 1590);
+        quad(OP, [shoreX(sy) * S, 0.0, sy * S], [2560 * S, 0.0, sy * S], [2560 * S, 0.0, ey * S], [shoreX(ey) * S, 0.0, ey * S], [0, 1, 0], WUV, WCOL, 10);
+        sy = ey;
+      }
+    }
+    for (const [s0, s1] of [[740, 1072], [1168, 1500]]) {
+      for (let sy = s0; sy < s1;) {
+        const ey = Math.min(sy + 83, s1);
+        quad(OP, [2340 * S, 0.03, sy * S], [shoreX(sy) * S, 0.03, sy * S], [shoreX(ey) * S, 0.03, ey * S], [2340 * S, 0.03, ey * S], [0, 1, 0],
+          [[0, 0], [(shoreX(sy) - 2340) * S, 0], [(shoreX(ey) - 2340) * S, (ey - sy) * S], [0, (ey - sy) * S]], SAND, 15);
+        sy = ey;
+      }
+    }
     for (let i = 0; i < 10; i += 1) { // bercak tone pasir (utara/selatan, JANGAN di koridor jalan)
       const pz = (i % 2 ? 74 : 118) + hash2(i, 5) * 32;
       const bw = 1.6 + hash2(i, 9) * 2.4, bd = 1.2 + hash2(i, 11) * 2.0;
@@ -1786,10 +1806,11 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       flat(OP, px + 0.5, 0.045, pz + 0.35, 0.35, 0.18, SAND_D, 15, [[0, 0], [0.35, 0], [0.35, 0.18], [0, 0.18]]);
     }
     // ombak: 2 baris buih di garis pantai, bergeser pelan dengan t.
+    // A-WORLD: buih mengikuti lekuk shoreX (bukan garis lurus x=2453).
     for (let r = 0; r < 2; r += 1) {
       for (let i = 0; i < 8; i += 1) {
         const wz = 76 + i * 9 + r * 4.5;
-        const wx = 245.3 + r * 1.2 + Math.sin(t * 0.9 + i * 1.3 + r * 2.0) * 0.45;
+        const wx = (shoreX(wz * 10) + 5 + r * 12 + Math.sin(t * 0.9 + i * 1.3 + r * 2.0) * 4.5) * S;
         flat(OP, wx, 0.05, wz, 1.1, 3.2 + hash2(i, r) * 2.4, [0.88, 0.92, 0.95], 8);
       }
     }
@@ -1880,7 +1901,14 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // Air + dermaga + marina (kalau hero dekat pelabuhan).
   if (hx0 > 2250) {
     const y0 = Math.max(0, hy0 - 1500), y1 = Math.min(1920, hy0 + 1500);
-    flat(OP, (WATER_X + 56) * S, 0.0, ((y0 + y1) / 2) * S, 112 * S, (y1 - y0) * S, [0.05, 0.20, 0.32], 10);
+    // A-WORLD: pita air harbor mengikuti lekuk shoreX(y) — TRAPESIUM via
+    // quad() (tepi barat = shoreX di kedua ujung, ubin tanpa celah — lihat
+    // blok pantai di atas kenapa persegi tidak cukup).
+    for (let sy = y0; sy < y1;) {
+      const ey = Math.min(sy + 120, y1);
+      quad(OP, [shoreX(sy) * S, 0.0, sy * S], [2560 * S, 0.0, sy * S], [2560 * S, 0.0, ey * S], [shoreX(ey) * S, 0.0, ey * S], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], [0.05, 0.20, 0.32], 10);
+      sy = ey;
+    }
     const dk = city.docks;
     box(OP, (dk.x + dk.w / 2) * S, 0.25, (dk.y + dk.h / 2) * S, dk.w * S, 0.5, dk.h * S, [0.35, 0.30, 0.22], 5);
     const mr = city.marina;
