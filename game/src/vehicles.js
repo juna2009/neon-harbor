@@ -63,8 +63,10 @@ export function vehicleColor(body, fallback) {
 // JANGAN PERNAH varian: taksi pink M1 (car.pink), mobil pemain
 // (kind 'player'), unit polisi/militer (kind 'police'), truk lapis baja
 // (kind 'armored'), taksi (body 'taxi').
-// Laju (dinaikkan dari spec setelah probe 100-seed — rates-probe):
-// van -> 50% delivery; sedanL traffic -> 50% suv; sedanL parkir -> 25% race.
+// Laju (rencana yang disetujui — IMPACT.md §4): van -> 50% delivery;
+// sedanL traffic -> ~25% suv; sedanL parkir -> ~1/8 (12,5%) race.
+// KOREKSI follow-up: merge v18 mengimplementasikan 50% suv / 25% race
+// (menyimpang dari rencana); dikembalikan ke 25% / 12,5% di sini.
 function h2(a, b) {
   let v = (a * 73856093) ^ (b * 19349663);
   v = Math.imul(v ^ (v >>> 13), 1274126177);
@@ -78,8 +80,8 @@ export function carVariant(car) {
     return h < 0.50 ? 'delivery' : null;
   }
   if (car.body === 'sedanL' || car.body === 'sedan') {
-    if (traffic) return h2(Math.round(car.cruise * 100), 7) < 0.50 ? 'suv' : null;
-    return h2(Math.round(car.x || 0), Math.round(car.y || 0)) < 0.25 ? 'race' : null;
+    if (traffic) return h2(Math.round(car.cruise * 100), 7) < 0.25 ? 'suv' : null;
+    return h2(Math.round(car.x || 0), Math.round(car.y || 0)) < 0.125 ? 'race' : null;
   }
   return null;
 }
@@ -165,10 +167,10 @@ export function drawVehicleBody(c, car, night, t) {
   // CARS v18: varian visual — jenis yang digambar bisa berbeda dari
   // car.body (sedanL -> suv/race, van -> delivery). Warna + ukuran
   // tetap milik mobilnya; hanya detail jenis yang berubah.
-  // BATASAN (jujur): jalur top-down utama render.js drawTrafficCar
-  // mem-bypass fungsi ini untuk van (drawVan) — jadi delivery TIDAK
-  // terbaca top-down sampai render.js disentuh (di luar scope 4 file).
-  // SUV/race (slot sedanL) LEWAT sini dan terbaca top-down.
+  // FOLLOW-UP v18: jalur top-down utama render.js drawTrafficCar kini
+  // merutekan mobil varian ke sini (dulu bypass ke drawVan/drawSportCar,
+  // jadi delivery/suv TIDAK terbaca top-down). Parkir sedanL sudah lewat
+  // sini via drawCarShape (assets.js) sejak v18.
   const vType = carVariant(car) || car.body;
   const vt = VEHICLE_TYPES[vType];
   if (!vt) return false;
@@ -314,8 +316,7 @@ export function drawVehicleBody(c, car, night, t) {
     // CARS v18 — DELIVERY top-down: panel atap TEAL (boks warna usaha) +
     // sambungan pintu geser di kedua flank + garis pintu kabin.
     // TANPA palang merah / tangga / strip amber (B8).
-    // (Jalur traffic utama mem-bypass fungsi ini untuk van — cabang ini
-    // hanya terjangkau lewat drawCarShape langsung; lihat catatan di atas.)
+    // (Terjangkau via drawTrafficCar render.js + drawCarShape langsung.)
     c.fillStyle = '#298c99';
     R(c, -L / 2 + 4, -W / 2 + 3, L * 0.60, W - 6, '#298c99');
     c.fillStyle = 'rgba(255,255,255,0.35)';

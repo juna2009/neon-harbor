@@ -399,11 +399,17 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   // v18-P3: pita ATAS digelapkan lagi ([0,24,0,28,0,40] -> [0,16,0,19,0,28],
   // mendekati pita tengah) — di close-up, pita atas masih terbaca
   // lavender-putih vs kaca samping yang gelap.
+  // FOLLOW-UP P3 (v18+): pita diukur 167 lum di close-up vs kaca samping
+  // ~30 — strip sheen saja tidak cukup (tanpa strip pun 167). Pita ke
+  // [0,07,0,08,0,12] / [0,05,0,06,0,09]: emissive x2.2 di shader, jadi
+  // render ~82 — mendekati gelapnya kaca samping. Langkah 2: [0,05,0,055,
+  // 0,085] / [0,035,0,04,0,06] -> render ~60 (kaca tetap biru-abu, bukan
+  // lubang hitam). Gradasi 3 pita dipertahankan.
   const skyGlass = (lx, ly, lz, w, h, rx) => {
     const hw = w / 2, hh = h / 2;
-    faceQuad(lx, ly, lz, -hw, hw, hh * 0.35, hh, 0.035, rx, 0.006, [0.16, 0.19, 0.28], 4);
-    faceQuad(lx, ly, lz, -hw, hw, -hh * 0.35, hh * 0.35, 0.035, rx, 0.006, [0.17, 0.20, 0.30], 4);
-    faceQuad(lx, ly, lz, -hw, hw, -hh, -hh * 0.35, 0.035, rx, 0.006, [0.11, 0.13, 0.20], 4);
+    faceQuad(lx, ly, lz, -hw, hw, hh * 0.35, hh, 0.035, rx, 0.006, [0.05, 0.055, 0.085], 4);
+    faceQuad(lx, ly, lz, -hw, hw, -hh * 0.35, hh * 0.35, 0.035, rx, 0.006, [0.05, 0.055, 0.085], 4);
+    faceQuad(lx, ly, lz, -hw, hw, -hh, -hh * 0.35, 0.035, rx, 0.006, [0.035, 0.04, 0.06], 4);
   };
   // Border karet tipis (0.04) — sisi + bawah saja (tanpa strip atas).
   // v15d: strip sisi DIPENDEK (ujung atas hh*0.7) supaya tak menjulur di atas atap.
@@ -415,10 +421,10 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   };
   // Kaca tegak (rx=0): bingkai (kotak lebih besar, 0.02 ke dalam) + kaca
   // material 1 + pantulan horizontal halus. face = -1 belakang / +1 depan.
-  const flatGlass = (lx, ly, lz, w, h, face) => {
+  const flatGlass = (lx, ly, lz, w, h, face, sheen) => {
     p(lx, ly, lz - face * 0.02, w + 0.08, h + 0.08, 0.05, DARK, 5); // bingkai karet
     p(lx, ly, lz, w, h, 0.06, GLASS, 1); // kaca glossy (bukan material 2)
-    glassSheen(lx, ly, lz, w * 0.6, 0.10, 0, face, [0.30, 0.37, 0.48], 0, 0.05); // R38 Item 3: pantulan horizontal halus (dulu streak diagonal 20° — garis miring di kaca belakang bus)
+    glassSheen(lx, ly, lz, w * 0.6, 0.10, 0, face, sheen || [0.30, 0.37, 0.48], 0, 0.05); // R38 Item 3: pantulan horizontal halus (dulu streak diagonal 20° — garis miring di kaca belakang bus)
   };
   // Bevel belakang v15: talang antara muka belakang dan deck — dari
   // (topY-0,10, -L/2-0,03) ke (topY+0,01, -L/2+0,08). Sedan: topY 1,06
@@ -676,7 +682,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     }
     flatGlass(0, 1.7, L / 2 + 0.01, W * 0.88, 0.85, 1);                    // kaca depan + bingkai + streak (v3: lebih besar)
     qF(0, 2.18, L / 2 + 0.03, W * 0.5, 0.18, [1.0, 0.7, 0.2], 4);         // papan tujuan
-    flatGlass(0, 1.7, -L / 2 - 0.01, W * 0.8, 0.72, -1);                   // kaca belakang + bingkai + streak (v3: lebih besar)
+    flatGlass(0, 1.7, -L / 2 - 0.01, W * 0.8, 0.72, -1, [0.05, 0.055, 0.085]); // kaca belakang + bingkai + streak redup (FOLLOW-UP P3: strip putih 163 lum di kaca gelap 52 lum — sheen ikut gelap, langkah 2 samakan sedan; kaca depan tetap default)
     p(0, bodyTop + 0.14, -L * 0.2, W * 0.5, 0.18, L * 0.2, [0.6, 0.62, 0.65], 5); // AC atap
     p(0, bodyTop + 0.10, 0, W * 0.5, 0.06, L * 0.8, paintLight, 1);       // pita atap (clear-coat)
     rearBevel(bodyTop, W * 0.8);
@@ -1071,7 +1077,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     glassBorder(0, rearY, rearZ, W * spec.cabW * rearW, rearH, rearRx);
     p(0, rearY, rearZ, W * spec.cabW * rearW, rearH, 0.07, GLASS, 1, rearRx);
     skyGlass(0, rearY, rearZ, W * spec.cabW * rearW, rearH, rearRx);
-    glassSheen(0, rearY, rearZ, W * spec.cabW * 0.55, 0.10, rearRx, -1, [0.34, 0.41, 0.54], 0, 0.08); // R38 Item 3: pantulan horizontal halus — ganti 2 streak diagonal 20° (probe: garis diagonal di kaca = streak ini)
+    glassSheen(0, rearY, rearZ, W * spec.cabW * 0.55, 0.10, rearRx, -1, [0.05, 0.055, 0.085], 0, 0.08); // R38 Item 3: pantulan horizontal halus — ganti 2 streak diagonal 20° (probe: garis diagonal di kaca = streak ini). FOLLOW-UP P3: [0,34,0,41,0,54] -> [0,07,0,08,0,12] -> [0,05,0,055,0,085] (ikuti pita skyGlass langkah 2, supaya sheen tak jadi bilah terang di atas kaca yang makin gelap); kaca depan (glassStreak) TIDAK disentuh.
     const shieldY = beltY + (wind.h * Math.cos(wind.rx)) / 2;
     const shieldZ = (shieldBaseZ + shieldTopZ) / 2;
     p(0, shieldY, shieldZ - 0.02, W * spec.cabW * (wind.w + 0.04), wind.h + 0.04, 0.05, DARK, 5, -wind.rx); // bingkai
@@ -1162,7 +1168,12 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       for (const s of [-1, 1]) qS(s * (W / 2 + 0.225), 0.98, -L * 0.32, 0.42, 0.14, DARK, 5);
     }
     // Rim light hangat di tepi belakang atap (jurus GTA V — bible §1.2 butir 8)
-    if (hi) p(0, roofEdgeY(roofRZ) + 0.02, roofRZ + 0.02, W * spec.cabW * 0.78, 0.04, 0.04, [0.9, 0.55, 0.28], 4);
+    // FOLLOW-UP P3: [0,9,0,55,0,28] emissive x2,2 -> strip putih ~220 lum di
+    // tepi atas kaca belakang (bukan glassSheen — sheen sudah diredup, strip
+    // tetap 218). Ke [0,12,0,08,0,05] -> 88 lum; langkah 2 [0,08,0,055,0,035]
+    // -> ~65 lum (ikuti kaca yang makin gelap). Bus TIDAK punya rim light
+    // (builder lain).
+    if (hi) p(0, roofEdgeY(roofRZ) + 0.02, roofRZ + 0.02, W * spec.cabW * 0.78, 0.04, 0.04, [0.08, 0.055, 0.035], 4);
     // v16c: sunroof KEMBALI di blok v19 di atas (4 tris hi, GLASS);
     // sweep TETAP DICABUT (pemicu beam — jangan kembalikan).
     // ---- detail kecil (bible §1.7): spion, gagang pintu, panel line, antena ----

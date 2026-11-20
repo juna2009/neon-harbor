@@ -6,6 +6,7 @@ import { drawBuildingShadow, drawDayTint, drawLightPool, drawLightning, drawWetR
 import { drawBuoy, drawBuilding, drawCargoShip, drawContainer, drawCrane, drawCrosswalk, drawHydrant, drawLamp, drawPier, drawSign, drawTree } from './props.js';
 import { drawDirectionArrow, drawMenuFrame, drawTargetRing } from './ui-art.js';
 import { drawArmoredTruck, drawBoatWake, drawCarShape, drawExplosionSprite, drawHarborSkyline, drawPedPhone, drawPedestrian, drawPerson, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet, rr } from './assets.js';
+import { carVariant, drawVehicleBody } from './vehicles.js'; // FOLLOW-UP v18: varian top-down (SUV/race/delivery) — render.js TIDAK ada di teks dossier (cut berakhir di audio.js, terverifikasi dari out/dossier.json yang diregenerasi), dan vehicles.js sudah terjangkau lewat assets.js di sub-pohon yang sama, jadi import ini 0 byte dossier (dossier diregenerasi + dibuktikan identik setelah edit).
 import { drawJaxPortrait, drawMaraPortrait } from './portraits.js';
 import { drawBridge } from './drawbridge.js';
 import { drawHud2, drawPause2, drawShop2, drawTitle2, hudCluster, hudScaleFor } from './ui2.js';
@@ -37,6 +38,7 @@ function drawTrafficCar(ctx, car, night) {
   ctx.fill();
   if (car.pink) drawPinkTaxi(ctx, car.x, car.y, car.angle);
   else if (car.kind === 'armored') drawArmoredTruck(ctx, car.x, car.y, car.angle, car.color); // R27c: truk lapis baja bukan van
+  else if (carVariant(car)) drawVehicleBody(ctx, car, night); // FOLLOW-UP v18: SUV/race/delivery terbaca top-down (dulu drawVan/drawSportCar di bawah mem-bypass varian — SUV top-down terbaca van polos)
   else if (car.body === 'van') drawVan(ctx, car.x, car.y, car.angle, car.color);
   else if (car.body === 'sedan' || car.body === 'hatch') drawSportCar(ctx, car.x, car.y, car.angle, car.color);
   else drawCarShape(ctx, car, night);
