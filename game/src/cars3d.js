@@ -200,16 +200,16 @@ const RIMWARM = [1.0, 0.6, 0.3];      // rim light hangat (tepi atap)
 // kabin 12–15% lebih sempit) + §1.6 (resep per kendaraan).
 // ---------------------------------------------------------------------------
 export const CAR_SPECS = {
-  hero:      { label: 'Hero Neon GT',  kind: 'sport',  len: 5.4, wid: 2.3, bodyH: 0.80, cabFrac: 0.48, cabW: 0.78, wheels: 4, wheelD: 0.72, paint: '#e33e5f', spoiler: true,  lightbar: true },
+  hero:      { label: 'Hero Neon GT',  kind: 'sport',  len: 5.4, wid: 2.3, bodyH: 0.80, cabFrac: 0.48, cabW: 0.78, wheels: 4, wheelD: 0.88, paint: '#e33e5f', spoiler: true,  lightbar: true },
   bus:       { label: 'Bus Kota',     kind: 'bus',    len: 9.6, wid: 2.6, bodyH: 1.70, cabFrac: 0.90, cabW: 1.00, wheels: 6, wheelD: 0.70, paint: '#e8b93c', spoiler: false, lightbar: false },
   fire:      { label: 'Pemadam',      kind: 'fire',   len: 8.4, wid: 2.6, bodyH: 1.50, cabFrac: 0.50, cabW: 0.90, wheels: 4, wheelD: 0.70, paint: '#c0392b', spoiler: false, lightbar: true },
   medic:     { label: 'Ambulans',     kind: 'medic',  len: 6.2, wid: 2.4, bodyH: 1.40, cabFrac: 0.60, cabW: 0.90, wheels: 4, wheelD: 0.66, paint: '#f5f5f5', spoiler: false, lightbar: true },
   apc:       { label: 'APC Tentara',  kind: 'apc',    len: 6.8, wid: 2.6, bodyH: 1.30, cabFrac: 0.40, cabW: 0.70, wheels: 6, wheelD: 0.45, paint: '#4a5a2a', spoiler: false, lightbar: false },
   armored:   { label: 'Truk Lapis Baja', kind: 'armored', len: 5.4, wid: 2.4, bodyH: 1.50, cabFrac: 0.30, cabW: 0.92, wheels: 6, wheelD: 0.70, paint: '#4a5240', spoiler: false, lightbar: false },
-  hatchback: { label: 'Hatchback',    kind: 'hatch',  len: 4.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.62, cabW: 0.80, wheels: 4, wheelD: 0.68, paint: '#2e8b9e', spoiler: true,  lightbar: true },
-  sedanL:    { label: 'Sedan Panjang',kind: 'sedan',  len: 5.4, wid: 2.2, bodyH: 0.80, cabFrac: 0.45, cabW: 0.78, wheels: 4, wheelD: 0.70, paint: '#7d8ea3', spoiler: false, lightbar: true },
-  pickup:    { label: 'Pickup',       kind: 'pickup', len: 5.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.42, cabW: 0.80, wheels: 4, wheelD: 0.70, paint: '#d97b2b', spoiler: false, lightbar: true },
-  police:    { label: 'Polisi',       kind: 'sedan',  len: 4.6, wid: 2.2, bodyH: 0.80, cabFrac: 0.50, cabW: 0.78, wheels: 4, wheelD: 0.70, paint: '#141c3c', spoiler: false, lightbar: true, police: true },
+  hatchback: { label: 'Hatchback',    kind: 'hatch',  len: 4.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.62, cabW: 0.80, wheels: 4, wheelD: 0.84, paint: '#2e8b9e', spoiler: true,  lightbar: true },
+  sedanL:    { label: 'Sedan Panjang',kind: 'sedan',  len: 5.4, wid: 2.2, bodyH: 0.80, cabFrac: 0.45, cabW: 0.78, wheels: 4, wheelD: 0.86, paint: '#7d8ea3', spoiler: false, lightbar: true },
+  pickup:    { label: 'Pickup',       kind: 'pickup', len: 5.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.42, cabW: 0.80, wheels: 4, wheelD: 0.86, paint: '#d97b2b', spoiler: false, lightbar: true },
+  police:    { label: 'Polisi',       kind: 'sedan',  len: 4.6, wid: 2.2, bodyH: 0.80, cabFrac: 0.50, cabW: 0.78, wheels: 4, wheelD: 0.86, paint: '#141c3c', spoiler: false, lightbar: true, police: true },
 };
 export function carSpec(type) { return CAR_SPECS[type] || CAR_SPECS.hero; }
 
@@ -413,7 +413,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], paintDark, 1);
   };
   const wheelD = spec.wheelD, wheelY = wheelD / 2;
-  const axleZ = spec.wheels === 6 ? [-L * 0.33, 0, L * 0.33] : [-L * 0.33, L * 0.33];
+  const axleZ = spec.wheels === 6 ? [-L * 0.29, 0, L * 0.29] : [-L * 0.29, L * 0.29];
 
   // Bayangan kontak v3 — oktagon (bukan persegi panjang): tepi lebih lembut.
   // DUA lapis (alasan di STATUS-V2.md): (a) elips lembut material 9 di G
@@ -518,7 +518,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       // v7: fxc 0,12→0,16 (tepi luar W/2+0,14) — flank v7 menonjol ke
       // W/2+0,12, fender HARUS tetap di luar flank supaya lengkung roda
       // terbaca (v6: tepi luar W/2+0,10 di atas flank W/2+0,05).
-      const fxc = s * (W / 2 + 0.14), fR = r + 0.10, iR = r + 0.02; // v9: fender DIPISAH dari roda (tetap W/2+0,14, tepi luar W/2+0,22) — roda geser, fender tidak ikut
+      const fxc = s * (W / 2 + 0.10), fR = r + 0.10, iR = r + 0.02; // v9: fender DIPISAH dari roda (tetap W/2+0,14, tepi luar W/2+0,22) — roda geser, fender tidak ikut
       for (let j = 0; j < 6; j += 1) {
         const a0 = (-75 + j * 25) * Math.PI / 180, a1 = (-75 + (j + 1) * 25) * Math.PI / 180;
         // R36V2-SMOOTH: lengkung roda — normal tiap sudut = arah radial
@@ -581,7 +581,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     }
   };
   for (const lz of axleZ) {
-    for (const s of [-1, 1]) drawWheel(s * (W / 2 + 0.06), lz, s); // v15: ban +0,04 keluar (muka luar ban 1,54 ≈ tonjolan flank 1,55 — ban kebaca dari belakang di bawah beltline)
+    for (const s of [-1, 1]) drawWheel(s * (W / 2 - 0.04), lz, s); // v15: ban +0,04 keluar (muka luar ban 1,54 ≈ tonjolan flank 1,55 — ban kebaca dari belakang di bawah beltline)
   }
 
   if (spec.kind === 'bus') return drawBus();

@@ -822,8 +822,6 @@ function car3d(wx, wy, angle, len, wid, color, o) {
     topStrip(cx, cz, angle, 0, -Wd / 2 + 0.06, L * 0.55, 0.22, 0.15 + BH + 0.03, rim);
     topStrip(cx, cz, angle, 0, Wd / 2 - 0.06, L * 0.55, 0.22, 0.15 + BH + 0.03, rim);
   }
-  vQuad(cx, cz, angle, L * 0.2, 0, Wd * 0.5, 1.0, 1.42, 'rgba(120,180,230,0.25)');
-  vQuad(cx, cz, angle, -L * 0.32, 0, Wd * 0.5, 1.0, 1.42, 'rgba(120,180,230,0.15)');
   for (const s of [-1, 1]) {
     vQuad(cx, cz, angle, -L / 2 - 0.06, s * Wd * 0.28, Wd * 0.22, 0.45, 0.72, o.hero ? tlC(255, 92, 122) : tlC(255, 59, 48));
     vQuad(cx, cz, angle, L / 2 + 0.05, s * Wd * 0.28, Wd * 0.3, 0.4, 0.76, '#0c0e14'); // T2: headlight housing
@@ -831,10 +829,10 @@ function car3d(wx, wy, angle, len, wid, color, o) {
     // REWORK: hero wheels BIGGER + protruding past the body sides (they were
     // flush + dark, invisible from behind at chase-cam distance).
     const wOut = o.hero ? Wd / 2 - 0.05 : Wd / 2 - 0.16;
-    const wW = o.hero ? 0.8 : 0.62, wH = o.hero ? 0.72 : 0.58, wL = o.hero ? 1.15 : 0.95;
-    const wxp = cx + fx * (L / 2 - 0.7) + (-fz) * s * wOut, wzp = cz + fz * (L / 2 - 0.7) + fx * s * wOut;
+    const wW = o.hero ? 0.8 : 0.62, wH = o.hero ? 0.72 : 0.72, wL = o.hero ? 1.15 : 0.95;
+    const wxp = cx + fx * (L / 2 - 1.05) + (-fz) * s * wOut, wzp = cz + fz * (L / 2 - 1.05) + fx * s * wOut;
     box3(wxp, 0.05, wzp, wW, wH, wL, angle, '#0a0a0e', dep);
-    const wxp2 = cx - fx * (L / 2 - 0.7) + (-fz) * s * wOut, wzp2 = cz - fz * (L / 2 - 0.7) + fx * s * wOut;
+    const wxp2 = cx - fx * (L / 2 - 1.05) + (-fz) * s * wOut, wzp2 = cz - fz * (L / 2 - 1.05) + fx * s * wOut;
     box3(wxp2, 0.05, wzp2, wW, wH, wL, angle, '#0a0a0e', dep);
     // REWORK hub v2: on the REAR face of the rear wheel, explicit dep in
     // front of the body rear face. v1 put it on the wheel's OUTER face with
@@ -842,8 +840,8 @@ function car3d(wx, wy, angle, len, wid, color, o) {
     // 4px sliver at a grazing angle; the rear face is what chase-cam sees.
     const hubW = o.hero ? 0.55 : 0.4, hubC = o.hero ? '#d8dce2' : '#c8ccd4';
     const hubDep = dep - L / 2 - 0.5;
-    vQuad(cx, cz, angle, -(L / 2 - 0.7), s * wOut, hubW, 0.12, 0.5, hubC, hubDep);
-    vQuad(cx, cz, angle, -(L / 2 - 0.7), s * wOut, o.hero ? 0.22 : 0.14, 0.22, 0.4, '#20242a', hubDep);
+    vQuad(cx, cz, angle, -(L / 2 - 1.05), s * wOut, hubW, 0.12, 0.5, hubC, hubDep);
+    vQuad(cx, cz, angle, -(L / 2 - 1.05), s * wOut, o.hero ? 0.22 : 0.14, 0.22, 0.4, '#20242a', hubDep);
     // T2: side character line + door seam + handle + mirror (one per side)
     const lx = (-fz) * s * (Wd / 2 + 0.03), lz = fx * s * (Wd / 2 + 0.03);
     // REWORK: thin 0.05 lines vanish at chase-cam distance — thicker line
