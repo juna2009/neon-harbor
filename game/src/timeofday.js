@@ -238,3 +238,14 @@ export function canvasPalette(p) {
     moonH: 26, moon: p.moon,
   };
 }
+
+// T1: jam live -> preset TOD. Dipanggil tiap frame dari world.step:
+// preset + daylight mengikuti jam HUD (presetForHour), sinus mati.
+export function tickTimeOfDay(state) {
+  const h = (state.clock.total / 60) % 24;
+  const p = presetForHour(h);
+  state.timeOfDay = p;
+  state.daylight = p.daylight;
+  state.daylightManual = true;
+  return p;
+}

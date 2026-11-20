@@ -1,4 +1,5 @@
 import { CAR, PLAYER, STEP, UFO_DURATION, UFO_HOUR, WANTED, WEAPONS, WORLD_H, WORLD_W } from './config.js';
+import { tickTimeOfDay } from './timeofday.js';
 import { WATER_X, buildCity, buildingAt, collides, districtAt, moveCircle, onRoad } from './city.js';
 import { createBullets, fireWeapon, stepBullets } from './combat.js';
 import { BOAT_ACCEL, BOAT_MAX_SPEED, boatHitsObstacle as hit, createBoats, nearestBoat, stepBoats } from './boats.js';
@@ -36,7 +37,7 @@ export function createWorld(rng, savedMission, sp) {
     blackout: { active: false, timer: 0 },
     weather: { rain: false, timer: 55, duration: 0, storm: false, heavy: false, bolt: null, boltTimer: 0, flash: 0, thunderIn: 0 },
     rainDrops: [],
-    clock: { total: 21 * 60 },
+    clock: { total: 1110 },
     heat: [0, 0, 0],
     upgrades: {},
     ufo: { active: false, timer: 0, seen: false, x: WATER_X + 56, y: 620 },
@@ -137,7 +138,7 @@ export function createWorld(rng, savedMission, sp) {
     state.pizza = createPizza(city);
     state.weather = { rain: false, timer: 55, duration: 0, storm: false, heavy: false, bolt: null, boltTimer: 0, flash: 0, thunderIn: 0 };
     state.rainDrops.length = 0;
-    state.clock = { total: 21 * 60 };
+    state.clock = { total: 1110 };
     state.ufo = { active: false, timer: 0, seen: false, x: WATER_X + 56, y: 620 };
     state.bridge = createBridge();
     if (sp) state.space = sp.createSpaceState();
@@ -642,9 +643,7 @@ export function createWorld(rng, savedMission, sp) {
     const events = state.events;
     for (const k of ['fists', 'rifle']) if (!p.weapons[k]) p.weapons[k] = { ammo: k === 'fists' ? 9999 : 0, reserve: k === 'fists' ? 9999 : 0 };
     const wantedBefore = state.wanted;
-    if (!state.daylightManual) {
-      state.daylight = 0.55 + 0.45 * Math.sin(state.elapsed * 0.013);
-    }
+    tickTimeOfDay(state);
     if (input.wasPressed && input.wasPressed('interact')) {
       if (sp && p.inPlane) sp.exitPlane(state);
       else if (sp && sp.tryBoardPlane(state)) { }
