@@ -45,8 +45,8 @@ export function createTraffic(city, rng) {
   cab.body = 'taxi';
   cab.color = '#ff7fc0';
   cab.pink = true;
-  // #17: no parked car in an intersection box (±52) — nudge +104 (320-apart grid: never lands in another box).
-  const clearBox = (a, rs) => { for (const r of rs) if (Math.abs(a - r) < 52) return a + 104; return a; };
+  // #17: no parked car in an intersection box (±60) — nudge +120 (320-apart grid: never lands in another box).
+  const clearBox = (a, rs) => { for (const r of rs) if (Math.abs(a - r) < 60) return a + 120; return a; };
   const parked = [];
   for (let i = 0; i < 12; i += 1) {
     const vertical = rng.chance(0.5);
@@ -210,7 +210,7 @@ export function createPedestrians(city, rng) {
     let x;
     let y;
     let angle;
-    const off = rng.chance(0.5) ? ROAD_W / 2 + 4 : -ROAD_W / 2 - 4;
+    const off = rng.chance(0.5) ? ROAD_W / 2 + 9 : -ROAD_W / 2 - 9;
     if (vertical) {
       const rx = rng.pick(city.roadsV);
       x = rx + off;
@@ -237,21 +237,21 @@ export function createPedestrians(city, rng) {
       flashTimer: 0,
     });
   }
-  // R27c: hero peds on the NORTH sidewalk (y=440), not the road (before: both
+  // R27c: hero peds on the NORTH sidewalk (y=431), not the road (before: both
   // stood on y=480, run over ~5s into every drive). South lane y=504 is 16u
-  // from the south sidewalk — inside the 26u run-over radius; north is 64u away.
+  // from the south sidewalk — inside the 26u run-over radius; north is 73u away.
   peds.push({
-    x: 540, y: 440, angle: 0, speed: 40,
+    x: 540, y: 431, angle: 0, speed: 40,
     color: '#6b4423', skin: '#d8a077', pants: '#1c1f24', hat: 0, build: 'wide',
     flee: 0, alive: true, walkPhase: 0, photo: 0, flashTimer: 0, hero: 'jax',
   });
   peds.push({
-    x: 420, y: 440, angle: Math.PI, speed: 38,
+    x: 420, y: 431, angle: Math.PI, speed: 38,
     color: '#8a1f28', skin: '#e8b98a', pants: '#2a1214', hat: 0, build: 'slim',
     flee: 0, alive: true, walkPhase: 1.6, photo: 0, flashTimer: 0, hero: 'mara',
   });
   // R27c: no ped spawns walking ALONG a vehicle lane; departure corridor stays clear.
-  const SIDE = ROAD_W / 2 + 4; // 40 — sidewalk offset, same as random spawns
+  const SIDE = ROAD_W / 2 + 9; // 49 — sidewalk offset, same as random spawns
   const spawnRoad = city.roadsH.find((ry) => Math.abs(ry - city.playerStart.y) < 1)
     ?? city.playerStart.y;
   for (const ped of peds) {

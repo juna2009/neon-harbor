@@ -211,7 +211,7 @@ export function stageShot(name, world) {
       // old layout put u1 eastbound in the north lane and u2 oncoming in
       // the hero's lane, and the dir=-1 traffic car read as a head-on taxi
       // (yellow cab 120 px ahead in the A4 crowd shot, pink cab at +520).
-      // On this 72 px road the lanes sit 14 px off the centreline, so an
+      // On this 80 px road the lanes sit 14 px off the centreline, so an
       // oncoming car can never read as "clearly opposite-lane" — all
       // staged traffic faces away instead.
       const px = state.player.x;
@@ -293,7 +293,7 @@ export function stageShot(name, world) {
     // on the sidewalk. The "on the road" read at +48 came from the
     // live green ped overlapping it at off 44, which is hidden below
     // (item 12b) — with that gone, ped2@48 reads as on the sidewalk.
-    // Live spawn (createPedestrians, walk line 40) is NOT touched — the
+    // Live spawn (createPedestrians, walk line 49) is NOT touched — the
     // same root cause lives there for the traffic-AI round (see STATUS).
     stagePhotoPeds(world, [
       { x: cp.x + 120, y: 1120 - 56 },
@@ -345,7 +345,7 @@ export function stageShot(name, world) {
     // -pov (mode 0) dan -front (mode 2) hanya untuk verifikasi kamera,
     // bukan shot dossier. Shot mode tidak menjalankan loop main.js, jadi
     // updateOnFoot tidak pernah dipanggil: state.onfoot + state.view3d
-    // di-set langsung di sini. Jax di-stage di trotoar y=440 (scout Worker
+    // di-set langsung di sini. Jax di-stage di trotoar y=431 (scout Worker
     // A v4: bersih x=100..1790) lalu jalan ke timur 0,6 dtk. SMOOTH-WALK: Jax di-stage di x=1045 (bukan 1000) supaya dgn walkSpeed 100 ia tetap berakhir di x=1105 (60 px) — dan dunia hanya di-step 36x seperti R41, jadi traffic/ped di posisi yang SAMA dgn shot R41 (walkFor 1,05 dtk sempat menggeser traffic hingga mobil merah menutupi Jax). walkPlayer
     // mengarahkan p.angle ke mouse scripted (640,400) — begitu Jax lewat
     // titik itu angle berbalik π — jadi angle di-set eksplisit 0 (timur,
@@ -357,10 +357,10 @@ export function stageShot(name, world) {
     const mode = name === 'onfoot-pov' ? 0 : name === 'onfoot-front' ? 2 : 1;
     setLight(world, 0.9);
     state.view3d = true;
-    placePlayerOnFoot(world, 1045, 440); // SMOOTH-WALK: 1045 + 60 px (0,6 dtk @100) = 1105, sama dgn R41
-    stagePed(world, 1250, 440);
+    placePlayerOnFoot(world, 1045, 431); // SMOOTH-WALK: 1045 + 60 px (0,6 dtk @100) = 1105, sama dgn R41
+    stagePed(world, 1250, 431);
     stagePed(world, 1400, 432);
-    stagePed(world, 850, 440);
+    stagePed(world, 850, 431);
     stagePed(world, 760, 448);
     // Ped yang di-stage menghadap arah spawn acak — tanpa ini ped #2 jalan
     // ke utara selama walkFor dan masuk ke blok gedung (probe: 432→406).

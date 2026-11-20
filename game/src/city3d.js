@@ -799,7 +799,7 @@ function tlC(r, g, b) { return 'rgb(' + ((r * chaseTL) | 0) + ',' + ((g * chaseT
 // R35-F7: stunt ramp — 3 LOW rising yellow steps (0.18/0.36/0.54 — the
 // 4-step 1.28-high version read as a giant staircase in the first WebGL2
 // shot) + chevron approach on the road, with a depth-sorted floating
-// label. FIX3-A: width 56 -> 36 (road 72: asphalt visible each side) +
+// label. FIX3-A: width 56 -> 36 (road 80: asphalt visible each side) +
 // steps alternate yellow/dark (was two near-identical yellows merging into
 // one flat slab) — mirror of the webgl2.js block, same numbers. World px
 // in, CS-scaled out (same convention as car3d). ONE
@@ -2012,17 +2012,19 @@ export function drawChase3D(ctx, state) {
   // string lights; visual only, no collision (see game/src/market.js).
   drawMarket3D({ box3, vQuad, flatQuad, inRange, sh, hx3, hz, CS, dist: (wx, wy) => Math.hypot(wx * CS - ccX, wy * CS - ccZ) }, city, nightF);
   // roads + sidewalks + center dashes, segmented per 320 px
-  // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44,
-  // sidewalk 52->58, so cars sit clearly clear of the flanking buildings.
-  // VISUAL ONLY (drawChase3D paint): ROAD_W/gameplay/collision untouched.
-  // Building faces stay at 50 (city.js), so a 6 px sidewalk strip remains;
-  // parked cars (+40) now sit on the asphalt edge, as parallel-parked cars do.
+  // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44;
+  // A-LITE (wave 2): ROAD_W 72->80, asphalt 44->48, sidewalk 58->60, so
+  // cars sit clearly clear of the flanking buildings. VISUAL ONLY
+  // (drawChase3D paint): ROAD_W/gameplay/collision untouched. Building
+  // faces stay at 60 (city.js), so a 12 px sidewalk strip remains;
+  // parked cars (+16, traffic.js) sit well inside the asphalt, as
+  // parallel-parked cars do.
   for (const rx of city.roadsV) {
     for (let gy = -320; gy < WORLD_H + 320; gy += 320) {
       if (!inRange(rx, gy + 160, 175, 135)) continue;
       const rd = Math.hypot(rx * CS - ccX, (gy + 160) * CS - ccZ);
-      flatQuad(rx - 58, gy, rx + 58, gy + 320, 0.05, sh(hx3('#9aa0a8'), shadeK, hz(rd)));
-      flatQuad(rx - 44, gy, rx + 44, gy + 320, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
+      flatQuad(rx - 60, gy, rx + 60, gy + 320, 0.05, sh(hx3('#9aa0a8'), shadeK, hz(rd)));
+      flatQuad(rx - 48, gy, rx + 48, gy + 320, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
       for (let d0 = gy + 24; d0 < gy + 320; d0 += 128) {
         if (!inRange(rx, d0 + 16, 115, 75)) continue;
         flatQuad(rx - 2.5, d0, rx + 2.5, d0 + 64, 0.09, '#e8d44d');
@@ -2041,8 +2043,8 @@ export function drawChase3D(ctx, state) {
       const clip = rd < 80;
       const x1 = clip ? Math.min(gx + 320, WATER_X) : gx + 320;
       if (x1 <= gx) continue;
-      flatQuad(gx, ry - 58, x1, ry + 58, 0.05, sh(hx3('#9aa0a8'), shadeK, hz(rd)));
-      flatQuad(gx, ry - 44, x1, ry + 44, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
+      flatQuad(gx, ry - 60, x1, ry + 60, 0.05, sh(hx3('#9aa0a8'), shadeK, hz(rd)));
+      flatQuad(gx, ry - 48, x1, ry + 48, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
       for (let d0 = gx + 24; d0 < gx + 320 && (!clip || d0 < WATER_X); d0 += 128) {
         if (!inRange(d0 + 16, ry, 115, 75)) continue;
         flatQuad(d0, ry - 2.5, clip ? Math.min(d0 + 64, WATER_X) : d0 + 64, ry + 2.5, 0.09, '#e8d44d');
@@ -2057,10 +2059,10 @@ export function drawChase3D(ctx, state) {
     if (!inRange(rx, ry, 175, 135)) continue;
     const rd = Math.hypot(rx * CS - ccX, ry * CS - ccZ), zw = sh(hx3('#e8e8e6'), shadeK, hz(rd));
     for (const sd of [1, -1]) {
-      for (let k = 0; k < 9; k += 1) flatQuad(rx - 36 + k * 9, ry + sd * 52 - 14, rx - 36 + k * 9 + 4, ry + sd * 52 + 14, 0.11, zw);
-      flatQuad(rx - 44, ry + sd * 57 - 2, rx + 44, ry + sd * 57 + 2, 0.11, zw);
-      for (let k = 0; k < 9; k += 1) flatQuad(rx + sd * 52 - 14, ry - 36 + k * 9, rx + sd * 52 + 14, ry - 36 + k * 9 + 4, 0.11, zw);
-      flatQuad(rx + sd * 57 - 2, ry - 44, rx + sd * 57 + 2, ry + 44, 0.11, zw);
+      for (let k = 0; k < 11; k += 1) flatQuad(rx - 45 + k * 9, ry + sd * 56 - 14, rx - 45 + k * 9 + 4, ry + sd * 56 + 14, 0.11, zw);
+      flatQuad(rx - 48, ry + sd * 61 - 2, rx + 48, ry + sd * 61 + 2, 0.11, zw);
+      for (let k = 0; k < 11; k += 1) flatQuad(rx + sd * 56 - 14, ry - 45 + k * 9, rx + sd * 56 + 14, ry - 45 + k * 9 + 4, 0.11, zw);
+      flatQuad(rx + sd * 61 - 2, ry - 48, rx + sd * 61 + 2, ry + 48, 0.11, zw);
     }
   }
   // warm sun glow on the asphalt ahead (low sun, straight ahead)
@@ -2374,8 +2376,8 @@ export function drawChase3D(ctx, state) {
     return (roadX * CS - ccX) * -cfZ;
   })();
   // POLEFIX2: lamps + palms sit HARD on the sidewalk, flush with the
-  // building line — walkLat 4.8 (48px from the road centreline: 12px
-  // past the 36px asphalt edge, 2px off the 50px facade). JF4's 4.3
+  // building line — walkLat 5.2 (52px from the road centreline: 12px
+  // past the 40px asphalt edge, 8px off the 60px facade). JF4's 4.3
   // (mid-sidewalk, 7px past the edge) FAILED on screen: at the
   // chase-cam's grazing angle the 7px strip projects to a sliver, so
   // the trunk base still read as standing on the asphalt edge and the
@@ -2383,8 +2385,8 @@ export function drawChase3D(ctx, state) {
   // base y~510, dark asphalt immediately left AND right of the base).
   // Palms use EXACTLY walkLat now (JF4's +h2*0.3 drifted them to 5.1,
   // inside the wall). Fronds shortened 3.4 -> 2.0 so the canopy's inner
-  // tip (38px) clears the 36px road edge instead of overhanging it.
-  const walkLat = 4.8; // sidewalk outer edge, in 3D units (48px from road centre)
+  // tip (42px) clears the 40px road edge instead of overhanging it.
+  const walkLat = 5.2; // sidewalk outer edge, in 3D units (52px from road centre)
   // R36-ROADS (fallback Canvas): tekstur jalan dekat kamera + prop trotoar.
   // VISUAL ONLY — padanan versi WebGL2 di webgl2.js (roadSeg/atFU).
   const fwdU = (f, lat) => [ccX + cfX * f + (-cfZ) * lat, ccZ + cfZ * f + cfX * lat]; // (maju, lateral) unit -> [x, z] 3D
@@ -2410,23 +2412,23 @@ export function drawChase3D(ctx, state) {
     else { flatQuad(sp[0] - 2.5, sp[1] - 12, sp[0] + 2.5, sp[1] + 12, 0.11, '#e8e8e6');
       QW([[ht[0], 0.11, ht[1]], [hb[0] - 0.8, 0.11, hb[1]], [hb[0] + 0.8, 0.11, hb[1]], [ht[0], 0.11, ht[1]]], '#e8e8e6', 30); }
   }
-  for (let f = -6; f <= 66; f += 12) for (const lat of [roadLat - 4.8, roadLat + 4.8]) { // sambungan ubin trotoar (dari fwd -6, dasar layar)
+  for (let f = -6; f <= 66; f += 12) for (const lat of [roadLat - 5.4, roadLat + 5.4]) { // sambungan ubin trotoar (dari fwd -6, dasar layar)
     const j = fwdP(f, lat);
     if (ewRoad) flatQuad(j[0] - 0.7, j[1] - 3.5, j[0] + 0.7, j[1] + 3.5, 0.08, 'rgba(20,20,24,0.5)');
     else flatQuad(j[0] - 3.5, j[1] - 0.7, j[0] + 3.5, j[1] + 0.7, 0.08, 'rgba(20,20,24,0.5)');
   }
-  if (fwdClear(16, roadLat + 4.7)) { // halte: bangku kayu + rambu biru (trotoar kanan)
-    const bn = fwdU(16, roadLat + 4.7), bb = fwdU(16, roadLat + 4.95), lg1 = fwdU(15.2, roadLat + 4.7), lg2 = fwdU(16.8, roadLat + 4.7), yaw = ewRoad ? Math.PI / 2 : 0; // box3: w ikut "right" — jalan E-W (sumbu x) butuh yaw pi/2 supaya panjang bangku sejajar jalan
+  if (fwdClear(16, roadLat + 5.2)) { // halte: bangku kayu + rambu biru (trotoar kanan)
+    const bn = fwdU(16, roadLat + 5.2), bb = fwdU(16, roadLat + 5.45), lg1 = fwdU(15.2, roadLat + 5.2), lg2 = fwdU(16.8, roadLat + 5.2), yaw = ewRoad ? Math.PI / 2 : 0; // box3: w ikut "right" — jalan E-W (sumbu x) butuh yaw pi/2 supaya panjang bangku sejajar jalan
     box3(lg1[0], 0, lg1[1], 0.12, 0.55, 0.12, 0, '#3a2c1c', 16); // kaki bangku (alas 0 -> dudukan)
     box3(lg2[0], 0, lg2[1], 0.12, 0.55, 0.12, 0, '#3a2c1c', 16);
     box3(bn[0], 0.55, bn[1], 1.9, 0.14, 0.55, yaw, '#6b4a2f', 16);
     box3(bb[0], 0.6, bb[1], 1.9, 0.6, 0.1, yaw, '#5d3f28', 16); // sandaran naik dari dudukan (alas 0.6, bukan 0.95 — dulu melayang)
-    const sg = fwdU(19, roadLat + 4.7);
+    const sg = fwdU(19, roadLat + 5.2);
     box3(sg[0], 0, sg[1], 0.14, 2.6, 0.14, 0, '#3a3340', 19);
     box3(sg[0], 2.3, sg[1], 0.95, 0.65, 0.1, yaw, '#2456c8', 19); // panel menimpa ujung tiang
   }
-  if (fwdClear(24, roadLat - 4.7)) { // tempat sampah hijau (trotoar kiri)
-    const tb = fwdU(24, roadLat - 4.7);
+  if (fwdClear(24, roadLat - 5.2)) { // tempat sampah hijau (trotoar kiri)
+    const tb = fwdU(24, roadLat - 5.2);
     box3(tb[0], 0, tb[1], 0.55, 0.95, 0.55, 0, '#2a6b45', 24);
     box3(tb[0], 0.95, tb[1], 0.6, 0.12, 0.6, 0, '#1d4e33', 24);
   }

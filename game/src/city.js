@@ -81,13 +81,13 @@ export function buildCity(rng) {
   const trees = [];
   for (let i = 0; i < roadsV.length - 1; i += 1) {
     for (let j = 0; j < roadsH.length - 1; j += 1) {
-      const bx = roadsV[i] + ROAD_W / 2 + 14;
-      const by = roadsH[j] + ROAD_W / 2 + 14;
-      const bw = BLOCK - ROAD_W - 28;
-      const bh = BLOCK - ROAD_W - 28;
+      const bx = roadsV[i] + ROAD_W / 2 + 20;
+      const by = roadsH[j] + ROAD_W / 2 + 20;
+      const bw = BLOCK - ROAD_W - 40;
+      const bh = BLOCK - ROAD_W - 40;
       if (bx + bw > WATER_X - 20) continue;
-      // #26: blocks (2130,210)/(2130,1490) overlap the marina/docks pier — never parks.
-      // #25: last parkable block (2130,1170) is forced to a park when the RNG made none,
+      // #26: blocks (2140,220)/(2140,1500) overlap the marina/docks pier — never parks.
+      // #25: last parkable block (2140,1180) is forced to a park when the RNG made none,
       // so Pasar Malam always exists (seed 3 had 0 parks). Chance still rolls every block.
       if ((rng.chance(0.16) || (i === 6 && j === 3 && !parks.length)) && !(bx + bw > 2280 && (by < 280 || by + bh > 1480))) {
         parks.push({ x: bx, y: by, w: bw, h: bh });
@@ -134,12 +134,12 @@ export function buildCity(rng) {
   }
   if (stadium) stadium.stadium = true;
   buildings.push({
-    x: 2300, y: 1820, w: 44, h: 44,
+    x: 2290, y: 1820, w: 44, h: 44,
     color: '#e8e4d8', neon: '#ffd23e', height: 3, roof: 0,
     district: 2, props: 0, landmark: 'lighthouse',
   });
   const lighthouse = buildings[buildings.length - 1];
-  const gasStation = { x: 850, y: 1490, w: 210, h: 210, label: 'Gas',
+  const gasStation = { x: 860, y: 1500, w: 200, h: 200, label: 'Gas',
     pumps: [900, 960, 1020].map((x) => ({ x, y: 1610, alive: true })) };
   const overlapsLot = (b) => b.x < 1080 && b.x + (b.w || b.r || 0) > 836
     && b.y < 1710 && b.y + (b.h || b.r || 0) > 1480;
@@ -147,10 +147,10 @@ export function buildCity(rng) {
     for (let i = list.length - 1; i >= 0; i -= 1) if (overlapsLot(list[i])) list.splice(i, 1);
   }
   const candidates = intersections.filter((pt) => pt.x < WATER_X - 80 && !(pt.x === 800 && pt.y === 1440));
-  const hydrants = [{ x: 842, y: 1398, burst: false }];
+  const hydrants = [{ x: 852, y: 1388, burst: false }];
   while (hydrants.length < 8 && candidates.length) {
     const pt = candidates.splice(rng.int(0, candidates.length - 1), 1)[0];
-    const x = pt.x + 42, y = pt.y + 42;
+    const x = pt.x + 52, y = pt.y + 52;
     if (!buildingAt({ buildings }, x, y, 5)) hydrants.push({ x, y, burst: false });
   }
   return {

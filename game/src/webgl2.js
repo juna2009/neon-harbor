@@ -879,7 +879,7 @@ function palm(B, x, z, sa, sc, road) { // R36 v3: sc = skala tinggi (1 normal; s
   // Normal miring menarik ambient langit + komponen-Y matahari seperti
   // pelepah lama, tapi geometri tetap pita vertikal (kebaca daun).
   const frond = (dx, dz, L, rise, drop, w0, col) => {
-    if (road) { const tw = dx * road[0] + dz * road[1]; if (tw > 0) L = Math.min(L, 1.0 / tw); } // 1A-TREES (POLEFIX2): pelepah ke arah jalan dipendekkan — ujung tajuk >=38px dr sumbu jalan
+    if (road) { const tw = dx * road[0] + dz * road[1]; if (tw > 0) L = Math.min(L, 1.0 / tw); } // 1A-TREES (POLEFIX2): pelepah ke arah jalan dipendekkan — ujung tajuk >=42px dr sumbu jalan (batang di 52px, jangkauan maks 1.0u ke jalan)
     const nn = norm([-dz, 0.9, dx]);
     const fs = 1 - sa.w * (1 - (dx * sa.x + dz * sa.z)) / 4; // R36: lantai 0.8 (dulu /2 = 0.6, dobel-gelap dgn shader)
     const c = [col[0] * fs, col[1] * fs, col[2] * fs];
@@ -957,7 +957,7 @@ function shadeTree(B, x, z, sa, sc) { // R36 v3: sc = skala (sama dgn palm)
   const tx = x + lx, tz = z + lz;
   const fs = 1 - sa.w * 0.15;
   const G1 = [0.25 * fs, 0.60 * fs, 0.31 * fs], G2 = [0.31 * fs, 0.70 * fs, 0.37 * fs], G3 = [0.19 * fs, 0.50 * fs, 0.25 * fs]; // R36 v4: lebih terang lagi (sore: gumpal gelap vs fasad gelap = tak kebaca)
-  box(B, tx, 3.6 * sc, tz, 2.0 * sc, 1.6 * sc, 2.0 * sc, G1, 5); // gumpal utama 1A-TREES: 3.0 -> 2.0u (ujung tajuk >=38px dr sumbu jalan; 2.2 memberi 37px)
+  box(B, tx, 3.6 * sc, tz, 2.0 * sc, 1.6 * sc, 2.0 * sc, G1, 5); // gumpal utama 1A-TREES: 3.0 -> 2.0u (ujung tajuk >=42px dr sumbu jalan: batang di 52px, gumpal 2.0u)
   box(B, tx + 0.5 * sc, 4.3 * sc, tz - 0.4 * sc, 1.0 * sc, 1.1 * sc, 1.0 * sc, G2, 5); // gumpal atas (terang) — jangkauan samping <=1.0u
   box(B, tx - 0.5 * sc, 3.1 * sc, tz + 0.5 * sc, 1.0 * sc, 1.1 * sc, 1.0 * sc, G3, 5); // gumpal bawah (gelap) — jangkauan samping <=1.0u
   box(B, tx, 5.0 * sc, tz, 1.2 * sc, 0.8 * sc, 1.2 * sc, G2, 5); // pucuk
@@ -1410,28 +1410,29 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   const roadCol = [0.10, 0.09, 0.11], walkCol = [0.22, 0.20, 0.24];
   const roadSeg = (x0, y0, x1, y1, vertical) => {
     const len = Math.hypot(x1 - x0, y1 - y0) * S;
-    // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44
-    // (same +22% as the Canvas fallback in city3d.js). VISUAL ONLY: this
-    // is paint (roadSeg); ROAD_W/gameplay/collision untouched. Sidewalk
-    // strips sit at hw+1.2, so they shift out with the asphalt; lamps at
-    // +-48 stay clear of the asphalt (edge 44, facades at 50).
-    const hw = 44 * S;
+    // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44;
+    // A-LITE (wave 2): ROAD_W 72->80, asphalt half-width 44->48 (same as
+    // the Canvas fallback in city3d.js). VISUAL ONLY: this is paint
+    // (roadSeg); ROAD_W/gameplay/collision untouched. Sidewalk strips
+    // span hw..hw+1.2u (48..60px, full band to the facades); lamps at
+    // +-52 stay clear of the asphalt (edge 48, facades at 60).
+    const hw = 48 * S;
     if (vertical) {
       const X = x0 * S, z0 = y0 * S, z1 = y1 * S;
       quad(OP, [X - hw, -0.05, z0], [X + hw, -0.05, z0], [X + hw, -0.05, z1], [X - hw, -0.05, z1],
         [0, 1, 0], [[0, 0], [0, 1], [len, 1], [len, 0]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
-      flat(OP, X - (hw + 1.2), 0.02, (z0 + z1) / 2, 2.4, (z1 - z0), walkCol, 14, // R40: trotoar 6 -> 14 + UV dunia (u = lebar 2.4, v = panjang)
-        [[0, 0], [2.4, 0], [2.4, (z1 - z0)], [0, (z1 - z0)]]);
-      flat(OP, X + (hw + 1.2), 0.02, (z0 + z1) / 2, 2.4, (z1 - z0), walkCol, 14,
-        [[0, 0], [2.4, 0], [2.4, (z1 - z0)], [0, (z1 - z0)]]);
+      flat(OP, X - (hw + 0.6), 0.02, (z0 + z1) / 2, 1.2, (z1 - z0), walkCol, 14, // A-LITE: trotoar pita penuh hw..hw+1.2u (48..60px) + UV dunia (u = lebar 1.2, v = panjang)
+        [[0, 0], [1.2, 0], [1.2, (z1 - z0)], [0, (z1 - z0)]]);
+      flat(OP, X + (hw + 0.6), 0.02, (z0 + z1) / 2, 1.2, (z1 - z0), walkCol, 14,
+        [[0, 0], [1.2, 0], [1.2, (z1 - z0)], [0, (z1 - z0)]]);
     } else {
       const Z = y0 * S, x0u = x0 * S, x1u = x1 * S;
       quad(OP, [x0u, -0.05, Z - hw], [x1u, -0.05, Z - hw], [x1u, -0.05, Z + hw], [x0u, -0.05, Z + hw],
         [0, 1, 0], [[0, 0], [len, 0], [len, 1], [0, 1]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
-      flat(OP, (x0u + x1u) / 2, 0.02, Z - (hw + 1.2), (x1u - x0u), 2.4, walkCol, 14, // R40: trotoar 6 -> 14 + UV dunia (u = panjang, v = lebar 2.4)
-        [[0, 0], [(x1u - x0u), 0], [(x1u - x0u), 2.4], [0, 2.4]]);
-      flat(OP, (x0u + x1u) / 2, 0.02, Z + (hw + 1.2), (x1u - x0u), 2.4, walkCol, 14,
-        [[0, 0], [(x1u - x0u), 0], [(x1u - x0u), 2.4], [0, 2.4]]);
+      flat(OP, (x0u + x1u) / 2, 0.02, Z - (hw + 0.6), (x1u - x0u), 1.2, walkCol, 14, // A-LITE: trotoar pita penuh hw..hw+1.2u (48..60px) + UV dunia (u = panjang, v = lebar 1.2)
+        [[0, 0], [(x1u - x0u), 0], [(x1u - x0u), 1.2], [0, 1.2]]);
+      flat(OP, (x0u + x1u) / 2, 0.02, Z + (hw + 0.6), (x1u - x0u), 1.2, walkCol, 14,
+        [[0, 0], [(x1u - x0u), 0], [(x1u - x0u), 1.2], [0, 1.2]]);
     }
   };
   for (const rx of city.roadsV) {
@@ -1452,14 +1453,14 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // Zebra + garis stop di tiap persimpangan yang terlihat (4 lengan penuh).
   // Strip membujur (sejajar lalu lintas, standar zebra): 9 strip per lengan.
   const zebraV = (rx, ry, side) => {
-    const cz = (ry + side * 52) * S;
-    for (let k = -4; k <= 4; k += 1) flat(OP, (rx + k * 9) * S, 0.01, cz, 0.45, 3.5, MARK_W, 5);
-    flat(OP, rx * S, 0.01, (ry + side * 57) * S, 8.0, 0.5, MARK_W, 5); // garis stop
+    const cz = (ry + side * 56) * S;
+    for (let k = -5; k <= 5; k += 1) flat(OP, (rx + k * 9) * S, 0.01, cz, 0.45, 3.5, MARK_W, 5);
+    flat(OP, rx * S, 0.01, (ry + side * 61) * S, 9.6, 0.5, MARK_W, 5); // garis stop
   };
   const zebraH = (rx, ry, side) => {
-    const cx = (rx + side * 52) * S;
-    for (let k = -4; k <= 4; k += 1) flat(OP, cx, 0.01, (ry + k * 9) * S, 3.5, 0.45, MARK_W, 5);
-    flat(OP, (rx + side * 57) * S, 0.01, ry * S, 0.5, 8.0, MARK_W, 5); // garis stop
+    const cx = (rx + side * 56) * S;
+    for (let k = -5; k <= 5; k += 1) flat(OP, cx, 0.01, (ry + k * 9) * S, 3.5, 0.45, MARK_W, 5);
+    flat(OP, (rx + side * 61) * S, 0.01, ry * S, 0.5, 9.6, MARK_W, 5); // garis stop
   };
   for (const rx of city.roadsV) {
     for (const ry of city.roadsH) {
@@ -1501,31 +1502,31 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   }
   // Ubin trotoar: sambungan melintang tiap ~12 unit di kedua trotoar.
   // R36-ROADS item 17: dari fwd -6 (dasar layar, di belakang hero).
-  for (let f = -6; f <= 66; f += 12) for (const lat of [-4.8, 4.8]) {
+  for (let f = -6; f <= 66; f += 12) for (const lat of [-5.4, 5.4]) {
     const j = atFU(f, lat);
     if (hEW) flat(OP, j[0], 0.03, j[1], 0.14, 0.7, [0.16, 0.15, 0.17], 5);
     else flat(OP, j[0], 0.03, j[1], 0.7, 0.14, [0.16, 0.15, 0.17], 5);
   }
   // Halte bus (bangku + rambu) di trotoar kanan, tempat sampah di kiri.
-  if (propClear(16, 4.7)) {
-    const bn = atFU(16, 4.7), bb = atFU(16, 4.95), yaw = hEW ? 0 : Math.PI / 2;
+  if (propClear(16, 5.2)) {
+    const bn = atFU(16, 5.2), bb = atFU(16, 5.45), yaw = hEW ? 0 : Math.PI / 2;
     boxR(OP, bn[0], 0.55, bn[1], 1.9, 0.14, 0.55, yaw, 0, [0.45, 0.32, 0.20], 5); // bangku: dudukan kayu
     boxR(OP, bb[0], 0.95, bb[1], 1.9, 0.6, 0.1, yaw, 0, [0.40, 0.28, 0.18], 5); // sandaran
     boxR(OP, bn[0], 0.25, bn[1], 0.12, 0.5, 0.5, yaw, 0, [0.15, 0.15, 0.16], 5); // kaki
   }
-  if (propClear(19, 4.7)) {
-    const sg = atFU(19, 4.7);
+  if (propClear(19, 5.2)) {
+    const sg = atFU(19, 5.2);
     box(OP, sg[0], 1.4, sg[1], 0.12, 2.8, 0.12, LAMP_STEEL, 5); // tiang rambu halte
     if (hEW) box(OP, sg[0], 2.5, sg[1], 0.95, 0.65, 0.08, [0.12, 0.35, 0.85], 5);
     else box(OP, sg[0], 2.5, sg[1], 0.08, 0.65, 0.95, [0.12, 0.35, 0.85], 5); // panel biru halte
   }
-  if (propClear(24, -4.7)) {
-    const tb = atFU(24, -4.7);
+  if (propClear(24, -5.2)) {
+    const tb = atFU(24, -5.2);
     box(OP, tb[0], 0.48, tb[1], 0.55, 0.95, 0.55, [0.10, 0.28, 0.14], 5); // tempat sampah hijau
     box(OP, tb[0], 1.0, tb[1], 0.6, 0.1, 0.6, [0.08, 0.22, 0.11], 5); // tutup
   }
   // Lampu lalu lintas di persimpangan pertama di depan hero (sudut yang tidak
-  // dipakai lampu jalan: lampu di (rx-48,ry+48)/(rx+48,ry-48), ini (rx+48,ry+48)).
+  // dipakai lampu jalan: lampu di (rx-52,ry+52)/(rx+52,ry-52), ini (rx+52,ry+52)).
   {
     let best = null;
     for (const rx of city.roadsV) for (const ry of city.roadsH) {
@@ -1535,7 +1536,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       if (fw > 15 && fw < 120 && (!best || fw < best[0])) best = [fw, rx, ry];
     }
     if (best) {
-      const rx = best[1], ry = best[2], px = (rx + 48) * S, pz = (ry + 48) * S;
+      const rx = best[1], ry = best[2], px = (rx + 52) * S, pz = (ry + 52) * S;
       box(OP, px, 2.6, pz, 0.35, 5.2, 0.35, LAMP_STEEL, 5); // tiang
       if (hEW) { deboxBeam(OP, px, 5.0, pz, px, 5.3, pz - 1.5, 0.18, LAMP_STEEL, 5); box(OP, px, 4.9, pz - 1.5, 0.5, 1.3, 0.5, [0.08, 0.08, 0.09], 5); }
       else { deboxBeam(OP, px, 5.0, pz, px - 1.5, 5.3, pz, 0.18, LAMP_STEEL, 5); box(OP, px - 1.5, 4.9, pz, 0.5, 1.3, 0.5, [0.08, 0.08, 0.09], 5); }
@@ -1557,7 +1558,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // ONE block: everything F7 in this file. Stunt ramps = 2 chevron boxes +
   // 3 LOW rising yellow steps (0.18/0.36/0.54 high — the 4-step 1.28-high
   // version read as a giant staircase filling the frame in the first shot).
-  // FIX3-A: width 56 -> 36 (road is 72: 18 asphalt visible each side, no
+  // FIX3-A: width 56 -> 36 (road is 80: 22 asphalt visible each side, no
   // more yellow plate covering the road) + steps alternate yellow/dark
   // (was two near-identical yellows that merged into one flat slab at
   // chase-cam grazing angle). Heights/positions/trigger untouched (jobs.js).
@@ -1623,10 +1624,10 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // kelihatan tanpa pohon sama sekali (probe seed 7: 0 pohon di koridor
   // x 1400..2400, y 960..1280). 5 pohon staged di trotoar jalan yang
   // sedang dilalui hero, relatif-kamera seperti lampu city3d.js (JF4):
-  // batang di ±48 px dari garis tengah jalan (tepi trotoar; aspal 44,
-  // fasad 50), TIDAK di lajur. Posisi dijepit ke TENGAH BLOK (along ≡ 8
+  // batang di ±52 px dari garis tengah jalan (tepi trotoar; aspal 48,
+  // fasad 60), TIDAK di lajur. Posisi dijepit ke TENGAH BLOK (along ≡ 8
   // mod 16 unit; persimpangan tiap 16 unit) supaya tidak menabrak tiang
-  // lampu di sudut persimpangan (±48,±48) — jarak min 32 px. Slot
+  // lampu di sudut persimpangan (±52,±52) — jarak min 32 px. Slot
   // k=2 = pohon rindang, sisanya palem; sisi selang-seling, tapi kalau
   // ada pejalan kaki / koin Harbor Token dalam 20 px dari titik rencana,
   // GESER dulu sepanjang jalan (±4 unit, tetap di sisi yang sama) — balik
@@ -1658,7 +1659,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       return false;
     };
     const spot = (a, side) => { // posisi dunia (unit) utk along a & sisi side
-      const la = roadLat + side * 4.8;
+      const la = roadLat + side * 5.2;
       return [(cam.eye[0] + fx2 * (a - camAlong) + rx2 * la) / S,
               (cam.eye[2] + fz2 * (a - camAlong) + rz2 * la) / S];
     };
@@ -1679,8 +1680,8 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
           if (clash(wx, wy)) continue; // dua sisi bentrok -> lewati slot
         }
       }
-      const wxu = cam.eye[0] + fx2 * (along - camAlong) + rx2 * (roadLat + side * 4.8);
-      const wyu = cam.eye[2] + fz2 * (along - camAlong) + rz2 * (roadLat + side * 4.8);
+      const wxu = cam.eye[0] + fx2 * (along - camAlong) + rx2 * (roadLat + side * 5.2);
+      const wyu = cam.eye[2] + fz2 * (along - camAlong) + rz2 * (roadLat + side * 5.2);
       if (Math.hypot(wxu - cam.eye[0], wyu - cam.eye[2]) < 12) continue;
       const scK = k === 2 ? 1.0 : 1 + k * 0.12; // 1A-TREES: slot k=2 (shade tree) tanpa skala (dulu 1.24); R36 v4: jauh = lebih tinggi
       if (k === 2) shadeTree(OP, wxu, wyu, sunA, scK);
@@ -2024,12 +2025,12 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       // TOD (cull): tiang lampu <14 unit dari kamera dihilangkan — sama seperti
       // gedung (round 22). Tanpa ini, satu tiang di depan lensa memenuhi frame
       // (kasus nyata: shot pagi v1, tiang 3,2 unit dari kamera jadi bar hitam).
-      // POLE-FIX R26: tiang HARUS di sudut trotoar (±48). (±48,±20) salah
-      // thd jalan menyilang: 20 < ROAD_W/2 (36) = tiang di atas aspal,
-      // di tengah jalur mobil. 48 = di trotoar (aspal 44, fasad di 50).
+      // POLE-FIX R26: tiang HARUS di sudut trotoar (±52, A-LITE: dulu ±48). (±48,±20) salah
+      // thd jalan menyilang: 20 < ROAD_W/2 (40) = tiang di atas aspal,
+      // di tengah jalur mobil. 52 = di trotoar (aspal 48, fasad di 60).
       const lampNear = (lx, lz) => Math.hypot(lx * S - camX, lz * S - camZ) < 14;
-      if (!lampNear(rx - 48, ry + 48)) lamp(OP, GL, (rx - 48) * S, (ry + 48) * S, tod.lamp, 0.7071, -0.7071); // DEBOX: lengan ke pusat persimpangan
-      if (!lampNear(rx + 48, ry - 48)) lamp(OP, GL, (rx + 48) * S, (ry - 48) * S, tod.lamp, -0.7071, 0.7071);
+      if (!lampNear(rx - 52, ry + 52)) lamp(OP, GL, (rx - 52) * S, (ry + 52) * S, tod.lamp, 0.7071, -0.7071); // DEBOX: lengan ke pusat persimpangan
+      if (!lampNear(rx + 52, ry - 52)) lamp(OP, GL, (rx + 52) * S, (ry - 52) * S, tod.lamp, -0.7071, 0.7071);
     }
   }
 }

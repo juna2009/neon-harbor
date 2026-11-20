@@ -6,7 +6,7 @@
 //
 // SITE: the Downtown park (first park whose centre is in x 1120..1760),
 // else the largest park. Deterministic from the city object, so it works
-// for every seed (seed 7: park 1490,530,220,220 — centre 1600,640).
+// for every seed (seed 7: park 1500,540,200,200 — centre 1600,640).
 // STALLS ARE VISUAL ONLY: no collision (city.js untouched) — the player
 // walks and fights down the centre aisle; in the 2D view a stall rect
 // underfoot reads as standing at the stall. No imports: this file stays

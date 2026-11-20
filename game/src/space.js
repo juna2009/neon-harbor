@@ -66,8 +66,8 @@ export function onWater(x, y) {
   return x > WATER_X + 8 && x < WORLD_W - 8 && y > 8 && y < WORLD_H - 8;
 }
 export function onRoadAt(city, x, y) {
-  for (const rx of city.roadsV) if (Math.abs(x - rx) <= 36) return true;
-  for (const ry of city.roadsH) if (Math.abs(y - ry) <= 36) return true;
+  for (const rx of city.roadsV) if (Math.abs(x - rx) <= 40) return true;
+  for (const ry of city.roadsH) if (Math.abs(y - ry) <= 40) return true;
   return false;
 }
 function nearPlane(state, x, y, d) {

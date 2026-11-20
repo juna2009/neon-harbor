@@ -42,12 +42,12 @@ export function stepBridge(b, s, dt, fx) {
 }
 export function drawBridge(ctx, b, t) {
   const x = BRIDGE.x, top = BRIDGE.top, bot = BRIDGE.bottom;
-  if (b.up) { ctx.fillStyle = '#1d6f9e'; ctx.fillRect(x - 36, top, 72, bot - top); }
+  if (b.up) { ctx.fillStyle = '#1d6f9e'; ctx.fillRect(x - 40, top, 80, bot - top); }
   ctx.fillStyle = '#3a3f46';
-  ctx.fillRect(x - 36, top - 6, 72, 6); ctx.fillRect(x - 36, bot, 72, 6);
+  ctx.fillRect(x - 40, top - 6, 80, 6); ctx.fillRect(x - 40, bot, 80, 6);
   for (let i = 0; i < 9; i += 1) {
     ctx.fillStyle = i % 2 ? '#111' : '#ffd23e';
-    ctx.fillRect(x - 36 + i * 8, top - 6, 8, 6); ctx.fillRect(x - 36 + i * 8, bot, 8, 6);
+    ctx.fillRect(x - 40 + i * 8, top - 6, 8, 6); ctx.fillRect(x - 40 + i * 8, bot, 8, 6);
   }
   if (b.up) {
     ctx.fillStyle = '#2c313a';
@@ -57,7 +57,7 @@ export function drawBridge(ctx, b, t) {
       ctx.beginPath(); ctx.arc(x + lx, ly, 5, 0, 7); ctx.fill();
     }
   } else {
-    ctx.fillStyle = '#4a5058'; ctx.fillRect(x - 36, top, 72, bot - top);
+    ctx.fillStyle = '#4a5058'; ctx.fillRect(x - 40, top, 80, bot - top);
     ctx.fillStyle = '#e8d44d'; ctx.fillRect(x - 2, top + 8, 4, bot - top - 16);
   }
 }

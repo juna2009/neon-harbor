@@ -1,7 +1,7 @@
 export const WORLD_W = 2560;
 export const WORLD_H = 1920;
 export const STEP = 1 / 60;
-export const ROAD_W = 72;
+export const ROAD_W = 80;
 export const BLOCK = 320;
 export const BEST_KEY = 'neon-harbor-best-cash';
 export const PROGRESS_KEY = 'neon-harbor-mission';

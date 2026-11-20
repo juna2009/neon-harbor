@@ -124,11 +124,11 @@ export function createRenderer(canvas) {
     g.closePath();
     g.fill();
     g.fillStyle = COLORS.sidewalk;
-    for (const rx of city.roadsV) g.fillRect(rx - 52, 0, 104, WORLD_H);
-    for (const ry of city.roadsH) g.fillRect(0, ry - 52, WATER_X, 104);
+    for (const rx of city.roadsV) g.fillRect(rx - 60, 0, 120, WORLD_H);
+    for (const ry of city.roadsH) g.fillRect(0, ry - 60, WATER_X, 120);
     g.fillStyle = COLORS.road;
-    for (const rx of city.roadsV) g.fillRect(rx - 36, 0, 72, WORLD_H);
-    for (const ry of city.roadsH) g.fillRect(0, ry - 36, WATER_X, 72);
+    for (const rx of city.roadsV) g.fillRect(rx - 40, 0, 80, WORLD_H);
+    for (const ry of city.roadsH) g.fillRect(0, ry - 40, WATER_X, 80);
     g.fillStyle = COLORS.roadLine;
     for (const rx of city.roadsV) {
       for (let y = 0; y < WORLD_H; y += 64) g.fillRect(rx - 2, y + 12, 4, 32);
@@ -137,10 +137,10 @@ export function createRenderer(canvas) {
       for (let x = 0; x < WATER_X; x += 64) g.fillRect(x + 12, ry - 2, 32, 4);
     }
     for (const pt of city.intersections) {
-      drawCrosswalk(g, pt.x - 46, pt.y - 46, 92, 12, 0);
-      drawCrosswalk(g, pt.x - 46, pt.y + 34, 92, 12, 0);
-      drawCrosswalk(g, pt.x - 46, pt.y - 46, 12, 92, 1);
-      drawCrosswalk(g, pt.x + 34, pt.y - 46, 12, 92, 1);
+      drawCrosswalk(g, pt.x - 48, pt.y - 62, 96, 12, 0);
+      drawCrosswalk(g, pt.x - 48, pt.y + 50, 96, 12, 0);
+      drawCrosswalk(g, pt.x - 62, pt.y - 48, 12, 96, 1);
+      drawCrosswalk(g, pt.x + 50, pt.y - 48, 12, 96, 1);
     }
     for (const park of city.parks) {
       g.fillStyle = COLORS.park;
@@ -441,9 +441,9 @@ export function createRenderer(canvas) {
     }
     if (night > 0.3 && !blackout) {
       for (const pt of city.intersections) {
-        if ((pt.x + pt.y) % 640 !== 0 || !inView(pt.x + 48, pt.y - 48, 60)) continue;
-        drawLamp(ctx, pt.x + 48, pt.y - 48, night);
-        drawLightPool(ctx, pt.x + 48, pt.y - 48, 60, '#ffd23e', 0.25 * night);
+        if ((pt.x + pt.y) % 640 !== 0 || !inView(pt.x + 52, pt.y - 52, 60)) continue;
+        drawLamp(ctx, pt.x + 52, pt.y - 52, night);
+        drawLightPool(ctx, pt.x + 52, pt.y - 52, 60, '#ffd23e', 0.25 * night);
       }
     }
     for (const skid of state.skids) {
