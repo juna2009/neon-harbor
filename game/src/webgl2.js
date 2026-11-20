@@ -794,10 +794,13 @@ function bld(B, G, b, idx, facK) { // SIANG v2: facK = pengali kecerahan fasad i
       deboxPoly(B, tx, topY, tz, ring, 1.8, [0.45, 0.38, 0.30], 5);
       deboxCone(B, tx, topY + 1.8, tz, ring, 0.7, [0.38, 0.32, 0.26], 5);
     }
-    if (hash2(idx, 37) < 0.6) box(B, cx - w * 0.16, topY + 1.8, cz - d * 0.12, 0.15, 3.6, 0.15, DARK, 5); // antena
+    if (hash2(idx, 37) < 0.6) { // antena H1+R1: mast tebal 0.3 + kotak dasar di kaki
+      box(B, cx - w * 0.16, topY + 0.15, cz - d * 0.12, 0.5, 0.3, 0.5, DARK, 5);
+      box(B, cx - w * 0.16, topY + 1.8, cz - d * 0.12, 0.3, 3.6, 0.3, DARK, 5);
+    }
     if (hash2(idx, 43) < 0.4) { // dish (ukuran ikut gedung supaya muat di atap setback)
       const ds = Math.min(1.4, w * 0.12, d * 0.12);
-      boxR(B, cx + w * 0.10, topY + 0.7, cz + d * 0.12, ds, 0.15, ds, 0, 0.6, [0.8, 0.8, 0.85], 5);
+      boxR(B, cx + w * 0.10, topY + 0.7, cz + d * 0.12, ds, 0.15, ds, 0, 0.6, [0.6, 0.6, 0.65], 5);
     }
     box(B, cx + w * 0.14, topY + 0.4, cz - d * 0.12, w * 0.16, 0.8, d * 0.16, DARK, 5); // AC rooftop
   }

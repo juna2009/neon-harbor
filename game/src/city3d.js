@@ -858,8 +858,8 @@ function car3d(wx, wy, angle, len, wid, color, o) {
     topStrip(cx, cz, angle, 0, -Wd / 2 + 0.06, L * 0.55, 0.22, 0.15 + BH + 0.03, rim);
     topStrip(cx, cz, angle, 0, Wd / 2 - 0.06, L * 0.55, 0.22, 0.15 + BH + 0.03, rim);
   }
-  vQuad(cx, cz, angle, L * 0.2, 0, Wd * 0.7, 1.0, 1.42, 'rgba(120,180,230,0.5)');
-  vQuad(cx, cz, angle, -L * 0.32, 0, Wd * 0.7, 1.0, 1.42, 'rgba(120,180,230,0.4)');
+  vQuad(cx, cz, angle, L * 0.2, 0, Wd * 0.5, 1.0, 1.42, 'rgba(120,180,230,0.25)');
+  vQuad(cx, cz, angle, -L * 0.32, 0, Wd * 0.5, 1.0, 1.42, 'rgba(120,180,230,0.15)');
   for (const s of [-1, 1]) {
     vQuad(cx, cz, angle, -L / 2 - 0.06, s * Wd * 0.28, Wd * 0.22, 0.45, 0.72, o.hero ? tlC(255, 92, 122) : tlC(255, 59, 48));
     vQuad(cx, cz, angle, L / 2 + 0.05, s * Wd * 0.28, Wd * 0.3, 0.4, 0.76, '#0c0e14'); // T2: headlight housing
@@ -1639,9 +1639,19 @@ function bld3(b, nightF, t) {
     const deckCols = [[122, 117, 104], [110, 114, 120], [93, 97, 103], [138, 111, 92], [117, 112, 95], [107, 111, 102]];
     const deckI = Math.floor(h2(b.x * 3 + 1, b.y * 7) * deckCols.length);
     QW([[bx - w * 0.43, h3 + 0.06, bz - d * 0.43], [bx + w * 0.43, h3 + 0.06, bz - d * 0.43], [bx + w * 0.43, h3 + 0.06, bz + d * 0.43], [bx - w * 0.43, h3 + 0.06, bz + d * 0.43]], mix(deckCols[deckI], hz(dep)), roofMin - 0.5);
+    // H1+R1: deck dua-nada — SATU quad inset (bukan 4 strip tepi) 13%
+    // lebih gelap, di atas deck (y +0.03, dep sama, didorong belakangan
+    // jadi menang seri). Jangan jadi parapet: inset 0.36 tetap di dalam
+    // deck 0.43, tidak pernah menyentuh tepi antar gedung.
+    QW([[bx - w * 0.36, h3 + 0.09, bz - d * 0.36], [bx + w * 0.36, h3 + 0.09, bz - d * 0.36], [bx + w * 0.36, h3 + 0.09, bz + d * 0.36], [bx - w * 0.36, h3 + 0.09, bz + d * 0.36]], mix(deckCols[deckI].map((v) => v * 0.87), hz(dep)), roofMin - 0.5);
     if (h2(b.x, b.y) > 0.45) {
       const acx = bx + (h2(b.x + 1, b.y) - 0.5) * w * 0.4, acz = bz + (h2(b.x, b.y + 1) - 0.5) * d * 0.4;
       box3(acx, h3, acz, 2.2, 1.2, 2.2, 0, '#6b7280', dep, propOff(acx, acz));
+      // H1+R1: quad atas AC lebih terang — dep = muka atas box AC
+      // (sudut terdekat + propOff) minus epsilon, jadi tepat di depan
+      // muka atasnya dan terbaca sebagai kotak, bukan persegi gelap.
+      const acTopD = Math.min(fwdD(acx - 1.1, acz - 1.1), fwdD(acx + 1.1, acz - 1.1), fwdD(acx - 1.1, acz + 1.1), fwdD(acx + 1.1, acz + 1.1)) + propOff(acx, acz) - 0.05;
+      QW([[acx - 1.1, h3 + 1.23, acz - 1.1], [acx + 1.1, h3 + 1.23, acz - 1.1], [acx + 1.1, h3 + 1.23, acz + 1.1], [acx - 1.1, h3 + 1.23, acz + 1.1]], '#9aa0ab', acTopD);
     }
     if (h2(b.x + 2, b.y) > 0.35) { // 2nd rooftop AC unit
       const ac2x = bx - (h2(b.x + 3, b.y) - 0.5) * w * 0.4, ac2z = bz - (h2(b.x, b.y + 3) - 0.5) * d * 0.4;
@@ -1649,8 +1659,10 @@ function bld3(b, nightF, t) {
     }
     if (h2(b.x, b.y + 2) > 0.35) { // antenna mast + tip light
       const anx = bx + (h2(b.x + 4, b.y) - 0.5) * w * 0.5, anz = bz + (h2(b.x, b.y + 4) - 0.5) * d * 0.5;
-      box3(anx, h3, anz, 0.18, 3.2, 0.18, 0, '#3a3f47', dep, propOff(anx, anz));
-      vQuad(anx, anz, 0, 0, 0, 0.3, h3 + 3.1, h3 + 3.4, '#ff4040', roofMin - 1.0);
+      // H1+R1: mast tebal 0.35 + kotak dasar di kaki, tip merah diperbesar.
+      box3(anx, h3, anz, 0.5, 0.3, 0.5, 0, '#3a3f47', dep, propOff(anx, anz));
+      box3(anx, h3, anz, 0.35, 3.2, 0.35, 0, '#3a3f47', dep, propOff(anx, anz));
+      vQuad(anx, anz, 0, 0, 0, 0.5, h3 + 3.1, h3 + 3.4, '#ff4040', roofMin - 1.0);
     }
     if (h2(b.x + 6, b.y + 6) > 0.72) { // T2: water tank on legs (old-town silhouette)
       const txp = bx - (h2(b.x + 8, b.y) - 0.5) * w * 0.4, tzp = bz - (h2(b.x, b.y + 8) - 0.5) * d * 0.4;
@@ -1659,7 +1671,7 @@ function bld3(b, nightF, t) {
     }
     if (h2(b.x + 9, b.y + 9) > 0.78) { // T2: satellite dish, tilted to the sky
       const dix = bx + (h2(b.x + 10, b.y) - 0.5) * w * 0.4, diz = bz + (h2(b.x, b.y + 10) - 0.5) * d * 0.4;
-      box3(dix, h3 + 0.6, diz, 1.4, 0.2, 1.4, 0.6, '#c8ccd4', dep, propOff(dix, diz));
+      box3(dix, h3 + 0.6, diz, 1.4, 0.2, 1.4, 0.6, '#9aa0aa', dep, propOff(dix, diz));
     }
   }
 }
