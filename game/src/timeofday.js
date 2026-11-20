@@ -78,12 +78,12 @@ export const PRESETS = {
   // bawah; langit/matahari/neon TIDAK diubah, sunset tetap sunset.
   sore: {
     name: 'sore', label: 'Sore — sunset (baseline)', hour: 18.5, daylight: 0.45, nightF: 0.43,
-    sky5: [[1.00, 0.72, 0.42], [1.00, 0.50, 0.22], [0.85, 0.28, 0.38], [0.45, 0.14, 0.42], [0.12, 0.05, 0.28]], // = stop SKYF
+    sky5: [[1.00, 0.77, 0.52], [1.00, 0.60, 0.34], [0.85, 0.28, 0.38], [0.45, 0.14, 0.42], [0.12, 0.05, 0.28]], // = stop SKYF
     sky4: [[30, 11, 51], [107, 35, 85], [255, 179, 92], [255, 150, 110]], // = SKY[1] city3d
     sun: { y: 0.30, col: [1.00, 0.72, 0.55], disc: [1.00, 0.91, 0.66], glow: [1.00, 0.75, 0.45], pos: [0.55, 0.56] }, // FIX1 v2: sun.col (0.66,0.45 -> 0.72,0.55) — hangat netral; disc/glow TIDAK diubah (piringan matahari tetap sunset)
     moon: 0, moonCol: [0.90, 0.93, 1.00],
     ambG: [0.38, 0.33, 0.46], ambS: [0.55, 0.45, 0.60], // FIX1 v2: ambient lebih dingin lagi (R/B campuran ≈1,0) — v1 hanya 1.94->1.52, kurang; fasad biru harus <1,2
-    hz: [0.95, 0.75, 0.70], // FIX1 v2: kabut dusty-rose pucat, bukan oranye — SKYF TIDAK pakai uHz (langit murni sky5), jadi langit sunset aman; hz hanya fog geometri + kaca + air
+    hz: [0.92, 0.80, 0.78], // FIX1 v2: kabut dusty-rose pucat, bukan oranye — SKYF TIDAK pakai uHz (langit murni sky5), jadi langit sunset aman; hz hanya fog geometri + kaca + air
     winLit: 0.58, winTint: [0.88, 0.94, 1.05], // FIX1: jendela menyala sedikit putih-dingin — kontras lawan fasad hangat
     neonGain: 2.2, lamp: 0.70, headlight: 0.50, wet: 0.40, // = base * 2.2 emissive
     waterDeep: [0.05, 0.20, 0.32], waterSky: [1.00, 0.55, 0.35], // = FS air
