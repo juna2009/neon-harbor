@@ -806,7 +806,7 @@ function tlC(r, g, b) { return 'rgb(' + ((r * chaseTL) | 0) + ',' + ((g * chaseT
 // block: everything F7-A in this file is this function + the loop below
 // (F7-RAMP-START..END). Lamps, tokens, buildings and roads are NOT
 // touched (zona R36/R38).
-function drawRamp3D(r) {
+function drawRamp3D(r, showLabel) {
   const fx = Math.cos(r.angle), fz = Math.sin(r.angle);
   const dep = Math.hypot(r.x * CS - ccX, r.y * CS - ccZ);
   for (let i = 0; i < 2; i += 1) {
@@ -818,7 +818,10 @@ function drawRamp3D(r) {
     box3(ox, 0.05, oz, 36 * CS, 0.18 * (i + 1), 14 * CS, r.angle, i % 2 ? '#1f1f24' : '#ffe14d', dep);
   }
   const lp = cP(r.x * CS, 3.4, r.y * CS);
-  if (lp) {
+  // DIAG-C: label hanya bila showLabel (ramp terdekat yang belum selesai,
+  // dan tidak selama toast stunt tampil) — dua ramp segaris di y=1120
+  // (Sunset Straight 1520 + East Harbor Jump 1700) menumpukkan labelnya.
+  if (showLabel && lp) {
     ops.push({ d: lp[2], f() {
       x.save();
       x.font = 'bold ' + Math.round(cl(900 / lp[2], 11, 20)) + 'px sans-serif'; x.textAlign = 'center';
@@ -2216,8 +2219,22 @@ export function drawChase3D(ctx, state) {
   // ---- R35-F7-RAMP-START (F7-A ramps + F7-B job beacon, canvas fallback) ----
   // Stunt ramps on the road + active district-job beacon (cyan, same shape
   // as the mission beacon above so it reads as a waypoint). ONE block.
+  // DIAG-C: label HANYA untuk ramp terdekat yang belum selesai — Sunset
+  // Straight (1520) + East Harbor Jump (1700) segaris di y=1120 sehingga
+  // dua label "STUNT JUMP ▲" bertumpuk di tengah layar; label ramp yang
+  // sudah selesai juga disembunyikan (geometri ramp tetap jadi landmark),
+  // dan semua label disembunyikan selama toast stunt tampil.
+  const _jd = jobsState(state);
+  const _stuntToast = _jd.toast && _jd.toast.text === 'STUNT JUMP!';
+  let _nearRamp = null, _nearD = Infinity;
   for (const r of STUNT_RAMPS) {
-    if (inRange(r.x, r.y, 160, 120)) drawRamp3D(r);
+    if (!inRange(r.x, r.y, 160, 120)) continue;
+    const d = Math.hypot(r.x - p.x, r.y - p.y);
+    if (d < _nearD) { _nearD = d; _nearRamp = r; }
+  }
+  for (const r of STUNT_RAMPS) {
+    if (inRange(r.x, r.y, 160, 120))
+      drawRamp3D(r, r === _nearRamp && !_jd.rampDone[r.name] && !_stuntToast);
   }
   const _job = activeJob(jobsState(state));
   if (_job && inRange(_job.tx, _job.ty, 160, 120)) {
