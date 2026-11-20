@@ -45,6 +45,16 @@ const shW=(c,b,t)=>{const m=c.map(v=>Math.min(255,v*b|0)).map((v,i)=>Math.round(
 // so the R31 window pattern is preserved exactly.
 let titleTOD = 'sore';
 export function setTitleTOD(name) { if (PRESETS[name]) titleTOD = name; }
+// TITLE-SCENE: 'surround' (Jax dikepung polisi, tangan terangkat) |
+// 'robbery' (Jax rampok bawa tas, panik). Live title default = surround.
+let titleScene = 'surround';
+export function setTitleScene(name) { if (name === 'surround' || name === 'robbery') { titleScene = name; titleBG = 'night'; } }
+// TITLE-BG v2 (Juna 21:46 — latar lama ditolak): latar title scene =
+// jalanan malam padat + neon. setTitleScene otomatis memakai malam.
+// setTitleBG untuk tes; 'day' = backdrop lama (sore). Palet malam =
+// TITLE_PAL.malam (langit biru gelap + bintang, haze dingin).
+let titleBG = 'night';
+export function setTitleBG(n) { if (n === 'night' || n === 'day') titleBG = n; }
 let TL = 1;       // taillight gain: 1 = lit, ~0.1 = off in daylight
 let HZMAX = 0.72; // haze cap, scaled by preset fogK (siang 0.45 = clear air)
 let BOUNCE = [255,140,80]; // bounce colour mixed into shW() (warm at sunset)
@@ -278,6 +288,129 @@ function palmT(x, z) {
       (u) => pcy + 0.3 + 1.0 * u - 1.2 * u * u, 0.26, gL);
   }
 }
+// TITLE-SCENE people: quad-built billboard figures (same pattern as
+// palmT/bUmb) — the title path has no person drawing, and the ped atlas
+// has no hands-up / aim / run-with-bag poses, so figures are built from
+// quads here. All quads live in the X-Y plane at fixed z (facing the
+// camera). Poses: 'handsUp' (Jax surrender), 'aim' (police behind cars,
+// gun above the roofline), 'run' (fleeing ped), 'carry' (Jax robbery,
+// run + loot bag), 'panic' (run + one arm up).
+// o = { pose, shirt, pants, skin, hair, h, lean, aimDir, bag, cap, jacket }
+function personT(px, pz, o) {
+  const d = pz - camZ, t = hz(d);
+  const H = o.h || 1.8, s = H / 1.8;
+  const shirt = o.shirt || [107, 68, 35], pants = o.pants || [28, 31, 36];
+  const skin = o.skin || [216, 160, 119], hairC = o.hair || [26, 18, 10];
+  const w = 0.62 * s, legH = 0.8 * s, torsoH = 0.66 * s;
+  const hipY = legH, shY = legH + torsoH, headH = 0.26 * s;
+  const lean = o.lean || 0; // torso top offset in x (run lean)
+  const C = (c) => mix(c, t);
+  const legW = 0.24 * s;
+  // contact shadow — grounds the figure (no floating)
+  Q([px - 0.45 * s, 0.02, pz - 0.3], [px + 0.45 * s, 0.02, pz - 0.3],
+    [px + 0.45 * s, 0.02, pz + 0.3], [px - 0.45 * s, 0.02, pz + 0.3],
+    'rgba(0,0,0,0.30)', d);
+  // STYLE v2 (Juna 21:50 — karakter & mobil satu gaya): outline gelap di
+  // belakang torso+kepala — memisahkan figur dari neon/jendela terang,
+  // seperti ban/arch gelap memisahkan mobil dari aspal.
+  Q([px - w / 2 - 0.07 * s, hipY - 0.06 * s, pz], [px + w / 2 + 0.07 * s, hipY - 0.06 * s, pz],
+    [px + w / 2 + 0.07 * s, shY + headH + 0.07 * s, pz], [px - w / 2 - 0.07 * s, shY + headH + 0.07 * s, pz], 'rgba(8,8,14,0.45)', d);
+  // legs (standing straight, or scissor stride for run/carry/panic)
+  const running = o.pose === 'run' || o.pose === 'carry' || o.pose === 'panic';
+  if (running) {
+    Q([px - w / 2 - 0.35 * s, 0, pz], [px - w / 2 - 0.35 * s + legW, 0, pz],
+      [px - 0.02 + lean * 0.4, hipY, pz], [px - legW - 0.02 + lean * 0.4, hipY, pz], C(pants), d);
+    Q([px + w / 2 + 0.35 * s - legW, 0, pz], [px + w / 2 + 0.35 * s, 0, pz],
+      [px + 0.02 + lean * 0.4, hipY * 0.82, pz], [px + 0.02 + legW + lean * 0.4, hipY * 0.82, pz], sh(pants, 0.8, t), d);
+  } else {
+    Q([px - w / 2 + 0.02, 0, pz], [px - w / 2 + 0.02 + legW, 0, pz],
+      [px - 0.02, hipY, pz], [px - legW - 0.02, hipY, pz], C(pants), d);
+    Q([px + 0.02, 0, pz], [px + 0.02 + legW, 0, pz],
+      [px + w / 2 - 0.02, hipY, pz], [px + w / 2 - 0.02 - legW, hipY, pz], sh(pants, 0.8, t), d);
+  }
+  // shoes
+  Q([px - w / 2 - (running ? 0.37 : 0) * s, 0, pz], [px - w / 2 + legW + 0.06 * s - (running ? 0.37 : 0) * s, 0, pz],
+    [px - w / 2 + legW + 0.06 * s - (running ? 0.37 : 0) * s, 0.09 * s, pz], [px - w / 2 - (running ? 0.37 : 0) * s, 0.09 * s, pz], C([52, 52, 60]), d);
+  Q([px + w / 2 + (running ? 0.33 : 0) * s - legW - 0.06 * s, 0, pz], [px + w / 2 + (running ? 0.33 : 0) * s, 0, pz],
+    [px + w / 2 + (running ? 0.33 : 0) * s, 0.09 * s, pz], [px + w / 2 + (running ? 0.33 : 0) * s - legW - 0.06 * s, 0.09 * s, pz], C([52, 52, 60]), d);
+  // torso (top edge offset by lean)
+  Q([px - w / 2, hipY, pz], [px + w / 2, hipY, pz],
+    [px + w / 2 + lean, shY, pz], [px - w / 2 + lean, shY, pz], C(shirt), d);
+  // STYLE v2: strip sisi gelap + tepi atas terang (seperti muka mobil
+  // yang beda kecerahan per sisi) + sabuk gelap di pinggang.
+  Q([px + w / 2 - 0.16 * s, hipY, pz], [px + w / 2, hipY, pz],
+    [px + w / 2 + lean, shY, pz], [px + w / 2 - 0.16 * s + lean, shY, pz], sh(shirt, 0.62, t), d);
+  Q([px - w / 2 + lean, shY - 0.07 * s, pz], [px + w / 2 + lean, shY - 0.07 * s, pz],
+    [px + w / 2 + lean, shY, pz], [px - w / 2 + lean, shY, pz], sh(shirt, 1.3, t), d);
+  Q([px - w / 2, hipY - 0.05 * s, pz], [px + w / 2, hipY - 0.05 * s, pz],
+    [px + w / 2, hipY + 0.05 * s, pz], [px - w / 2, hipY + 0.05 * s, pz], 'rgba(0,0,0,0.5)', d);
+  if (o.jacket) { // darker centre strip (Jax leather jacket, like drawPedestrian)
+    Q([px - 0.03 * s + lean * 0.5, hipY, pz], [px + 0.03 * s + lean * 0.5, hipY, pz],
+      [px + 0.03 * s + lean, shY, pz], [px - 0.03 * s + lean, shY, pz], C([58, 36, 16]), d);
+  }
+  // head + hair (or police cap)
+  Q([px - 0.15 * s + lean, shY, pz], [px + 0.15 * s + lean, shY, pz],
+    [px + 0.15 * s + lean, shY + headH, pz], [px - 0.15 * s + lean, shY + headH, pz], C(skin), d);
+  if (o.cap) {
+    Q([px - 0.17 * s + lean, shY + headH * 0.5, pz], [px + 0.17 * s + lean, shY + headH * 0.5, pz],
+      [px + 0.17 * s + lean, shY + headH + 0.06 * s, pz], [px - 0.17 * s + lean, shY + headH + 0.06 * s, pz], C([24, 28, 38]), d);
+    // STYLE v2: lencana kecil di dada (detail bersarang seperti pelat mobil)
+    Q([px - 0.04 * s + lean, shY - 0.32 * s, pz], [px + 0.04 * s + lean, shY - 0.32 * s, pz],
+      [px + 0.04 * s + lean, shY - 0.24 * s, pz], [px - 0.04 * s + lean, shY - 0.24 * s, pz], mix([220, 200, 120], t), d);
+  } else {
+    Q([px - 0.16 * s + lean, shY + headH * 0.62, pz], [px + 0.16 * s + lean, shY + headH * 0.62, pz],
+      [px + 0.16 * s + lean, shY + headH + 0.02 * s, pz], [px - 0.16 * s + lean, shY + headH + 0.02 * s, pz], C(hairC), d);
+  }
+  // arms: quad from shoulder to hand (width wd), + skin hand quad
+  const arm = (sx, sy, hx, hy, wd) => {
+    const dx = hx - sx, dy = hy - sy, len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len * wd / 2, ny = dx / len * wd / 2;
+    Q([sx - nx, sy - ny, pz], [sx + nx, sy + ny, pz],
+      [hx + nx, hy + ny, pz], [hx - nx, hy - ny, pz], C(shirt), d);
+    Q([hx - 0.07 * s, hy - 0.07 * s, pz], [hx + 0.07 * s, hy - 0.07 * s, pz],
+      [hx + 0.07 * s, hy + 0.07 * s, pz], [hx - 0.07 * s, hy + 0.07 * s, pz], C(skin), d);
+  };
+  const aw = 0.14 * s;
+  const shL = [px - w / 2 + 0.05 * s + lean, shY - 0.08 * s];
+  const shR = [px + w / 2 - 0.05 * s + lean, shY - 0.08 * s];
+  if (o.pose === 'handsUp') {
+    arm(shL[0], shL[1], px - w / 2 - 0.5 * s + lean, shY + 0.55 * s, aw);
+    arm(shR[0], shR[1], px + w / 2 + 0.5 * s + lean, shY + 0.55 * s, aw);
+  } else if (o.pose === 'aim') {
+    // both hands meet at gun height, just above the car roofline;
+    // barrel points sideways toward Jax (aimDir +1 = right, -1 = left),
+    // angled up so the muzzle clears the roof sliver and reads clearly
+    const ad = o.aimDir || 1, gx = px + ad * 0.15 * s, gy = shY + 0.12 * s;
+    arm(shL[0], shL[1], gx, gy, aw);
+    arm(shR[0], shR[1], gx, gy, aw);
+    Q([gx, gy - 0.04 * s, pz], [gx + ad * 0.55 * s, gy + 0.14 * s, pz],
+      [gx + ad * 0.55 * s, gy + 0.23 * s, pz], [gx, gy + 0.05 * s, pz], C([20, 22, 26]), d);
+    // STYLE v2: tepi atas laras terang (seperti sheen kaca mobil)
+    Q([gx, gy + 0.05 * s, pz], [gx + ad * 0.55 * s, gy + 0.23 * s, pz],
+      [gx + ad * 0.55 * s, gy + 0.27 * s, pz], [gx, gy + 0.09 * s, pz], 'rgba(200,210,220,0.5)', d);
+  } else if (o.pose === 'carry') {
+    arm(shL[0], shL[1], px - w / 2 - 0.3 * s + lean, shY - 0.4 * s, aw); // left arm pumping
+    arm(shR[0], shR[1], px + w / 2 + 0.1 * s + lean, hipY + 0.15 * s, aw); // right arm down to the bag
+    if (o.bag) { // loot duffel hanging from the right hand + shoulder strap
+      const bx = px + (w / 2 + 0.22 * s) + lean, by = hipY + 0.1 * s;
+      Q([bx - 0.24 * s, by - 0.4 * s, pz], [bx + 0.24 * s, by - 0.4 * s, pz],
+        [bx + 0.24 * s, by, pz], [bx - 0.24 * s, by, pz], C([28, 36, 30]), d);
+      Q([bx - 0.24 * s, by - 0.06 * s, pz], [bx + 0.24 * s, by - 0.06 * s, pz],
+        [bx + 0.24 * s, by + 0.02 * s, pz], [bx - 0.24 * s, by + 0.02 * s, pz], C([90, 78, 55]), d);
+      // STYLE v2: resleting terang di tas
+      Q([bx - 0.24 * s, by - 0.22 * s, pz], [bx + 0.24 * s, by - 0.22 * s, pz],
+        [bx + 0.24 * s, by - 0.18 * s, pz], [bx - 0.24 * s, by - 0.18 * s, pz], 'rgba(220,210,190,0.6)', d);
+      Q([px - w / 2 + 0.05 * s + lean, shY - 0.15 * s, pz], [px - w / 2 + 0.12 * s + lean, shY - 0.15 * s, pz],
+        [bx + 0.05 * s, by + 0.05 * s, pz], [bx - 0.02 * s, by + 0.05 * s, pz], C([60, 50, 35]), d);
+    }
+  } else if (o.pose === 'panic') {
+    arm(shL[0], shL[1], px - w / 2 - 0.35 * s + lean, shY + 0.35 * s, aw); // one arm flailing up
+    arm(shR[0], shR[1], px + w / 2 + 0.3 * s + lean, hipY + 0.2 * s, aw);
+  } else { // 'run': arms pumping
+    arm(shL[0], shL[1], px - w / 2 - 0.3 * s + lean, shY - 0.35 * s, aw);
+    arm(shR[0], shR[1], px + w / 2 + 0.3 * s + lean, hipY + 0.15 * s, aw);
+  }
+}
 // R40-D: garis pantai berlekuk (bukan lurus x=64) — tepi air/pasir ikut
 // fungsi dunia yang sama supaya pasir, air, dan buih selalu bertemu.
 // Amplitudo total ±7 unit (tepi terendah ~57 — semua prop pantai di x<=55
@@ -286,7 +419,8 @@ const coast=(z)=>64+4.5*Math.sin(z*0.028)+2.5*Math.sin(z*0.083+1.7);
 function frame(t){
   // R33: time-of-day palette — the title backdrop is no longer hardcoded
   // sunset. Default 'sore' reproduces the R31 values exactly.
-  const PAL=TITLE_PAL[titleTOD]||TITLE_PAL.sore;
+  const PAL=titleBG==='night'?TITLE_PAL.malam:(TITLE_PAL[titleTOD]||TITLE_PAL.sore);
+  const nightBG=titleBG==='night'; // v2: latar malam (neon) vs siang/sore lama
   HZ[0]=PAL.hz[0];HZ[1]=PAL.hz[1];HZ[2]=PAL.hz[2];BOUNCE=PAL.bounce;TL=PAL.tlGain;
   HZMAX=0.72*PAL.fogK;NEON=PAL.neon;WINLIT=PAL.winLit;WIN_T=PAL.winTint;
   fovF=640;camH=5.6; // title lens (round 22: chase uses its own values)
@@ -310,13 +444,14 @@ function frame(t){
   // trotoar gelap — tone pasir + jejak di apron dekat kamera juga.
   // R40-D: tepi kanan ikut coast() (berlekuk) + 2 bercak tone supaya apron
   // pasir dekat kamera tidak lempeng beige.
-  Q([20,0,camZ+2],[coast(camZ+2),0,camZ+2],[coast(camZ+24),0,camZ+24],[20,0,camZ+24],shW([196,164,116],1,0),2);
+  Q([20,0,camZ+2],[coast(camZ+2),0,camZ+2],[coast(camZ+24),0,camZ+24],[20,0,camZ+24],shW(nightBG?[38,40,54]:[196,164,116],1,0),2);
+  if(!nightBG){ // v2: detail pasir (jejak/kerang) — tidak ada di malam
   Q([24,.05,camZ+8],[24.9,.05,camZ+8],[24.9,.05,camZ+11],[24,.05,camZ+11],mix([150,120,80],0),2);
   Q([40,.05,camZ+14],[40.7,.05,camZ+14],[40.7,.05,camZ+14.7],[40,.05,camZ+14.7],mix([235,220,190],0),2);
   Q([30,.05,camZ+5],[31.8,.05,camZ+5],[31.8,.05,camZ+6.4],[30,.05,camZ+6.4],mix([170,140,95],0),2);
   Q([48,.05,camZ+18],[49.6,.05,camZ+18],[49.6,.05,camZ+19.2],[48,.05,camZ+19.2],mix([215,185,140],0),2);
   Q([36,.05,camZ+11],[38.5,.05,camZ+11],[38.5,.05,camZ+13],[36,.05,camZ+13],mix([170,140,95],0),2);
-  Q([52,.05,camZ+9],[54,.05,camZ+9],[54,.05,camZ+10.6],[52,.05,camZ+10.6],mix([215,185,140],0),2);
+  Q([52,.05,camZ+9],[54,.05,camZ+9],[54,.05,camZ+10.6],[52,.05,camZ+10.6],mix([215,185,140],0),2);}
   // road + sidewalks (segmented so fog deepens with distance)
   for(let z=Math.floor((camZ-30)/30)*30;z<camZ+430;z+=30){const d=z-camZ,v=h2(3,z);
     // R33: road texture — per-segment tone jitter, so the foreground is not
@@ -338,13 +473,13 @@ function frame(t){
     // datar) — tone jitter + jejak kaki + kerang, per segmen 30 unit.
     // R40-D: tepi kanan ikut coast() (berlekuk) + 2 bercak tone kecil per
     // segmen supaya pasir tidak lempeng beige (grain halus = tugas C).
-    Q([20,0,z],[coast(z),0,z],[coast(z+30),0,z+30],[20,0,z+30],shW([196+v*14,164+v*10,116+v*8],1,hz(d)),d);
-    if(h2(23,z)<.45){const fx=22+h2(29,z)*30;Q([fx,.05,z+6],[fx+.9,.05,z+6],[fx+.9,.05,z+9],[fx,.05,z+9],mix([150,120,80],hz(d)),d);}
+    Q([20,0,z],[coast(z),0,z],[coast(z+30),0,z+30],[20,0,z+30],shW(nightBG?[38+v*6,40+v*6,54+v*8]:[196+v*14,164+v*10,116+v*8],1,hz(d)),d);
+    if(!nightBG){if(h2(23,z)<.45){const fx=22+h2(29,z)*30;Q([fx,.05,z+6],[fx+.9,.05,z+6],[fx+.9,.05,z+9],[fx,.05,z+9],mix([150,120,80],hz(d)),d);}
     if(h2(41,z)<.3){const sx2=20+h2(43,z)*32;Q([sx2,.05,z+16],[sx2+.7,.05,z+16],[sx2+.7,.05,z+16.7],[sx2,.05,z+16.7],mix([235,220,190],hz(d)),d);}
     if(h2(53,z)<.4){const fx2=24+h2(59,z)*28;Q([fx2,.05,z+22],[fx2+.8,.05,z+22],[fx2+.8,.05,z+24.5],[fx2,.05,z+24.5],mix([140,112,74],hz(d)),d);}
     if(h2(89,z)<.8){const px2=20+h2(97,z)*30,pz2=z+4+h2(101,z)*18;Q([px2,.05,pz2],[px2+3,.05,pz2],[px2+3,.05,pz2+2.2],[px2,.05,pz2+2.2],mix([170,140,95],hz(d)),d);}
     if(h2(103,z)<.6){const px3=22+h2(107,z)*28,pz3=z+8+h2(109,z)*16;Q([px3,.05,pz3],[px3+2.6,.05,pz3],[px3+2.6,.05,pz3+2],[px3,.05,pz3+2],mix([215,185,140],hz(d)),d);}
-    if(h2(113,z)<.5){const px4=24+h2(117,z)*26,pz4=z+14+h2(119,z)*12;Q([px4,.05,pz4],[px4+2.2,.05,pz4],[px4+2.2,.05,pz4+1.8],[px4,.05,pz4+1.8],mix([150,120,80],hz(d)),d);}
+    if(h2(113,z)<.5){const px4=24+h2(117,z)*26,pz4=z+14+h2(119,z)*12;Q([px4,.05,pz4],[px4+2.2,.05,pz4],[px4+2.2,.05,pz4+1.8],[px4,.05,pz4+1.8],mix([150,120,80],hz(d)),d);}}
     Q([-20.4,.08,z],[-20,.08,z],[-20,.08,z+30],[-20.4,.08,z+30],mix([150,132,120],hz(d)),d);
     Q([20,.08,z],[20.4,.08,z],[20.4,.08,z+30],[20,.08,z+30],mix([150,132,120],hz(d)),d);}
   // R36-ROADS item 16: kiri bawah title datar (gradasi cokelat polos) — sambungan
@@ -376,6 +511,42 @@ function frame(t){
   {const z=camZ+38; // bangku promenade kanan (menghadap air)
     Q([22,.9,z],[26,.9,z],[26,.9,z+1.6],[22,.9,z+1.6],mix([120,85,55],hz(38)),38);
     Q([22,.9,z+1.6],[26,.9,z+1.6],[26,1.9,z+1.6],[22,1.9,z+1.6],mix([105,72,45],hz(38)),38);}
+  if(nightBG){ // v2: prop jalan kanan (cermin prop kiri) + genangan neon
+    {const z=camZ+14; // hidran merah kanan
+    Q([21.2,0,z],[22.8,0,z],[22.8,1.6,z],[21.2,1.6,z],mix([200,60,55],hz(14)),14);
+    Q([21.2,1.6,z],[22.8,1.6,z],[22.8,1.6,z-.9],[21.2,1.6,z-.9],mix([140,40,40],hz(14)),14);
+    Q([21.5,1.6,z-.2],[22.5,1.6,z-.2],[22.5,2,z-.7],[21.5,2,z-.7],mix([160,45,45],hz(14)),14);}
+    {const z=camZ+30; // kotak utilitas kanan
+    Q([25.7,0,z],[28.3,0,z],[28.3,2.2,z],[25.7,2.2,z],mix([90,110,95],hz(30)),30);
+    Q([26.95,0,z],[27.05,0,z],[27.05,2.2,z],[26.95,2.2,z],'rgba(0,0,0,0.4)',30); // garis pintu
+    Q([27.3,1.0,z],[27.5,1.0,z],[27.5,1.15,z],[27.3,1.15,z],mix([200,200,190],hz(30)),30); // gagang
+    Q([25.7,2.2,z],[28.3,2.2,z],[28.3,2.2,z-1],[25.7,2.2,z-1],mix([60,75,65],hz(30)),30);}
+    {const z=camZ+42; // bangku kayu kanan
+    Q([19,.9,z],[23,.9,z],[23,.9,z+1.6],[19,.9,z+1.6],mix([120,85,55],hz(42)),42);
+    Q([19,.9,z+1.6],[23,.9,z+1.6],[23,1.9,z+1.6],[19,1.9,z+1.6],mix([105,72,45],hz(42)),42);
+    Q([19,1.35,z+1.6],[23,1.35,z+1.6],[23,1.45,z+1.6],[19,1.45,z+1.6],'rgba(0,0,0,0.35)',42); // garis bilah sandaran
+    Q([19.3,0,z+.2],[19.5,0,z+.2],[19.5,.9,z+.2],[19.3,.9,z+.2],'rgba(0,0,0,0.5)',42); // kaki
+    Q([22.5,0,z+.2],[22.7,0,z+.2],[22.7,.9,z+.2],[22.5,.9,z+.2],'rgba(0,0,0,0.5)',42);} // kaki
+    {const z=camZ+52; // tempat sampah kanan
+    Q([24.4,0,z],[25.6,0,z],[25.6,1.7,z],[24.4,1.7,z],mix([40,90,55],hz(52)),52);
+    Q([24.4,1.5,z],[25.6,1.5,z],[25.6,1.58,z],[24.4,1.58,z],'rgba(0,0,0,0.45)',52); // garis tutup
+    Q([24.4,1.7,z],[25.6,1.7,z],[25.6,1.7,z-.9],[24.4,1.7,z-.9],mix([28,65,40],hz(52)),52);}
+    for(const bz of [camZ+10,camZ+25,camZ+40]){ // bollard kanan
+    const d=bz-camZ;
+    Q([17.2,0,bz],[17.8,0,bz],[17.8,1.3,bz],[17.2,1.3,bz],mix([50,50,55],hz(d)),d);
+    Q([17.2,1.3,bz],[17.8,1.3,bz],[17.8,1.3,bz-.5],[17.2,1.3,bz-.5],mix([200,180,60],hz(d)),d);}
+    {const z=camZ+58; // rambu jalan kanan
+    Q([18.8,0,z],[19.2,0,z],[19.2,3.5,z],[18.8,3.5,z],mix([90,90,95],hz(58)),58);
+    Q([18.1,2.6,z],[19.9,2.6,z],[19.9,3.8,z],[18.1,3.8,z],mix([40,90,200],hz(58)),58);}
+    // genangan cahaya neon di tanah (di bawah papan neon)
+    const pool=(cx,cz,w,l,col,a)=>{Q([cx-w/2,.05,cz-l/2],[cx+w/2,.05,cz-l/2],[cx+w/2,.05,cz+l/2],[cx-w/2,.05,cz+l/2],'rgba('+col+','+a+')',cz-camZ);};
+    pool(-14,camZ+80,9,26,'53,240,255',0.10); // cyan — NEON HARBOR (kiri)
+    pool(14,camZ+130,9,26,'255,92,168',0.12); // pink — CASINO (kanan)
+    pool(-14,camZ+160,9,26,'255,210,62',0.10); // kuning — RAMEN (kiri)
+    pool(14,camZ+210,9,26,'255,92,168',0.12); // pink — BAR (kanan)
+    pool(14,camZ+290,9,26,'53,240,255',0.10); // cyan — HOTEL (kanan)
+    pool(-14,camZ+340,9,26,'176,107,255',0.10); // ungu — CLUB (kiri)
+  }
   for(let z=Math.floor((camZ+14)/12)*12;z<camZ+420;z+=12){const d=z-camZ;
     // R40-D: marka tengah dulu 0.9 lebar × 3.5 panjang, kuning penuh
     // [255,179,71] = ubin kuning kotak-kotak. Kini marka CAT: 0.55 lebar ×
@@ -407,7 +578,7 @@ function frame(t){
   // Posisi dihitung dari proyeksi (proj-title.mjs): pita gedung kanan ada
   // di layar x 658..848 — semua prop di sini proyeksinya x>860 (kanan
   // pita) atau x<762 (kiri pita), jadi tidak ketutup gedung. VISUAL SAJA.
-  for(let z=Math.floor((camZ-30)/40)*40;z<camZ+430;z+=40){const d=z-camZ; // ombak: 2 garis buih MENGIKUTI lekuk pantai coast(z) (dulu 2 pita lurus x=62-66 / 68-71)
+  if(!nightBG)for(let z=Math.floor((camZ-30)/40)*40;z<camZ+430;z+=40){const d=z-camZ; // ombak: 2 garis buih MENGIKUTI lekuk pantai coast(z) (dulu 2 pita lurus x=62-66 / 68-71)
     const e0=coast(z),e1=coast(z+26),e2=coast(z+14),e3=coast(z+32);
     Q([e0-2,-.85,z],[e0+2,-.85,z],[e1+2,-.85,z+26],[e1-2,-.85,z+26],'rgba(255,255,255,.65)',d);
     Q([e2+3,-.85,z+14],[e2+6,-.85,z+14],[e3+6,-.85,z+14+18],[e3+3,-.85,z+14+18],'rgba(255,255,255,.35)',d);}
@@ -431,6 +602,7 @@ function frame(t){
     Q([bx-L*.93,y0+.7*s,bz],[bx+L*.93,y0+.7*s,bz],[bx+L*.9,y0+1*s,bz],[bx-L*.9,y0+1*s,bz],mix([235,230,220],t),d);
     Q([bx+.5*s,y0+1.1*s,bz],[bx+.8*s,y0+1.1*s,bz],[bx+.8*s,y0+4.8*s,bz],[bx+.5*s,y0+4.8*s,bz],mix([90,64,36],t),d);
     Q([bx+.8*s,y0+2.2*s,bz],[bx+5*s,y0+2.2*s,bz],[bx+.8*s,y0+4.6*s,bz],[bx+.8*s,y0+4.6*s,bz],mix([245,240,225],t),d);};
+  if(!nightBG){ // v2: prop pantai (payung/kursi/palem/perahu/dermaga) — tidak ada di malam
   bUmb(38,camZ+55,[16,200,200],[255,217,51]); // teal/kuning (depan, besar)
   bChair(41,camZ+58,[255,90,76]);
   bUmb(48,camZ+75,[255,140,38],[245,245,230]); // oranye/putih
@@ -469,7 +641,7 @@ function frame(t){
   Q([76,-1,camZ+110],[98,-1,camZ+110],[98,-.42,camZ+110],[76,-.42,camZ+110],sh([30,40,60],1,hz(110)),110);
   Q([83,1,camZ+110],[91,1,camZ+110],[91,2.3,camZ+110],[83,2.3,camZ+110],sh([70,85,110],1,hz(110)),110);
   Q([83,1.5,camZ+110],[86.5,1.5,camZ+110],[86.5,2.3,camZ+110],[83,1.9,camZ+110],sh([140,190,220],1,hz(110)),110);
-  Q([87,1.4,camZ+110],[90,1.4,camZ+110],[90,2,camZ+110],[87,2,camZ+110],mix([255,190,110],hz(110)),110);
+  Q([87,1.4,camZ+110],[90,1.4,camZ+110],[90,2,camZ+110],[87,2,camZ+110],mix([255,190,110],hz(110)),110);}
   // R36-BLD distant skyline (item 13): dulu 10 slab abu polos tanpa
   // jendela (kebaca jelas di title siang/sore, crop 2x). Tiap menara kini:
   // warna fasad bervariasi (5 nada), grid jendela padat ikut WINLIT/WIN_T
@@ -516,10 +688,54 @@ function frame(t){
   const carShad=(cx,cz,w,l)=>{const L=Math.min(PAL.shadowLen*0.4,4),A=PAL.shadowA*0.7,z0=Math.max(cz-l/2-L,camZ+2.5),sx2=-0.15*L;
     Q([cx-w/2-.55+sx2,.02,z0],[cx+w/2+.55+sx2,.02,z0],[cx+w/2+.3,.02,cz+l/2],[cx-w/2-.3,.02,cz+l/2],'rgba(0,0,0,'+(A*0.35)+')',cz-camZ);
     Q([cx-w/2-.25+sx2,.02,z0],[cx+w/2+.25+sx2,.02,z0],[cx+w/2,.02,cz+l/2],[cx-w/2,.02,cz+l/2],'rgba(0,0,0,'+A+')',cz-camZ);};
-  carShad(0,camZ+17,3.6,6.6);car({x:0,z:camZ+17,w:3.6,h:1.5,l:6.6,c:[180,45,65],hero:1}); // R36V2: hero title merah gelap (Huracan; dulu [30,30,44] navy — samakan keluarga merah hero 3D)
-  carShad(-5.5,camZ+48,3.2,6.2);car({x:-5.5,z:camZ+48,w:3.2,h:1.5,l:6.2,c:[12,12,16],pol:1});
-  carShad(6,camZ+88,3.2,6);car({x:6,z:camZ+88,w:3.2,h:1.4,l:6,c:[200,90,30]});
-  carShad(-3,camZ+150,3.2,6);car({x:-3,z:camZ+150,w:3.2,h:1.4,l:6,c:[40,60,120]});
+  // TITLE-SCENE: car + people staging per scene (see IMPACT.md §3).
+  // Emission order matters (Q() paints in insertion order): officers
+  // behind cars are emitted BEFORE the cars (cars occlude their legs);
+  // Jax + fleeing peds are emitted AFTER the cars (they stand in front).
+  const JAXC = { shirt: [107, 68, 35], pants: [28, 31, 36], skin: [216, 160, 119], hair: [26, 18, 10], jacket: 1 };
+  const POLC = { shirt: [28, 34, 48], pants: [20, 24, 32], skin: [232, 185, 138], cap: 1 };
+  // v2: hero di jalur kanan (bukan di tengah garis kuning — Juna 21:46);
+  // P3 (0,+46) boleh di tengah — itu mobil polisi (pengecualian).
+  // Urutan emit: mobil polisi DULU, hero TERAKHIR (hero paling dekat,
+  // menimpa P2 yang sejalur di belakangnya — oklusi benar).
+  // Semua petugas aim +1 (ke arah Jax di kanan — dihitung dari proyeksi:
+  // Jax layar x~960, semua petugas di kirinya).
+  const heroX = titleScene === 'robbery' ? -3 : 6;
+  const heroZ = camZ + (titleScene === 'robbery' ? 40 : 17);
+  if (titleScene === 'surround') {
+    // officers at the cars' rear corners (just outside the car span) —
+    // v1 had them dead-centre behind the cars: only ~7 px of head poked
+    // above the roofline and the guns were invisible. At the corners the
+    // car occludes only their legs; head + torso + gun read clearly.
+    personT(-8.3, camZ + 27.5, { ...POLC, pose: 'aim', aimDir: 1 });
+    personT(-4.7, camZ + 27.5, { ...POLC, pose: 'aim', aimDir: 1 });
+    personT(4.7, camZ + 27.5, { ...POLC, pose: 'aim', aimDir: 1 });
+    personT(8.3, camZ + 27.5, { ...POLC, pose: 'aim', aimDir: 1 });
+    personT(-1.8, camZ + 47.5, { ...POLC, pose: 'aim', aimDir: 1 });
+    personT(1.8, camZ + 47.5, { ...POLC, pose: 'aim', aimDir: 1 });
+  }
+  if (titleScene === 'surround') {
+    carShad(-6.5, camZ + 26, 3.2, 6.2); car({ x: -6.5, z: camZ + 26, w: 3.2, h: 1.5, l: 6.2, c: [12, 12, 16], pol: 1 });
+    carShad(6.5, camZ + 26, 3.2, 6.2); car({ x: 6.5, z: camZ + 26, w: 3.2, h: 1.5, l: 6.2, c: [12, 12, 16], pol: 1 });
+    carShad(0, camZ + 46, 3.2, 6.2); car({ x: 0, z: camZ + 46, w: 3.2, h: 1.5, l: 6.2, c: [12, 12, 16], pol: 1 });
+    carShad(-8, camZ + 70, 3.2, 6.2); car({ x: -8, z: camZ + 70, w: 3.2, h: 1.5, l: 6.2, c: [12, 12, 16], pol: 1 });
+  } else {
+    carShad(5, camZ + 38, 3.2, 6.2); car({ x: 5, z: camZ + 38, w: 3.2, h: 1.5, l: 6.2, c: [12, 12, 16], pol: 1 });
+  }
+  carShad(heroX, heroZ, 3.6, 6.6); car({ x: heroX, z: heroZ, w: 3.6, h: 1.5, l: 6.6, c: [180, 45, 65], hero: 1 }); // R36V2: hero title merah gelap (Huracan)
+  carShad(6, camZ + 88, 3.2, 6); car({ x: 6, z: camZ + 88, w: 3.2, h: 1.4, l: 6, c: [200, 90, 30] });
+  carShad(-3, camZ + 150, 3.2, 6); car({ x: -3, z: camZ + 150, w: 3.2, h: 1.4, l: 6, c: [40, 60, 120] });
+  // Jax + fleeing peds (in front of the cars)
+  if (titleScene === 'surround') {
+    personT(6.5, camZ + 13, { ...JAXC, pose: 'handsUp', h: 1.85 });
+  } else {
+    personT(1, camZ + 13, { ...JAXC, pose: 'carry', bag: 1, lean: 0.18, h: 1.85 });
+    personT(7.2, camZ + 30, { ...POLC, pose: 'aim', aimDir: -1 }); // officer beside the arriving car
+    personT(-8, camZ + 24, { pose: 'panic', shirt: [231, 76, 60], pants: [44, 62, 80], lean: -0.1 });
+    personT(18, camZ + 28, { pose: 'run', shirt: [52, 152, 219], pants: [34, 34, 34], lean: 0.12 });
+    personT(-5, camZ + 38, { pose: 'panic', shirt: [241, 196, 15], pants: [85, 85, 85], lean: -0.08 });
+    personT(11, camZ + 42, { pose: 'run', shirt: [155, 89, 182], pants: [44, 62, 80], lean: 0.1 });
+  }
   // R33: the R31 parked cars (x=±9, z=camZ+40/34) are DELETED — Juna:
   // "mobil jangan ada di samping situ". No cars at the road edges.
   // street lamps
@@ -549,6 +765,11 @@ function frame(t){
   sign(-1,camZ+40,camZ+120,'NEON HARBOR','#35f0ff');
   sign(1,camZ+100,camZ+160,'CASINO','#ff5ca8');
   sign(-1,camZ+220,camZ+300,'MOTEL','#ffd23e');
+  if(nightBG){ // v2: papan neon tambahan (jalanan malam padat)
+    sign(-1,camZ+130,camZ+190,'RAMEN','#ffd23e');
+    sign(1,camZ+180,camZ+240,'BAR','#ff5ca8');
+    sign(1,camZ+260,camZ+320,'HOTEL','#35f0ff');
+    sign(-1,camZ+310,camZ+370,'CLUB','#b06bff');}
   // R36 PALEM TITLE: 5 palem di tepi jalan (x=±17.5, di luar trotoar 16,
   // sejajar lampu ±14 tapi fase z beda 22 unit supaya tidak menumpuk tiang
   // lampu), selang-seling kiri/kanan. Dulu title TANPA pohon sama sekali —
@@ -585,21 +806,20 @@ function frame(t){
   const wg=x.createRadialGradient(CX,HOR+130,10,CX,HOR+130,560);
   wg.addColorStop(0,PAL.roadGlow);wg.addColorStop(1,'rgba(0,0,0,0)');
   x.fillStyle=wg;x.fillRect(0,HOR-60,W,H-HOR+60);x.restore();
-  // hero taillight glow
-  const tp=P(0,1,camZ+17-3.3);if(tp){x.save();x.globalCompositeOperation='lighter';
-    for(const gx of[-1.2,1.2]){const gp=P(gx,1,camZ+17-3.3);if(!gp)continue;
+  // hero taillight glow (follows the hero car per scene)
+  const tp=P(heroX,1,heroZ-3.3);if(tp){x.save();x.globalCompositeOperation='lighter';
+    for(const gx of[-1.2,1.2]){const gp=P(heroX+gx,1,heroZ-3.3);if(!gp)continue;
       const rg=x.createRadialGradient(gp[0],gp[1],1,gp[0],gp[1],26);rg.addColorStop(0,'rgba(255,80,100,'+(0.55*TL)+')');rg.addColorStop(1,'rgba(255,80,100,0)');
       x.fillStyle=rg;x.fillRect(gp[0]-26,gp[1]-26,52,52);}x.restore();}
-  // TITLE-FIX (police glow): the patrol car at camZ+48 reads as a dark
-  // blob at title distance — a soft red/blue halo over its light bar
-  // (fixed staging position, same pattern as the hero glow above).
-  // Alpha floors at 0.28 so it reads even at noon (unlike the hero
-  // glow, which is TL-gated and nearly invisible in daylight).
-  const pp=P(-5.5,1.75,camZ+44.5);if(pp){x.save();x.globalCompositeOperation='lighter';
+  // TITLE-SCENE police glow: one soft red/blue halo per patrol car in
+  // the scene (the old block was hardcoded to the single (-5.5, +48) car).
+  // Alpha floors at 0.28 so it reads even at noon.
+  const polGlowAt=(cx,cz)=>{const pp=P(cx,1.75,cz-3.5);if(!pp)return;x.save();x.globalCompositeOperation='lighter';
     const pgA=0.28+0.22*TL;
-    for(const [gx,col] of [[-0.6,'255,60,60'],[0.6,'60,120,255']]){const gp=P(-5.5+gx,1.75,camZ+44.5);if(!gp)continue;
+    for(const [gx,col] of [[-0.6,'255,60,60'],[0.6,'60,120,255']]){const gp=P(cx+gx,1.75,cz-3.5);if(!gp)continue;
       const rg=x.createRadialGradient(gp[0],gp[1],1,gp[0],gp[1],30);rg.addColorStop(0,'rgba('+col+','+pgA+')');rg.addColorStop(1,'rgba('+col+',0)');
-      x.fillStyle=rg;x.fillRect(gp[0]-30,gp[1]-30,60,60);}x.restore();}
+      x.fillStyle=rg;x.fillRect(gp[0]-30,gp[1]-30,60,60);}x.restore();};
+  if(titleScene==='robbery'){polGlowAt(5,camZ+38);}else{polGlowAt(-6.5,camZ+26);polGlowAt(6.5,camZ+26);polGlowAt(0,camZ+46);}
   // HUD
   x.textAlign='left';x.textBaseline='alphabetic';
   // TITLE-MINIMAP: the round radar used to be painted here (own design,

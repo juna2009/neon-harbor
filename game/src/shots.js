@@ -5,7 +5,7 @@ import { WATER_X, districtAt } from './city.js';
 import { makeCar } from './traffic.js';
 import { SCREEN_PLAY, SCREEN_SHOP, SCREEN_TITLE } from './render.js';
 import { applyTimeOfDay } from './timeofday.js';
-import { setTitleTOD } from './city3d.js';
+import { setTitleTOD, setTitleScene } from './city3d.js';
 import { marketAisle } from './market.js'; // R35-F9: night-market staging site
 function scriptedInput() {
   const pressed = new Set();
@@ -143,6 +143,14 @@ export function stageShot(name, world) {
   const todMatch = /^(.*)-(pagi|siang|sore|malam)$/.exec(name);
   const tod = todMatch ? todMatch[2] : null;
   if (todMatch) name = todMatch[1];
+  // TITLE-SCENE: shot names may carry a scene suffix, e.g.
+  // 'title3d-robbery' (or combined 'title3d-surround-sore' — TOD is
+  // stripped first, then the scene). The scene selects the title
+  // backdrop staging (surround = Jax dikepung polisi; robbery = Jax
+  // rampok bawa tas). Default (no suffix) = surround.
+  const sceneMatch = /^(.*)-(surround|robbery)$/.exec(name);
+  const scene = sceneMatch ? sceneMatch[2] : null;
+  if (sceneMatch) name = sceneMatch[1];
   const applyTod = () => { if (tod) { applyTimeOfDay(world.state, tod); setTitleTOD(tod); } };
   const state = world.state;
   // TITLE-MINIMAP: shot mode never runs runGame(), so window.__neonHarbor
@@ -156,6 +164,7 @@ export function stageShot(name, world) {
   state.cash = 2150;
   if (name === 'title3d') {
     state.titleT3d = 6;
+    if (scene) setTitleScene(scene);
     applyTod();
     return { screen: SCREEN_TITLE, best: state.cash };
   } else if (name === 'explosion') {
