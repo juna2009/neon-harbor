@@ -46,9 +46,101 @@ export const CAM_DEFAULT = 1;
 let prevF = false; // edge detection tombol F (sekali per tekan, bukan per frame)
 let prevPos = null; // posisi Jax SETELAH dorong-keluar pada update sebelumnya
 
+// DOOR-ANIM (visual-only, keluarga sedan): observer transisi masuk/keluar
+// mobil. world.js in-dossier — enterCar/exitCar TIDAK BOLEH menunggu
+// animasi, jadi pintu hanya quad yang berayun mengikuti transisi yang
+// diamati di sini (main.js memanggil updateOnFoot sekali per step, sesudah
+// world.step). State machine per mobil (field runtime, ditempel observer):
+//   doorAngle 0..1,2 rad | doorPhase closed/opening/hold/closing |
+//   doorSide -1 kiri (default, sisi exitCar) | +1 kanan (fallback) |
+//   doorHoldT detik tersisa di hold | doorAge detik sejak transisi terakhir.
+// Siklus ~1,3 dtk: buka ~0,45 dtk (2,7 rad/dtk) -> hold 0,25 dtk -> tutup
+// ~0,6 dtk (2,0 rad/dtk). FAILSAFE (B3): tanpa transisi 2 dtk OTOMATIS
+// menutup; target paksa 0 kalau mobil bergerak (speed > 5 px/dtk — ambang
+// "berhenti" yang sama dipakai traffic.js:187) atau umur animasi > 3 dtk.
+const DOOR_MAX = 1.2, DOOR_OPEN_RATE = 2.7, DOOR_CLOSE_RATE = 2.0, DOOR_HOLD = 0.25;
+let prevInCar = false, lastCar = null;
+let doorSfx = null;
+// Suara pintu: instance sfx sendiri (audio.js in-dossier — tidak bisa tambah
+// method di sana). Dynamic import sekali, pola sama seperti main.js mengimpor
+// modul ini. Batasan jujur: instance ini TIDAK ikut mute (M) game — status
+// mute hidup di audio.js dan tidak terekspos ke state; bunyi pintu pendek
+// (0,07/0,09 dtk) dan pelan, dan gagal bunyi = game tetap jalan.
+import('./sfx.js').then((m) => { try { doorSfx = m.createSfx(); } catch { doorSfx = null; } }).catch(() => {});
+function doorSound(open) {
+  if (!doorSfx) return;
+  try { doorSfx.unlock(); if (open) doorSfx.doorOpen(); else doorSfx.doorClose(); } catch { /* suara opsional — jangan crash game */ }
+}
+// Sisi pintu dari posisi Jax relatif ke mobil: proyeksi ke arah kiri mobil
+// (-sin a, cos a) — arah yang dipakai exitCar (world.js:220-235). >= 0 kiri.
+function doorSideOf(p, car) {
+  const a = car.angle || 0;
+  const lat = (p.x - car.x) * -Math.sin(a) + (p.y - car.y) * Math.cos(a);
+  return lat >= 0 ? -1 : 1;
+}
+function triggerDoor(car, side) {
+  if (!car) return;
+  car.doorSide = side;
+  car.doorPhase = 'opening';
+  car.doorHoldT = DOOR_HOLD;
+  car.doorAge = 0;
+  car.doorPeak = 0;
+  if (!(car.doorAngle > 0)) car.doorAngle = 0; // B5: re-trigger DARI angle saat ini, jangan reset ke 0
+  doorSound(true);
+}
+function advanceDoor(car, dt) {
+  if (!car) return;
+  let a = car.doorAngle || 0;
+  let ph = car.doorPhase || 'closed';
+  if (ph === 'closed' && a <= 0) { car.doorAngle = 0; car.doorAge = 0; return; }
+  if (ph === 'closed') ph = 'closing'; // sudut > 0 tanpa fase (mis. restore save) -> tutup
+  car.doorAge = (car.doorAge || 0) + dt;
+  // FAILSAFE B3 — paksa tutup: mobil bergerak / tanpa transisi 2 dtk / umur > 3 dtk.
+  if (Math.abs(car.speed || 0) > 5 || car.doorAge > 2) ph = 'closing';
+  if (ph === 'opening') {
+    const r = DOOR_OPEN_RATE;
+    a += Math.max(-r * dt, Math.min(r * dt, DOOR_MAX - a));
+    if (a >= DOOR_MAX - 0.001) { a = DOOR_MAX; ph = 'hold'; car.doorHoldT = DOOR_HOLD; }
+  } else if (ph === 'hold') {
+    a = DOOR_MAX;
+    car.doorHoldT = (car.doorHoldT ?? DOOR_HOLD) - dt;
+    if (car.doorHoldT <= 0) ph = 'closing';
+  } else { // closing
+    const r = DOOR_CLOSE_RATE;
+    a += Math.max(-r * dt, Math.min(r * dt, 0 - a));
+    if (a <= 0.001) {
+      a = 0; ph = 'closed'; car.doorAge = 0;
+      if ((car.doorPeak || 0) > 0.1) doorSound(false);
+      car.doorPeak = 0;
+    }
+  }
+  if (a > (car.doorPeak || 0)) car.doorPeak = a;
+  car.doorAngle = a;
+  car.doorPhase = ph;
+}
+function observeDoors(state, dt) {
+  const p = state.player;
+  const d = Math.min(Math.max(dt || 0, 0), 0.1);
+  const inCar = !!p.inCar;
+  if (inCar && p.car) lastCar = p.car; // PENTING: sesudah exitCar p.car sudah null
+  if (inCar !== prevInCar) {
+    const target = inCar ? p.car : lastCar;
+    if (target) triggerDoor(target, doorSideOf(p, target));
+    prevInCar = inCar;
+  }
+  // Majukan pintu mobil pemain/mobil terakhir + mobil lain yang kebetulan
+  // masih berayun (failsafe B3 harus menutup semuanya, bukan cuma lastCar).
+  const seen = new Set();
+  const adv = (c) => { if (c && !seen.has(c)) { seen.add(c); advanceDoor(c, d); } };
+  adv(p.car); adv(lastCar);
+  for (const c of (state.traffic || {}).cars || []) if (c && (c.doorAngle > 0 || c.doorPhase === 'opening' || c.doorPhase === 'hold')) adv(c);
+  for (const c of (state.traffic || {}).parked || []) if (c && (c.doorAngle > 0 || c.doorPhase === 'opening' || c.doorPhase === 'hold')) adv(c);
+  for (const u of (state.police || {}).units || []) if (u && u.car && (u.car.doorAngle > 0 || u.car.doorPhase === 'opening' || u.car.doorPhase === 'hold')) adv(u.car);
+}
+
 // Test-only: reset state modul (dipakai unit test — satu game = satu sesi,
 // jadi di produksi tidak pernah dipanggil).
-export function resetOnFootState() { prevF = false; prevPos = null; }
+export function resetOnFootState() { prevF = false; prevPos = null; prevInCar = false; lastCar = null; }
 
 // Fase jalan Jax — dari JARAK BERSIH (net displacement) antar update, BUKAN
 // dari gerak di walkPlayer saja. Alasan (temuan verifikasi v3): Jax yang
@@ -107,6 +199,9 @@ export function updateOnFoot(state, input, dt) {
   const st = state.onfoot;
   st.active = !p.inCar && !p.inBoat && !p.inPlane;
   let msg = null;
+  // DOOR-ANIM: observer transisi masuk/keluar + advance pintu — SEBELUM
+  // early-return di bawah (pintu harus berayun/ menutup JUGA saat inCar).
+  observeDoors(state, dt);
   // F: ganti kamera — hanya saat jalan kaki (di mobil, chase-cam tetap).
   const fDown = !!(input.keys && input.keys.has('KeyF'));
   if (fDown && !prevF && st.active) {

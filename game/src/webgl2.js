@@ -1958,7 +1958,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   const yawOf = (o) => Math.PI / 2 - (o.angle || 0);
   if (p.inCar && p.car) {
     const c = p.car;
-    drawCarRealistic(OP, GL, 'hero', c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#e33e5f'), { t, tl: tlGain }); // R26: hero selalu realistis v15d (gate heroReal dihapus)
+    drawCarRealistic(OP, GL, 'hero', c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#e33e5f'), { t, tl: tlGain, door: c.doorAngle || 0, doorSide: c.doorSide || -1 }); // R26: hero selalu realistis v15d (gate heroReal dihapus)
     if (tod.headlight > 0.02) { // TOD: kerucut lampu depan (malam) — trapesium mat 8,
       // v=0 di bemper (terang) -> v=1 jauh (memudar, ikut shader smear).
       const yaw = yawOf(c), fw = [Math.sin(yaw), Math.cos(yaw)], rg = [Math.cos(yaw), -Math.sin(yaw)];
@@ -2021,7 +2021,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     if (police) type = (unit && unit.emergency && (c.body === 'fire' || c.body === 'medic')) ? c.body : 'police';
     else type = CAR_TYPE[c.body] || 'sedanL';
     const lod = distPx(c.x, c.y, hx0, hy0) < 250 ? undefined : 'low';
-    drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, taxi: c.body === 'taxi', tl: tlGain }); // R36V2-TAXI: papan TAXI + strip kotak (cars3d.js) — digabung R38 tlGain
+    drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, taxi: c.body === 'taxi', tl: tlGain, door: c.doorAngle || 0, doorSide: c.doorSide || -1 }); // R36V2-TAXI: papan TAXI + strip kotak (cars3d.js) — digabung R38 tlGain
   };
   for (const c of state.traffic.cars || []) drawCar(c, false);
   for (const c of state.traffic.parked || []) drawCar(c, false);

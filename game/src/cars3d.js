@@ -223,7 +223,9 @@ export function carSpec(type) { return CAR_SPECS[type] || CAR_SPECS.hero; }
 //   paint : [r,g,b] atau '#rrggbb' (kosongkan = warna spec)
 //   opts  : { brake:boolean, t:number (waktu — strobo), police:boolean,
 //           detail:'low'|'mid' (LOD), damage:boolean (penyok + kaca retak),
-//           tl:number (gain lampu rem ikut waktu — R38 Item 7, default 1) }
+//           tl:number (gain lampu rem ikut waktu — R38 Item 7, default 1),
+//           door:number (sudut pintu depan 0..1,2 rad — DOOR-ANIM, default 0),
+//           doorSide:number (-1 flank kiri | +1 kanan, default -1) }
 //   Return: jumlah segitiga yang ditambahkan.
 // ---------------------------------------------------------------------------
 export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts) {
@@ -584,11 +586,39 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     for (const s of [-1, 1]) drawWheel(s * (W / 2 - 0.04), lz, s); // v15: ban +0,04 keluar (muka luar ban 1,54 ≈ tonjolan flank 1,55 — ban kebaca dari belakang di bawah beltline)
   }
 
+  // ---- DOOR-ANIM (visual-only): pintu depan berayun saat masuk/keluar ----
+  // Emit HANYA saat o.door > 0,01 (hemat vertex: 1 quad + 1 box gagang =
+  // 28 verts, maks 1 mobil berayun) dan HANYA keluarga sedan (dispatch di
+  // bawah sudah mengembalikan bus/fire/medic/apc/armored lebih dulu).
+  // Geometri = pola pintu gedung interiors.js:529-539: engsel di tepi DEPAN
+  // pintu, pusat panel = engsel + vektor-tutup yang diputar sebesar ayunan.
+  // Panel 1,7u (z) x 0,8u (y 0,34-1,14). Bidang panel di W/2+0,22 — BUKAN
+  // W/2+0,02: tonjolan flank (faset B) mencapai W/2+0,20, jadi offset 0,02
+  // menenggelamkan panel ke dalam bodi di sudut kecil (B1); preseden strip
+  // krom flank di W/2+0,21. swing = -doorSide (pintu kiri berayun ke kiri).
+  function drawDoor() {
+    const ang = o.door || 0;
+    if (ang <= 0.01) return;
+    const side = o.doorSide || -1;
+    const swing = -side, th = swing * ang;
+    const hx = side * (W / 2 + 0.22), hz = 0.6; // engsel (lokal)
+    const dx = -Math.sin(th), dz = -Math.cos(th); // arah engsel -> ujung bebas
+    const a = at(hx, 1.14, hz), b = at(hx + dx * 1.7, 1.14, hz + dz * 1.7);
+    const c = at(hx + dx * 1.7, 0.34, hz + dz * 1.7), d = at(hx, 0.34, hz);
+    const hint = dir(side * Math.cos(th), 0, -side * Math.sin(th));
+    quadOut(a, b, c, d, hint, paintDark, 1);
+    // Gagang: box kecil menembus panel dekat ujung bebas (0,35u dari ujung),
+    // ikut berputar (ry = yaw + ayunan) — pola interiors.js:544-546.
+    const gq = at(hx + dx * 1.35, 0, hz + dz * 1.35);
+    boxR(B, gq[0], 0.95, gq[2], 0.16, 0.14, 0.42, yaw + th, 0, DARK, 5);
+  }
+
   if (spec.kind === 'bus') return drawBus();
   if (spec.kind === 'fire') return drawFire();
   if (spec.kind === 'medic') return drawMedic();
   if (spec.kind === 'apc') return drawApc();
   if (spec.kind === 'armored') return drawArmored();
+  drawDoor();
   return drawSedanFamily();
 
   // ================= BUS =================
