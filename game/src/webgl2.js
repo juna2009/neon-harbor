@@ -1814,22 +1814,28 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
         flat(OP, wx, 0.05, wz, 1.1, 3.2 + hash2(i, r) * 2.4, [0.88, 0.92, 0.95], 8);
       }
     }
-    // 4 payung warna-warni + 4 kursi (posisi = proyeksi layar chase seed 7:
-    // payung di x 540..717, y ~385; mahkota palem y ~364).
-    beachUmbrella(OP, 238.0, 101.0, [1.0, 0.35, 0.30], [0.95, 0.95, 0.90]); // koral/putih
-    beachUmbrella(OP, 238.0, 123.0, [0.10, 0.80, 0.80], [1.0, 0.85, 0.20]); // teal/kuning
-    beachUmbrella(OP, 240.0, 108.0, [1.0, 0.55, 0.15], [0.95, 0.95, 0.90]); // oranye/putih
-    beachUmbrella(OP, 240.0, 116.0, [1.0, 0.40, 0.60], [1.0, 0.85, 0.20]); // pink/kuning
-    beachChair(OP, 241.5, 101.5, [1.0, 0.35, 0.30]);
-    beachChair(OP, 241.5, 122.5, [0.10, 0.80, 0.80]);
-    beachChair(OP, 236.5, 108.5, [1.0, 0.85, 0.20]);
-    beachChair(OP, 236.5, 115.5, [1.0, 0.40, 0.60]);
-    palm(OP, 236.0, 99.0, sunA); // palem pantai utara (palm() R27b di base ini; R36-pohon menambah sc opsional)
-    palm(OP, 236.0, 125.0, sunA); // palem pantai selatan
-    palm(OP, 237.0, 96.0, sunA); // palem pantai ujung utara (membingkai pantai)
-    palm(OP, 237.0, 128.0, sunA); // palem pantai ujung selatan
-    fishBoat(OP, 241.0, 118.0, false); // perahu nelayan di pasir (lambung searah Z)
-    fishBoat(OP, 239.0, 98.0, true); // perahu nelayan kedua (lambung searah X)
+    // 4 payung + 4 kursi + 4 palem + 2 perahu DI PASIR BARAT (x 235.0 =
+    // tengah strip pasir 2340-2360; dulu 238-241.5 = DI JALAN, kanopi 4.4u
+    // menutup ~40% frame chase-cam). Strip timur terlalu sempit (shoreX
+    // 2448.9-2456 -> 8.9-16u; tiang di y 1010 jatuh ke air); strip barat
+    // 20u, gedung terjauh x 2320 (seed 7, diukur node). Kanopi overhang
+    // jalan 1.2u di tepi (tiang 1.0u dari tepi jalan), bukan di tengah.
+    // y di luar koridor jalan y 1072-1168 (tanpa pasir): utara 99/105,
+    // selatan 119/125; kursi +1.0 di bawah kanopi; palem membingkai ujung.
+    beachUmbrella(OP, 235.0, 99.0, [1.0, 0.35, 0.30], [0.95, 0.95, 0.90]); // koral/putih
+    beachUmbrella(OP, 235.0, 125.0, [0.10, 0.80, 0.80], [1.0, 0.85, 0.20]); // teal/kuning
+    beachUmbrella(OP, 235.0, 105.0, [1.0, 0.55, 0.15], [0.95, 0.95, 0.90]); // oranye/putih
+    beachUmbrella(OP, 235.0, 119.0, [1.0, 0.40, 0.60], [1.0, 0.85, 0.20]); // pink/kuning
+    beachChair(OP, 235.0, 100.0, [1.0, 0.35, 0.30]);
+    beachChair(OP, 235.0, 126.0, [0.10, 0.80, 0.80]);
+    beachChair(OP, 235.0, 106.0, [1.0, 0.85, 0.20]);
+    beachChair(OP, 235.0, 120.0, [1.0, 0.40, 0.60]);
+    palm(OP, 235.0, 96.0, sunA); // palem pantai utara (palm() R27b di base ini; R36-pohon menambah sc opsional)
+    palm(OP, 235.0, 129.0, sunA); // palem pantai selatan
+    palm(OP, 235.0, 93.0, sunA); // palem pantai ujung utara (membingkai pantai)
+    palm(OP, 235.0, 132.0, sunA); // palem pantai ujung selatan
+    fishBoat(OP, 235.0, 136.0, false); // perahu nelayan di pasir (lambung searah Z)
+    fishBoat(OP, 235.0, 88.0, false); // perahu kedua (diputar searah Z: searah X 4.6u tidak muat di strip 20u)
   }
 
   // R35-F9: night market (Pasar Malam) — BEGIN. Satu blok, jangan pecah.
