@@ -1451,8 +1451,6 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // lebar jalan, lajur dan collision TIDAK berubah. Marka di y 0.01 (di atas aspal
   // -0.05) supaya tidak z-fight; prop di trotoar saja, tidak pernah menutupi koin.
   const MARK_W = [0.88, 0.88, 0.86]; // putih marka (sedikit redup biar tidak blown)
-  const DARK_RD = [0.06, 0.06, 0.08]; // retak (nyaris hitam, kecil — aman)
-  const TRACK_RD = [0.14, 0.14, 0.16]; // bekas ban: HANYA sedikit lebih gelap dari aspal [0.20,0.21,0.24] — dulu DARK_RD 0.06 kebaca dua slab hitam di dasar layar (dekat kamera, lebar)
   // Zebra + garis stop di tiap persimpangan yang terlihat (4 lengan penuh).
   // Strip membujur (sejajar lalu lintas, standar zebra): 9 strip per lengan.
   const zebraV = (rx, ry, side) => {
@@ -1487,17 +1485,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     for (const hd of state.hydrants || []) if (Math.hypot(hd.x - px, hd.y - pz) < 50) return false;
     return true;
   };
-  // Bekas ban di lajur hero + manhole + tambalan + retak + panah lajur.
-  // R36-ROADS item 17: bekas ban dari fwd -6 (di BELAKANG hero, dasar layar)
-  // supaya foreground bawah tidak hamparan kosong — bukan cuma fwd 4..60.
-  for (const lat of [-2.2, 2.2]) {
-    const a = atFU(-6, lat), b = atFU(60, lat), mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, ln = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    if (hEW) flat(OP, mx, 0.0, mz, ln, 0.9, TRACK_RD, 5); else flat(OP, mx, 0.0, mz, 0.9, ln, TRACK_RD, 5);
-  }
-  const mh = atFU(24, 2.6); flat(OP, mh[0], 0.0, mh[1], 1.3, 1.3, [0.09, 0.09, 0.10], 5); // manhole lajur kanan
-  const ptc = atFU(38, -2.4); flat(OP, ptc[0], 0.0, ptc[1], 3.2, 2.2, [0.08, 0.08, 0.09], 5); // tambalan aspal
-  const ck0 = atFU(48, -3.2), ck1 = atFU(52, -1.2); // retak diagonal
-  quad(OP, [ck0[0] - 0.12, 0.0, ck0[1]], [ck0[0] + 0.12, 0.0, ck0[1]], [ck1[0] + 0.12, 0.0, ck1[1]], [ck1[0] - 0.12, 0.0, ck1[1]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], DARK_RD, 5);
+  // Panah lajur (putih, searah jalan).
   { // panah lajur (putih, searah jalan): batang + kepala segitiga
     const sc = atFU(28.4, 0), hb = atFU(30.4, 0), ht = atFU(32.0, 0);
     if (hEW) { flat(OP, sc[0], 0.01, sc[1], 2.4, 0.5, MARK_W, 5); quad(OP, [ht[0], 0.01, ht[1]], [hb[0], 0.01, hb[1] - 0.8], [hb[0], 0.01, hb[1] + 0.8], [ht[0], 0.01, ht[1]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], MARK_W, 5); }

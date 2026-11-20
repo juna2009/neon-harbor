@@ -317,29 +317,16 @@ function frame(t){
   Q([48,.05,camZ+18],[49.6,.05,camZ+18],[49.6,.05,camZ+19.2],[48,.05,camZ+19.2],mix([215,185,140],0),2);
   Q([36,.05,camZ+11],[38.5,.05,camZ+11],[38.5,.05,camZ+13],[36,.05,camZ+13],mix([170,140,95],0),2);
   Q([52,.05,camZ+9],[54,.05,camZ+9],[54,.05,camZ+10.6],[52,.05,camZ+10.6],mix([215,185,140],0),2);
-  // R33: tyre tracks on the near apron too — the foreground road was a flat
-  // brown expanse (Juna: sore "aneh banget"). Two dark wheel lines + a
-  // crack, y=0.04 so they sit on the asphalt, under the dashes (y=0.05).
-  // R40-D: bekas ban dulu mix([40,32,36]) TANPA bounce — di atas aspal
-  // shW() (bounce putih siang) ia kebaca dua pita HITAM membujur selebar
-  // 1.2 unit sepanjang jalan. Kini shW() juga (tone ikut aspal) + warna
-  // nyaris seaspal [52,43,48] + lebar 0.8 = samar, bukan slab.
-  Q([-3.2,.04,camZ+2],[-2.4,.04,camZ+2],[-2.4,.04,camZ+24],[-3.2,.04,camZ+24],shW([52,43,48],1,0),2);
-  Q([2.4,.04,camZ+2],[3.2,.04,camZ+2],[3.2,.04,camZ+24],[2.4,.04,camZ+24],shW([52,43,48],1,0),2);
-  Q([-6,.04,camZ+9],[-4.8,.04,camZ+9],[-5.6,.04,camZ+20],[-6.8,.04,camZ+20],shW([30,24,28],1,0),2);
   // road + sidewalks (segmented so fog deepens with distance)
   for(let z=Math.floor((camZ-30)/30)*30;z<camZ+430;z+=30){const d=z-camZ,v=h2(3,z);
-    // R33: road texture — per-segment tone jitter + tyre tracks + an
-    // occasional dark patch / crack, so the foreground is not a flat expanse.
+    // R33: road texture — per-segment tone jitter, so the foreground is not
+    // a flat expanse. (City install: tyre tracks / dark patches / cracks
+    // removed — asphalt + markings + zebra only, per Juna 20:30 WIB.)
     Q([-12,0,z],[12,0,z],[12,0,z+30],[-12,0,z+30],shW([58+v*6,47+v*5,53+v*5],1,hz(d)),d);
     Q([-16,.1,z],[-12,.1,z],[-12,.1,z+30],[-16,.1,z+30],sh([80,70,76],1,hz(d)),d);
     Q([12,.1,z],[16,.1,z],[16,.1,z+30],[12,.1,z+30],sh([80,70,76],1,hz(d)),d);
     Q([-11.7,.06,z],[-11.4,.06,z],[-11.4,.06,z+30],[-11.7,.06,z+30],mix([220,200,170],hz(d)),d);
-    Q([11.4,.06,z],[11.7,.06,z],[11.7,.06,z+30],[11.4,.06,z+30],mix([220,200,170],hz(d)),d);
-    Q([-3.2,.04,z],[-2.4,.04,z],[-2.4,.04,z+30],[-3.2,.04,z+30],shW([52,43,48],1,hz(d)),d);
-    Q([2.4,.04,z],[3.2,.04,z],[3.2,.04,z+30],[2.4,.04,z+30],shW([52,43,48],1,hz(d)),d);
-    if(h2(17,z)<.2){const px0=-8+h2(29,z)*10;Q([px0,.045,z+5],[px0+4,.045,z+5],[px0+4,.045,z+18],[px0,.045,z+18],mix([48,38,44],hz(d)),d);}
-    if(h2(13,z)<.3){const cx=-8+h2(31,z)*16;Q([cx,.045,z+8],[cx+1.2,.045,z+8],[cx+.4,.045,z+20],[cx-.8,.045,z+20],mix([30,24,28],hz(d)),d);}}
+    Q([11.4,.06,z],[11.7,.06,z],[11.7,.06,z+30],[11.4,.06,z+30],mix([220,200,170],hz(d)),d);}
   // R31 title foreground: flanking ground — the frame's lower half was flat
   // #241a20 void beyond the sidewalks (|x|>16). Warm pavement strips with
   // per-segment variation + curb lines, haze-faded like the road, so the
@@ -366,19 +353,6 @@ function frame(t){
   // menimpa tanah tapi di bawah mobil/lampu (yang di-emit sesudahnya).
   for(let z=camZ+10;z<camZ+70;z+=15){const d=z-camZ;
     Q([-64,.02,z],[-16,.02,z],[-16,.02,z+.35],[-64,.02,z+.35],mix([38,30,34],hz(d)),d);}
-  { // R36-ROADS item 16: manhole + tambalan di apron (jalan depan hero — area
-    // foreground yang BENAR-BENAR terlihat; strip trotoar kiri x<-16 di
-    // dz<30 di luar layar/terhalang panel judul). Proyeksi title fovF=640:
-    // di dz=10, 1 unit = 64 px — manhole 2.5 unit dulu jadi 160 px, hitam
-    // pekat, kebaca lubang hitam. Kini kecil + warna nyaris seaspal.
-    const z=camZ+20; // manhole kanan (1.2 unit -> ~38 px, di kanan mobil hero)
-    Q([5.4,.03,z],[6.6,.03,z],[6.6,.03,z+1.2],[5.4,.03,z+1.2],mix([48,42,46],hz(20)),20);
-    const z2=camZ+16; // tambalan kiri (1.6 unit, samar)
-    Q([-7.8,.03,z2],[-6.2,.03,z2],[-6.2,.03,z2+1.6],[-7.8,.03,z2+1.6],mix([50,44,48],hz(16)),16);}
-  { // bekas ban samar di apron (dua lajur, z camZ+6..camZ+17, di depan mobil
-    // hero) — warna nyaris seaspal supaya tidak jadi dua slab hitam.
-    Q([-3.1,.03,camZ+6],[-2.3,.03,camZ+6],[-2.3,.03,camZ+17],[-3.1,.03,camZ+17],shW([52,43,48],1,hz(11)),11);
-    Q([2.3,.03,camZ+6],[3.1,.03,camZ+6],[3.1,.03,camZ+17],[2.3,.03,camZ+17],shW([52,43,48],1,hz(11)),11);}
   {const z=camZ+14; // hidran merah (depan + atas + kubah)
     Q([-22.8,0,z],[-21.2,0,z],[-21.2,1.6,z],[-22.8,1.6,z],mix([200,60,55],hz(14)),14);
     Q([-22.8,1.6,z],[-21.2,1.6,z],[-21.2,1.6,z-.9],[-22.8,1.6,z-.9],mix([140,40,40],hz(14)),14);
