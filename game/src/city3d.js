@@ -1513,6 +1513,10 @@ function bld3(b, nightF, t) {
     const nFaces = nightF > 0.15 ? 3 : 2;
     for (let fi = 0; fi < nFaces && faces[fi].dot > 0; fi += 1) {
       const f = faces[fi];
+      // DIAG-B (B0): q harus stabil per MUKA FISIK. fi adalah peringkat sort
+      // yang bertukar saat kamera melewati diagonal gedung -> seluruh pola
+      // nyala muka teracak dalam 1 frame (kedip). f.a stabil per muka fisik.
+      const fId = Math.round(f.a * 100) * 31;
       // REWORK (probe slab-probe.json): the right wall is the building at
       // (160,128) dep 24.1 — its north face is seen at a GRAZING angle
       // (depth range 5..27 across one face). box3 sorts a face by its
@@ -1529,7 +1533,7 @@ function bld3(b, nightF, t) {
       const nc = Math.max(3, Math.min(dep > 70 ? 5 : dep < 40 ? 9 : 7, Math.round(f.span / 3.0)));
       const nr = Math.max(3, Math.min(dep > 70 ? 5 : dep < 40 ? 10 : 8, Math.round(h3 / 3.0)));
       for (let i = 0; i < nc; i += 1) for (let j = 0; j < nr; j += 1) {
-        const q = h2(b.x * 7 + i * 13 + fi * 31, b.y * 3 + j * 17);
+        const q = h2(b.x * 7 + i * 13 + fId, b.y * 3 + j * 17);
         const q2 = h2(b.x * 11 + i * 5, b.y * 7 + j * 9);
         // REWORK: smaller windows on near facades (ww was capped 1.8 -> a
         // 65 px "sticker" square at dep 24); denser grid instead.
