@@ -1663,30 +1663,6 @@ function bld3(b, nightF, t) {
     }
   }
 }
-// G1 sun glare: radiating streaks + one horizontal anamorphic streak
-// soft=true (chase/boat): fewer, dimmer, wider streaks — the hard 6-streak
-// starburst was washing out the whole frame. Title frame never calls this.
-// SUN-PALM VB-39: soft alpha 0.16->0.22, half-width 4->5 — the old streaks
-// were invisible against the glow (probe: no brightening along the streak
-// angles). Still soft; the anamorphic stays 0.25 so it never reads as a
-// line painted on a facade (VB-01).
-function sunStreaks(sx, sy, len, soft) {
-  x.save(); x.globalCompositeOperation = 'lighter';
-  const angs = soft ? [-1.1, -0.3, 0.6, 1.7] : [-1.25, -0.55, 0.15, 0.85, 1.6, 2.5];
-  const a0 = soft ? 0.22 : 0.32, hw = soft ? 5 : 2;
-  for (let i = 0; i < angs.length; i += 1) {
-    const L = len * (0.55 + (i % 3) * 0.25);
-    x.save(); x.translate(sx, sy); x.rotate(angs[i]);
-    const lg = x.createLinearGradient(0, 0, L, 0);
-    lg.addColorStop(0, 'rgba(255,180,90,' + a0 + ')'); lg.addColorStop(1, 'rgba(255,180,90,0)');
-    x.fillStyle = lg; x.fillRect(0, -hw, L, hw * 2);
-    x.restore();
-  }
-  const hg = x.createLinearGradient(sx - 260, 0, sx + 260, 0);
-  hg.addColorStop(0, 'rgba(255,170,90,0)'); hg.addColorStop(0.5, 'rgba(255,190,120,' + (soft ? 0.25 : 0.38) + ')'); hg.addColorStop(1, 'rgba(255,170,90,0)');
-  x.fillStyle = hg; x.fillRect(sx - 260, sy - 2, 520, 4);
-  x.restore();
-}
 export function drawChase3D(ctx, state) {
   tickJobs(state, 1 / 60); // R35-F7: jobs tick (canvas fallback; see webgl2.js buildFrame)
   x = ctx; W = ctx.canvas.width; H = ctx.canvas.height; CX = W / 2; HOR = H * .46;
@@ -1865,7 +1841,6 @@ export function drawChase3D(ctx, state) {
       const dg = x.createRadialGradient(sunP[0], sunP[1], 0, sunP[0], sunP[1], 18);
       dg.addColorStop(0, '#fffdf0'); dg.addColorStop(0.55, '#ffe9a8'); dg.addColorStop(1, '#ffb45e');
       x.fillStyle = dg; x.beginPath(); x.arc(sunP[0], sunP[1], 18, 0, 7); x.fill();
-      sunStreaks(sunP[0], sunP[1], 190, true); // G1 soft (round 21)
     }
   }
   // ground tiles (segmented so quads never straddle the camera plane)
