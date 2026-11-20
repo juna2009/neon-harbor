@@ -26,6 +26,14 @@ export const VEHICLE_TYPES = {
   hatchback: { length: 42, width: 22, cruise: 150, color: null, bodyH: 0.8, cabFrac: 0.62, wheels: 4, label: 'Hatchback' },
   sedanL: { length: 54, width: 22, cruise: 155, color: null, bodyH: 0.8, cabFrac: 0.45, wheels: 4, label: 'Sedan Panjang' },
   pickup: { length: 52, width: 22, cruise: 150, color: null, bodyH: 0.8, cabFrac: 0.42, wheels: 4, label: 'Pickup' },
+  // ---- CARS v18: jenis baru (varian visual — slot traffic tetap) ----
+  // SUV: varian slot sedanL traffic (bodyH 1,30 + cabFrac 0,55 + ban
+  // serep). Race: varian langka slot sedanL PARKIR SAJA (bodyH rendah
+  // 0,62 + cabFrac 0,15 + spoiler). Delivery: varian slot van (boks
+  // teal usaha + pintu geser). Warna = warna traffic mobilnya (null).
+  suv: { length: 54, width: 22, cruise: 155, color: null, bodyH: 1.3, cabFrac: 0.55, wheels: 4, label: 'SUV' },
+  race: { length: 54, width: 22, cruise: 155, color: null, bodyH: 0.62, cabFrac: 0.15, wheels: 4, label: 'Mobil Balap' },
+  delivery: { length: 54, width: 22, cruise: 155, color: null, bodyH: 1.5, cabFrac: 0.3, wheels: 4, label: 'Van Delivery' },
 };
 
 // Register the new bodies into traffic.js's CAR_BODIES table (length/width
@@ -42,6 +50,38 @@ export function registerVehicleTypes(carBodies) {
 export function vehicleColor(body, fallback) {
   const vt = VEHICLE_TYPES[body];
   return (vt && vt.color) || fallback;
+}
+
+// ---- CARS v18 — MEKANISME VARIAN (deterministik, post-cut) ----
+// Hash stabil — rumus SAMA PERSIS dengan h2() di city3d.js (bukan
+// hash2() di webgl2.js — rumusnya beda konstanta). JANGAN ubah rumusnya:
+// distribusi sudah diprobe 100 seed dengan rumus ini (rates-probe).
+// Seed = nilai spawn yang STABIL (bukan posisi berjalan, bukan random
+// per frame): traffic pakai car.cruise (ditetapkan sekali saat spawn,
+// tak pernah diubah stepTraffic), parkir pakai posisi spawn (x,y).
+// Kembalikan 'suv' / 'race' / 'delivery' atau null (pakai body asli).
+// JANGAN PERNAH varian: taksi pink M1 (car.pink), mobil pemain
+// (kind 'player'), unit polisi/militer (kind 'police'), truk lapis baja
+// (kind 'armored'), taksi (body 'taxi').
+// Laju (dinaikkan dari spec setelah probe 100-seed — rates-probe):
+// van -> 50% delivery; sedanL traffic -> 50% suv; sedanL parkir -> 25% race.
+function h2(a, b) {
+  let v = (a * 73856093) ^ (b * 19349663);
+  v = Math.imul(v ^ (v >>> 13), 1274126177);
+  return ((v ^ (v >>> 16)) >>> 0) / 4294967296;
+}
+export function carVariant(car) {
+  if (!car || car.pink || car.kind === 'player' || car.kind === 'police' || car.kind === 'armored' || car.body === 'taxi') return null;
+  const traffic = car.cruise !== undefined;
+  if (car.body === 'van') {
+    const h = traffic ? h2(Math.round(car.cruise * 100), 11) : h2(Math.round(car.x || 0), Math.round(car.y || 0));
+    return h < 0.50 ? 'delivery' : null;
+  }
+  if (car.body === 'sedanL' || car.body === 'sedan') {
+    if (traffic) return h2(Math.round(car.cruise * 100), 7) < 0.50 ? 'suv' : null;
+    return h2(Math.round(car.x || 0), Math.round(car.y || 0)) < 0.25 ? 'race' : null;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -122,14 +162,22 @@ function lightBar2d(c, car, t, y0) {
   c.fillRect(-4, y0 + 5, 8, 4);
 }
 export function drawVehicleBody(c, car, night, t) {
-  const vt = VEHICLE_TYPES[car.body];
+  // CARS v18: varian visual — jenis yang digambar bisa berbeda dari
+  // car.body (sedanL -> suv/race, van -> delivery). Warna + ukuran
+  // tetap milik mobilnya; hanya detail jenis yang berubah.
+  // BATASAN (jujur): jalur top-down utama render.js drawTrafficCar
+  // mem-bypass fungsi ini untuk van (drawVan) — jadi delivery TIDAK
+  // terbaca top-down sampai render.js disentuh (di luar scope 4 file).
+  // SUV/race (slot sedanL) LEWAT sini dan terbaca top-down.
+  const vType = carVariant(car) || car.body;
+  const vt = VEHICLE_TYPES[vType];
   if (!vt) return false;
   const L = car.length, W = car.width;
   base2d(c, car, night);
   c.fillStyle = car.color || vt.color || '#888888';
   rr(c, -L / 2, -W / 2, L, W, 5);
   c.fill();
-  if (car.body === 'bus') {
+  if (vType === 'bus') {
     // ribbon windows: dark glass band both flanks + dividers (bible §1.6)
     c.fillStyle = '#16202c';
     R(c, -L / 2 + 8, -W / 2 + 3, L - 18, 5, '#16202c');
@@ -150,7 +198,7 @@ export function drawVehicleBody(c, car, night, t) {
     c.fillStyle = 'rgba(0,0,0,0.35)';
     R(c, L / 2 - 20, -W / 2 + 2, 2, W - 4, 'rgba(0,0,0,0.35)');
     wheels2d(c, car, [-1, 0, 1]);
-  } else if (car.body === 'fire') {
+  } else if (vType === 'fire') {
     // white flank stripe + roof ladder (rails + rungs) + cab + strobe (bible §1.6)
     c.fillStyle = '#e8e4d8';
     R(c, -L / 2 + 6, -W / 2 + 4, L - 16, 3, '#e8e4d8');
@@ -167,7 +215,7 @@ export function drawVehicleBody(c, car, night, t) {
     c.fillStyle = '#f1c40f';
     for (let i = 0; i < 4; i += 1) R(c, -L / 2 - 1, -W / 2 + 2 + i * 5, 3, 3, '#f1c40f');
     wheels2d(c, car, [-1, 1]);
-  } else if (car.body === 'medic') {
+  } else if (vType === 'medic') {
     // red flank stripe + roof cross + dark windows + red strobe (bible §1.6)
     c.fillStyle = '#c0392b';
     R(c, -L / 2 + 6, -W / 2 + 4, L - 16, 3, '#c0392b');
@@ -182,7 +230,7 @@ export function drawVehicleBody(c, car, night, t) {
     c.fillStyle = on ? '#ff3b30' : '#7a1f1a';
     R(c, -4, -W / 2 - 4, 8, 4, on ? '#ff3b30' : '#7a1f1a');
     wheels2d(c, car, [-1, 1]);
-  } else if (car.body === 'apc') {
+  } else if (vType === 'apc') {
     // dark lower band + turret + barrel + bull bar + 6 small wheels (bible §1.6)
     c.fillStyle = '#33391f';
     R(c, -L / 2 + 4, -W / 2 + 3, L - 8, 4, '#33391f');
@@ -196,7 +244,7 @@ export function drawVehicleBody(c, car, night, t) {
     c.fillStyle = '#22261a';
     R(c, L / 2 - 1, -W / 2 + 4, 3, W - 8, '#22261a');
     wheels2d(c, car, [-1, 0, 1]);
-  } else if (car.body === 'hatchback') {
+  } else if (vType === 'hatchback') {
     // long glass roof (55% of length, glass to the tail) + short hood (bible §1.6)
     c.fillStyle = '#1a2230';
     R(c, -L / 2 + 4, -W / 2 + 3, L - 12, W - 6, '#1a2230');
@@ -205,7 +253,7 @@ export function drawVehicleBody(c, car, night, t) {
     c.fillStyle = car.color || '#888888';
     R(c, L / 2 - 8, -W / 2 + 3, 6, W - 6, car.color || '#888888');
     wheels2d(c, car, [-1, 1]);
-  } else if (car.body === 'sedanL') {
+  } else if (vType === 'sedanL') {
     // cabin 45% + long trunk deck + panel line + chrome flank strip
     c.fillStyle = 'rgba(0,0,0,0.28)';
     rr(c, -8, -W / 2 + 3, 20, W - 6, 3);
@@ -217,7 +265,7 @@ export function drawVehicleBody(c, car, night, t) {
     c.fillStyle = 'rgba(255,255,255,0.55)';
     R(c, -L / 2 + 6, -1, L - 12, 2, 'rgba(255,255,255,0.55)');
     wheels2d(c, car, [-1, 1]);
-  } else if (car.body === 'pickup') {
+  } else if (vType === 'pickup') {
     // front cab (42%) + open bed: dark floor + side rails + tailgate line
     c.fillStyle = '#1a2230';
     R(c, L / 2 - 20, -W / 2 + 3, 12, W - 6, '#1a2230');
@@ -230,6 +278,54 @@ export function drawVehicleBody(c, car, night, t) {
     R(c, -L / 2 + 3, W / 2 - 5, L - 28, 2, car.color || '#888888');
     c.fillStyle = 'rgba(0,0,0,0.45)';
     R(c, -L / 2 + 1, -W / 2 + 2, 2, W - 4, 'rgba(0,0,0,0.45)');
+    wheels2d(c, car, [-1, 1]);
+  } else if (vType === 'suv') {
+    // CARS v18 — SUV top-down: atap kaca PANJANG (55% L, kabin tegak) +
+    // ban serep di muka belakang (lingkaran gelap + hub) + rel atap.
+    c.fillStyle = '#1a2230';
+    R(c, -L / 2 + 4, -W / 2 + 3, L * 0.55, W - 6, '#1a2230');
+    c.fillStyle = 'rgba(255,255,255,0.35)';
+    R(c, -L / 2 + 4 + L * 0.55 - 4, -W / 2 + 4, 3, W - 8, 'rgba(255,255,255,0.35)');
+    c.fillStyle = '#14181f';
+    c.beginPath();
+    c.arc(-L / 2 + 2, 0, 5, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#9aa0a8';
+    c.beginPath();
+    c.arc(-L / 2 + 2, 0, 2, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = 'rgba(0,0,0,0.35)';
+    R(c, L * 0.10, -W / 2 + 3, 2, W - 6, 'rgba(0,0,0,0.35)');
+    R(c, L * 0.10, W / 2 - 5, 2, W - 6, 'rgba(0,0,0,0.35)');
+    wheels2d(c, car, [-1, 1]);
+  } else if (vType === 'race') {
+    // CARS v18 — RACE top-down: spoiler belakang (bar gelap melintang) +
+    // garis balap tengah (strip terang) + kap panjang gelap.
+    c.fillStyle = '#14181f';
+    R(c, -L / 2 + 1, -W / 2 + 2, 3, W - 4, '#14181f');
+    c.fillStyle = 'rgba(255,255,255,0.75)';
+    R(c, -L / 2 + 6, -1.5, L - 12, 3, 'rgba(255,255,255,0.75)');
+    c.fillStyle = '#1a2230';
+    R(c, L / 2 - 16, -W / 2 + 3, 10, W - 6, '#1a2230');
+    c.fillStyle = car.color || '#888888';
+    R(c, L / 2 - 6, -W / 2 + 3, 4, W - 6, car.color || '#888888');
+    wheels2d(c, car, [-1, 1]);
+  } else if (vType === 'delivery') {
+    // CARS v18 — DELIVERY top-down: panel atap TEAL (boks warna usaha) +
+    // sambungan pintu geser di kedua flank + garis pintu kabin.
+    // TANPA palang merah / tangga / strip amber (B8).
+    // (Jalur traffic utama mem-bypass fungsi ini untuk van — cabang ini
+    // hanya terjangkau lewat drawCarShape langsung; lihat catatan di atas.)
+    c.fillStyle = '#298c99';
+    R(c, -L / 2 + 4, -W / 2 + 3, L * 0.60, W - 6, '#298c99');
+    c.fillStyle = 'rgba(255,255,255,0.35)';
+    R(c, -L / 2 + 4, -W / 2 + 3, L * 0.60, 2, 'rgba(255,255,255,0.35)');
+    R(c, -L / 2 + 4, W / 2 - 5, L * 0.60, 2, 'rgba(255,255,255,0.35)');
+    c.fillStyle = 'rgba(0,0,0,0.45)';
+    R(c, L * 0.02, -W / 2 + 2, 2, W - 4, 'rgba(0,0,0,0.45)');
+    R(c, -L * 0.28, -W / 2 + 2, 2, W - 4, 'rgba(0,0,0,0.45)');
+    c.fillStyle = '#1a2230';
+    R(c, L / 2 - 14, -W / 2 + 3, 7, W - 6, '#1a2230');
     wheels2d(c, car, [-1, 1]);
   }
   lights2d(c, car);

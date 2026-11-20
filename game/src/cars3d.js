@@ -201,15 +201,27 @@ const RIMWARM = [1.0, 0.6, 0.3];      // rim light hangat (tepi atap)
 // ---------------------------------------------------------------------------
 export const CAR_SPECS = {
   hero:      { label: 'Hero Neon GT',  kind: 'sport',  len: 5.4, wid: 2.3, bodyH: 0.80, cabFrac: 0.48, cabW: 0.78, wheels: 4, wheelD: 0.88, paint: '#e33e5f', spoiler: true,  lightbar: true },
-  bus:       { label: 'Bus Kota',     kind: 'bus',    len: 9.6, wid: 2.6, bodyH: 1.70, cabFrac: 0.90, cabW: 1.00, wheels: 6, wheelD: 0.70, paint: '#e8b93c', spoiler: false, lightbar: false },
-  fire:      { label: 'Pemadam',      kind: 'fire',   len: 8.4, wid: 2.6, bodyH: 1.50, cabFrac: 0.50, cabW: 0.90, wheels: 4, wheelD: 0.70, paint: '#c0392b', spoiler: false, lightbar: true },
-  medic:     { label: 'Ambulans',     kind: 'medic',  len: 6.2, wid: 2.4, bodyH: 1.40, cabFrac: 0.60, cabW: 0.90, wheels: 4, wheelD: 0.66, paint: '#f5f5f5', spoiler: false, lightbar: true },
+  bus:       { label: 'Bus Kota',     kind: 'bus',    len: 9.6, wid: 2.6, bodyH: 1.70, cabFrac: 0.90, cabW: 1.00, wheels: 6, wheelD: 1.00, paint: '#e8b93c', spoiler: false, lightbar: false },
+  fire:      { label: 'Pemadam',      kind: 'fire',   len: 8.4, wid: 2.6, bodyH: 1.50, cabFrac: 0.50, cabW: 0.90, wheels: 4, wheelD: 0.86, paint: '#c0392b', spoiler: false, lightbar: true },
+  medic:     { label: 'Ambulans',     kind: 'medic',  len: 6.2, wid: 2.4, bodyH: 1.40, cabFrac: 0.60, cabW: 0.90, wheels: 4, wheelD: 0.86, paint: '#f5f5f5', spoiler: false, lightbar: true },
   apc:       { label: 'APC Tentara',  kind: 'apc',    len: 6.8, wid: 2.6, bodyH: 1.30, cabFrac: 0.40, cabW: 0.70, wheels: 6, wheelD: 0.45, paint: '#4a5a2a', spoiler: false, lightbar: false },
-  armored:   { label: 'Truk Lapis Baja', kind: 'armored', len: 5.4, wid: 2.4, bodyH: 1.50, cabFrac: 0.30, cabW: 0.92, wheels: 6, wheelD: 0.70, paint: '#4a5240', spoiler: false, lightbar: false },
+  armored:   { label: 'Truk Lapis Baja', kind: 'armored', len: 5.4, wid: 2.4, bodyH: 1.50, cabFrac: 0.30, cabW: 0.92, wheels: 6, wheelD: 0.86, paint: '#4a5240', spoiler: false, lightbar: false },
   hatchback: { label: 'Hatchback',    kind: 'hatch',  len: 4.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.62, cabW: 0.80, wheels: 4, wheelD: 0.84, paint: '#2e8b9e', spoiler: true,  lightbar: true },
   sedanL:    { label: 'Sedan Panjang',kind: 'sedan',  len: 5.4, wid: 2.2, bodyH: 0.80, cabFrac: 0.45, cabW: 0.78, wheels: 4, wheelD: 0.86, paint: '#7d8ea3', spoiler: false, lightbar: true },
   pickup:    { label: 'Pickup',       kind: 'pickup', len: 5.2, wid: 2.2, bodyH: 0.80, cabFrac: 0.42, cabW: 0.80, wheels: 4, wheelD: 0.86, paint: '#d97b2b', spoiler: false, lightbar: true },
   police:    { label: 'Polisi',       kind: 'sedan',  len: 4.6, wid: 2.2, bodyH: 0.80, cabFrac: 0.50, cabW: 0.78, wheels: 4, wheelD: 0.86, paint: '#141c3c', spoiler: false, lightbar: true, police: true },
+  // ---- CARS v18: jenis baru (varian visual — slot traffic tetap) ----
+  // SUV: varian slot sedanL traffic — reuse cabang 'hatch' (belakang tegak),
+  // bodyH 1,30 (skala game) + cabFrac 0,55 + ban serep di belakang. wb/L
+  // 0,533 (estimasi suv-luxury, MEASUREMENTS.md A5) — posisi as dicek
+  // visual di screenshot samping, bukan dipercaya buta.
+  suv:      { label: 'SUV',          kind: 'hatch',  len: 5.4, wid: 2.2, bodyH: 1.30, cabFrac: 0.55, cabW: 0.80, wheels: 4, wheelD: 0.88, paint: '#8a9bb0', spoiler: false, lightbar: false, wb: 0.533, spare: true },
+  // Race: varian langka slot sedanL PARKIR SAJA — reuse cabang 'sport'
+  // (bodyH rendah + cabFrac 0,15 + spoiler besar). wb/L 0,594 (kit race).
+  race:     { label: 'Mobil Balap',  kind: 'sport',  len: 5.4, wid: 2.2, bodyH: 0.62, cabFrac: 0.15, cabW: 0.78, wheels: 4, wheelD: 0.86, paint: '#d7263d', spoiler: true,  lightbar: false },
+  // Delivery: varian visual slot van — cabang BARU drawDelivery (klon
+  // drawArmored minus detail kas). wb/L 0,498 (kit delivery).
+  delivery: { label: 'Van Delivery', kind: 'delivery', len: 5.4, wid: 2.4, bodyH: 1.50, cabFrac: 0.30, cabW: 0.92, wheels: 4, wheelD: 0.86, paint: '#e8e8e8', spoiler: false, lightbar: false, wb: 0.498 },
 };
 export function carSpec(type) { return CAR_SPECS[type] || CAR_SPECS.hero; }
 
@@ -384,9 +396,12 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   // Gradasi langit 3 pita di muka kaca miring (belakang saja).
   // v16: DIGELAPKAN — v15 terlalu pucat (kaca belakang terbaca seperti
   // layar putih di chase-cam sore/siang); kaca mobil asli gelap.
+  // v18-P3: pita ATAS digelapkan lagi ([0,24,0,28,0,40] -> [0,16,0,19,0,28],
+  // mendekati pita tengah) — di close-up, pita atas masih terbaca
+  // lavender-putih vs kaca samping yang gelap.
   const skyGlass = (lx, ly, lz, w, h, rx) => {
     const hw = w / 2, hh = h / 2;
-    faceQuad(lx, ly, lz, -hw, hw, hh * 0.35, hh, 0.035, rx, 0.006, [0.24, 0.28, 0.40], 4);
+    faceQuad(lx, ly, lz, -hw, hw, hh * 0.35, hh, 0.035, rx, 0.006, [0.16, 0.19, 0.28], 4);
     faceQuad(lx, ly, lz, -hw, hw, -hh * 0.35, hh * 0.35, 0.035, rx, 0.006, [0.17, 0.20, 0.30], 4);
     faceQuad(lx, ly, lz, -hw, hw, -hh, -hh * 0.35, 0.035, rx, 0.006, [0.11, 0.13, 0.20], 4);
   };
@@ -415,7 +430,12 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       nrm, [[0, 0], [1, 0], [1, 1], [0, 1]], paintDark, 1);
   };
   const wheelD = spec.wheelD, wheelY = wheelD / 2;
-  const axleZ = spec.wheels === 6 ? [-L * 0.29, 0, L * 0.29] : [-L * 0.29, L * 0.29];
+  // CARS v18: wheelbase per-spec (wb = wheelbase / L). Default 0,58
+  // (= 2 x 0,29, perilaku lama); SUV 0,533 + delivery 0,498 (kit Kenney,
+  // MEASUREMENTS.md) — as depan/belakang lebih masuk, overhang lebih
+  // panjang, sesuai kendaraan tinggi. 6-roda tetap global (as tengah 0).
+  const wbFrac = spec.wb || 0.58;
+  const axleZ = spec.wheels === 6 ? [-L * 0.29, 0, L * 0.29] : [-L * wbFrac / 2, L * wbFrac / 2];
 
   // Bayangan kontak v3 — oktagon (bukan persegi panjang): tepi lebih lembut.
   // DUA lapis (alasan di STATUS-V2.md): (a) elips lembut material 9 di G
@@ -482,6 +502,16 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     // atasnya (v3: cakram + spoke sama-sama RIM → spoke tak terlihat).
     wheelCyl(C, rimR, 0.32, 8, [0.07, 0.07, 0.09], 1, [0.07, 0.07, 0.09]); // v11: cakram HAMPIR HITAM (0,16 render abu-abu pucat di macro — celah antar-spoke harus gelap supaya 5 spoke terbaca terpisah)
     // (v16c: cakram rem DICABUT — lihat header. Velg 0,34×wheelD sudah membuat roda terbaca.)
+    // v19-MULUS (kembali, hi-only): CAKRAM REM — quad baja di belakang
+    // spoke (dx s*0,165, 0,005 di dalam bidang spoke 0,17), setengah
+    // ukuran rimR*0,70 — terbaca lewat celah antar-spoke. 2 tris/roda.
+    if (hi) {
+      const discR = rimR * 0.70;
+      const up = dir(0, 1, 0), fw = dir(0, 0, 1);
+      const dc = [C[0] + rgt[0] * s * 0.165, C[1], C[2] + rgt[1] * s * 0.165];
+      const dp = (su, sv) => [dc[0] + up[0] * su * discR + fw[0] * sv * discR, dc[1] + up[1] * su * discR + fw[1] * sv * discR, dc[2] + up[2] * su * discR + fw[2] * sv * discR];
+      quad(B, dp(-1, -1), dp(1, -1), dp(1, 1), dp(-1, 1), [rgt[0] * s, 0, rgt[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], [0.55, 0.56, 0.58], 1);
+    }
     if (hi || mid) {
       // 5 spoke di muka luar velg (bidang x = +0.17 dari pusat roda)
       // v6: spoke LEBIH TERANG [0,92] di atas cakram gelap — batch 9: velg
@@ -618,6 +648,9 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   if (spec.kind === 'medic') return drawMedic();
   if (spec.kind === 'apc') return drawApc();
   if (spec.kind === 'armored') return drawArmored();
+  // CARS v18: delivery BUKAN drawSedanFamily (bentuk van kotak) dan
+  // BUKAN drawArmored (tanpa detail kas) — cabang sendiri di bawah.
+  if (spec.kind === 'delivery') return drawDelivery();
   drawDoor();
   return drawSedanFamily();
 
@@ -790,6 +823,49 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     return finish();
   }
 
+  // ---- CARS v18 — VAN DELIVERY: varian visual slot van. Klon drawArmored
+  // (bentuk van kotak: bak + kabin) MINUS detail kas: tanpa strip amber,
+  // palka atap, ventilasi, pintu ganda kas, marker amber. Ganti: pintu
+  // geser di flank bak (2 sambungan + rel atas + gagang) + boks warna
+  // usaha (teal) + panel atap putih. TANPA palang merah / tangga /
+  // strip amber — delivery BUKAN ambulans/pemadam (B8).
+  // Semua shell ada di semua LOD (bentuk tak boleh berubah dengan jarak).
+  function drawDelivery() {
+    const BOX = [0.16, 0.55, 0.60]; // teal usaha — beda dari pemadam/ambulans
+    const BOXD = BOX.map((v) => v * 0.8); // pelat atas lebih gelap
+    const cargoZ = -L * 0.16, cargoL = L * 0.68; // bak: z -L/2 .. +L*0.18
+    const cabZ = L * 0.34, cabL = L * 0.32; // kabin: z +L*0.18 .. +L/2
+    // Bak kargo teal: bawah penuh + atas menyempit + atap putih
+    p(0, 0.95, cargoZ, W, 1.0, cargoL, BOX, 1);                           // bak bawah (0,45–1,45)
+    p(0, 1.70, cargoZ, W * 0.90, 0.5, cargoL * 0.94, BOXD, 1);            // bak atas (1,45–1,95)
+    p(0, 1.99, cargoZ, W * 0.88, 0.08, cargoL * 0.92, paintLight, 1);      // atap bak
+    // Kabin: badan + atap + kaca depan/samping (warna mobil)
+    p(0, 1.02, cabZ, W * 0.96, 1.14, cabL, col, 1);                        // kabin (0,45–1,59)
+    p(0, 1.63, cabZ, W * 0.94, 0.08, cabL, paintLight, 1);                 // atap kabin
+    for (const s of [-1, 1]) p(s * (W / 2 + 0.01), 1.30, cabZ, 0.05, 0.5, cabL * 0.64, GLASS, 1); // kaca samping kabin
+    flatGlass(0, 1.30, L / 2 + 0.01, W * 0.80, 0.55, 1);                   // kaca depan + bingkai + streak
+    // Flank bak: pita bawah gelap + PINTU GESER (sambungan depan/belakang
+    // + rel atas + gagang) + trim terang; kabin: garis pintu + gagang
+    for (const s of [-1, 1]) {
+      qS(s * (W / 2 + 0.01), 0.72, cargoZ, cargoL * 0.85, 0.28, paintDark, 1);
+      qS(s * (W / 2 + 0.02), 1.20, cargoZ + cargoL * 0.30, 0.06, 1.15, DARK, 5); // sambungan pintu geser (depan)
+      qS(s * (W / 2 + 0.02), 1.20, cargoZ - cargoL * 0.10, 0.06, 1.15, DARK, 5); // sambungan pintu geser (belakang)
+      qS(s * (W / 2 + 0.02), 1.45, cargoZ + cargoL * 0.10, 0.05, 1.15, DARK, 5); // rel atas pintu geser
+      qS(s * (W / 2 + 0.02), 1.05, cargoZ + cargoL * 0.18, 0.22, 0.07, CHROME, 1); // gagang pintu geser
+      qS(s * (W / 2 + 0.01), 1.45, cargoZ, cargoL * 0.85, 0.05, paintLight, 1); // trim terang
+      qS(s * (W / 2 + 0.02), 1.0, cabZ - cabL * 0.45, 0.05, 1.0, DARK, 5);  // garis pintu kabin
+      qS(s * (W / 2 + 0.02), 1.05, cabZ + cabL * 0.22, 0.25, 0.06, CHROME, 1); // gagang pintu kabin
+    }
+    // Muka belakang: pintu TUNGGAL (tanpa sambungan tengah ganda kas) +
+    // engsel + gagang; TANPA marker amber.
+    for (const s of [-1, 1]) qB(s * W * 0.38, 1.20, -L / 2 - 0.03, 0.06, 1.3, DARK, 5); // engsel
+    for (const s of [-1, 1]) qB(s * 0.22, 1.10, -L / 2 - 0.04, 0.08, 0.28, CHROME, 1); // gagang pintu
+    rearBevel(1.95, W * 0.8);
+    drawRearLights();
+    drawFrontLights();
+    return finish();
+  }
+
   // ================= KELUARGA SEDAN (hero / hatchback / sedanL / pickup / polisi) =================
   function drawSedanFamily() {
     const bodyBot = 0.34, bodyTop = bodyBot + spec.bodyH; // 0.34–1.14
@@ -807,10 +883,19 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     const cowlZ = 0.185 * L, noseZ = 0.5 * L, flankZ = 0.44 * L;
     // Kaca depan per jenis (rx = miring dari vertikal): sport tajam,
     // sedan agak tegak, pickup hampir tegak.
+    // CARS v18 — SUV: kaca depan HAMPIR TEGAK + h 0,42 (bukan 0,63) —
+    // kalau tidak, kaca menembus atap (cowlZ 0,185×L = 1,00 vs atap 1,64)
+    // dan mobil terbaca sedan tinggi, bukan SUV kotak. RACE: kaca depan
+    // tetap 'sport' (rx 0,92, h 0,63) — tanpa 'hatch' roofline.
     const wind = spec.kind === 'pickup' ? { rx: 0.70, h: 0.55, w: 0.80 }
       : spec.kind === 'sedan' ? { rx: 0.80, h: 0.60, w: 0.78 }
+      : (spec.bodyH >= 1.15 && spec.kind === 'hatch') ? { rx: 0.52, h: 0.42, w: 0.80 }
       : { rx: 0.92, h: 0.63, w: 0.78 };
-    const beltY = 1.16; // garis pinggang = atas bahu
+    // CARS v18 — SUV: semua geometri atap/kaca/kabin naik +0,50 (bodyH
+    // 1,30 vs sedan 0,80): atap 1,64, bahu 1,66 — mobil terbaca TINGGI.
+    // HANYA jenis dengan bodyH >= 1,15 (SUV); RACE pakai lift 0.
+    const lift = spec.bodyH >= 1.15 ? spec.bodyH - 0.80 : 0;
+    const beltY = 1.16 + lift; // garis pinggang = atas bahu
     const shieldBaseZ = cowlZ - 0.25; // dasar kaca depan (strip cowl 0,25)
     const shieldTopZ = shieldBaseZ - wind.h * Math.sin(wind.rx);
     const shieldTopY = beltY + wind.h * Math.cos(wind.rx);
@@ -840,7 +925,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       : z < trunkZ0 ? 0.06 * Math.min(1, (trunkZ0 - z) / (flankZ + trunkZ0)) : 0);
     // Badan: kotak bawah (tutup 0,99 = tepi depan kap) + bahu tengah.
     p(0, 0.691, 0, W, 0.598, L, paintDark, 1); // bawah (0,39–0,99)
-    p(0, 1.06, (trunkZ0 + cowlZ) / 2, W * 0.97, 0.2, cowlZ - trunkZ0, col, 1); // bahu (0,96–1,16)
+    p(0, 1.06 + lift, (trunkZ0 + cowlZ) / 2, W * 0.97, 0.2, cowlZ - trunkZ0, col, 1); // bahu (0,96–1,16; SUV +lift)
     // FLANK v15: 5 faset × 3 segmen (depan/tengah/belakang) — tepi atas
     // menurun mengikuti kap/bagasi; normal dari geometri (quadOut).
     const flankSegs = [[cowlZ, flankZ], [trunkZ0, cowlZ], [-flankZ, trunkZ0]];
@@ -856,7 +941,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     // → tonjolan samping terbaca melengkung halus. Tepi atas (bahu) +
     // bawah (skirt) tetap tajam = crease desain. 0 tris baru.
     const flankProfile = [
-      [W * 0.485, 1.06, W / 2 + 0.14, 0.95, paintLight], // (A1)
+      [W * 0.485, 1.06 + lift, W / 2 + 0.14, 0.95, paintLight], // (A1) — v18: SUV meregangkan faset atas (pintu lebih tinggi), bawah tetap 0,95
       [W / 2 + 0.14, 0.95, W / 2 + 0.20, 0.80, paintLight], // (A2)
       [W / 2 + 0.20, 0.80, W / 2 + 0.20, 0.55, col], // (B) — tonjolan 0,20
       [W / 2 + 0.20, 0.55, W / 2 + 0.10, 0.45, paintDark], // (C1)
@@ -920,7 +1005,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     // Kabin: inti MENYEMPIT (0,84×) + RENDAH (atas 1,50, di bawah atap) —
     // sisi kabin dibentuk kaca miring (tumblehome), bukan inti kotak.
     const coreFrontZ = shieldTopZ - 0.05, coreRearZ = rearTopZ - 0.05;
-    p(0, 1.36, (coreFrontZ + coreRearZ) / 2, W * spec.cabW * 0.84, 0.28, coreFrontZ - coreRearZ, col, 1);
+    p(0, 1.36 + lift, (coreFrontZ + coreRearZ) / 2, W * spec.cabW * 0.84, 0.28, coreFrontZ - coreRearZ, col, 1); // v18: SUV +lift (atas 2,00)
     // ATAP v15: cangkang lengkung (depan -> puncak -> belakang) × V
     // melintang (punggung +0,05) — atap datar MATI.
     // R36V2-SMOOTH: atap — normal halus sepanjang z per paruh (punggung
@@ -1004,6 +1089,61 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     // vertex v16c <= v15 di SEMUA scene — aman digabung apa pun keadaan
     // bucket. Geometri (haunch/disk/sunroof/sweep) kembali SETELAH
     // perbaikan Uint32 di webgl2.js (jatah R27c). ----
+    // ---- v19-MULUS PHASE 1: geometri v16-penuh KEMBALI (minus sweep) ----
+    // Uint32 (R28) sudah di webgl2.js — bucket tidak lagi wrap di 65.536,
+    // jadi geometri ini aman kembali. Koordinat PERSIS STATUS.md
+    // §"v16 penuh — yang dicabut". SWEEP LAMPU DEPAN TIDAK KEMBALI
+    // (pemicu beam terbukti lewat bisect — gate beam di lineup).
+    // Side skirt v16 TIDAK kembali: R36-SKIRT sudah memberi pita gelap
+    // bawah; posisi v16 (x W/2+0,16) kini DI DALAM tonjolan flank B
+    // (W/2+0,20) — tersembunyi, 4 tris sia-sia.
+    // Splitter depan (12 tris): bibir gelap di bawah bumper depan.
+    p(0, 0.35, L / 2 + 0.10, W * 0.78, 0.08, 0.22, DARK, 5);
+    // Fin diffuser (12 tris): 3 sirip dua sisi di bawah bumper belakang.
+    for (const fx of [-0.32, 0, 0.32]) {
+      for (const s of [-1, 1]) qS(fx + s * 0.01, 0.35, -L / 2 - 0.18, 0.08, 0.14, DARK, 5);
+    }
+    // Haunch belakang (8 tris) + tonjolan fender depan (8 tris): quad
+    // miring di atas roda — tepi atas di dalam flank, tepi bawah keluar
+    // (W/2+0,20→0,23) = flare fender. B3: vs fender saat belok penuh.
+    for (const s of [-1, 1]) {
+      quadOut(at(s * (W / 2 + 0.05), 1.02, -L * 0.16), at(s * (W / 2 + 0.05), 1.02, -L * 0.46),
+        at(s * (W / 2 + 0.23), 0.88, -L * 0.46), at(s * (W / 2 + 0.20), 0.88, -L * 0.16), [s, 0.3, 0], col, 1);
+      quadOut(at(s * (W / 2 + 0.05), 1.02, L * 0.16), at(s * (W / 2 + 0.05), 1.02, L * 0.46),
+        at(s * (W / 2 + 0.23), 0.88, L * 0.46), at(s * (W / 2 + 0.20), 0.88, L * 0.16), [s, 0.3, 0], col, 1);
+    }
+    // Valance belakang (2 tris): panel gelap di bawah bumper belakang.
+    qB(0, 0.35, -L / 2 - 0.14, W * 0.66, 0.10, DARK, 5);
+    // Arch gelap (4 tris): bayangan lengkung roda di muka belakang.
+    // B2: jangan menutupi roda / terbaca noda hitam — bila terbaca noda,
+    // kecilkan 20% (0,26×0,24 -> 0,21×0,19).
+    for (const s of [-1, 1]) qB(s * 0.95, 0.54, -L / 2 - 0.02, 0.26, 0.24, [0.03, 0.03, 0.04], 5);
+    // Ducktail (2 tris): bibir miring warna bodi di tepi deck belakang.
+    // B5: + spoiler bukan tonjolan ganda — ducktail di deck (bodyTop+0,04),
+    // sayap sport di bodyTop+0,30, spoiler kotak di bodyTop+0,02 (menyatu).
+    quadOut(at(-W * 0.44, bodyTop + 0.04, -L / 2 - 0.02), at(W * 0.44, bodyTop + 0.04, -L / 2 - 0.02),
+      at(W * 0.44, bodyTop + 0.09, -L / 2 - 0.14), at(-W * 0.44, bodyTop + 0.09, -L / 2 - 0.14), [0, 0.4, -1], col, 1);
+    // Recess plat (2 tris): ceruk gelap pelat nomor di bumper belakang.
+    qB(0, 0.52, -L / 2 - 0.145, 0.64, 0.20, DARK, 5);
+    // Sunroof (4 tris, hi): 2 quad kaca mengikuti lengkung V atap,
+    // z 30–65% atap. B6: bukan lubang hitam — kaca GLASS (bukan DARK).
+    if (hi) {
+      const srF = roofFZ + (roofRZ - roofFZ) * 0.30, srR = roofFZ + (roofRZ - roofFZ) * 0.65;
+      for (const s of [-1, 1]) {
+        quadOut(at(0, roofEdgeY(srF) + 0.015, srF), at(s * roofHalf * 0.85, roofEdgeY(srF) + 0.015, srF),
+          at(s * roofHalf * 0.85, roofEdgeY(srR) + 0.015, srR), at(0, roofEdgeY(srR) + 0.015, srR), [0, 1, 0], GLASS, 1);
+      }
+    }
+    // ---- v18 — SUV: BAN SEREP di muka belakang (semua LOD) ----
+    // Cakram gelap + hub terang, menempel di pintu belakang DI BAWAH
+    // kaca (bukan di atas kaca): kaca belakang 'hatch' SUV turun sampai
+    // y 1,12, jadi ban di y 1,80 menutupi kaca + menjulang di atas atap.
+    // Ban = boks (12 tris, tebal 0,16, menempel di pintu, muka belakang
+    // di -L/2-0,16, di belakang bumper -L/2-0,13) + hub quad di mukanya.
+    if (spec.spare) {
+      p(0, 0.80, -L / 2 - 0.08, 0.62, 0.62, 0.16, [0.05, 0.05, 0.06], 5);
+      qB(0, 0.80, -L / 2 - 0.17, 0.30, 0.30, [0.55, 0.56, 0.58], 1);
+    }
     // Garis pinggang (panel line) di flank — batch 5: sisi masih slab datar.
     for (const s of [-1, 1]) {
       if (hi) qS(s * (W / 2 + 0.21), 0.98, 0, L * 0.85, 0.03, DARK, 5); // garis pinggang (v7: di atas faset B v7)
@@ -1023,10 +1163,15 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     }
     // Rim light hangat di tepi belakang atap (jurus GTA V — bible §1.2 butir 8)
     if (hi) p(0, roofEdgeY(roofRZ) + 0.02, roofRZ + 0.02, W * spec.cabW * 0.78, 0.04, 0.04, [0.9, 0.55, 0.28], 4);
-    // v16c: sunroof + sweep DICABUT (8 tris hi) — kembali setelah Uint32.
+    // v16c: sunroof KEMBALI di blok v19 di atas (4 tris hi, GLASS);
+    // sweep TETAP DICABUT (pemicu beam — jangan kembalikan).
     // ---- detail kecil (bible §1.7): spion, gagang pintu, panel line, antena ----
     for (const s of [-1, 1]) {
       p(s * (W / 2 + 0.10), bodyTop + 0.08, L * 0.12, 0.14, 0.12, 0.22, col, 1); // spion (v16: lebih besar; muka gelap dicabut v16b — 4 tris)
+      // v19-MULUS: MUKA SPION GELAP kembali (4 tris, hi) — quad gelap di
+      // muka BELAKANG spion (z L*0.12-0.115, menghadap pengemudi),
+      // 0,10×0,08. Koordinat STATUS.md (qB).
+      if (hi) qB(s * (W / 2 + 0.10), bodyTop + 0.08, L * 0.12 - 0.115, 0.10, 0.08, DARK, 5);
       if (hi) {
         // v7: digeser ke W/2+0,13 — duduk di faset flank B v7 (bukan tertimbun).
         qS(s * (W / 2 + 0.21), 0.82, L * 0.08, 0.3, 0.045, DARK, 5);               // gagang pintu depan

@@ -5,6 +5,7 @@
 
 import { PRESETS, webglUniforms } from './timeofday.js';
 import { drawCarRealistic } from './cars3d.js'; // R26: cars3d v15d di game/src/
+import { carVariant } from './vehicles.js'; // CARS v18: varian visual (suv/race/delivery)
 import { drawCruiseShips } from './ships3d.js'; // R27b: kapal pesiar + yacht (statis, visual saja)
 import { marketSite, marketStalls } from './market.js'; // R35-F9: night market (Pasar Malam) — geometri dari market.js
 import { activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
@@ -2019,7 +2020,11 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     if (!near(c.x, c.y, R) || !vis(c.x, c.y, 100)) return; // R27c-TUNE: 60->100 (bus/APC ~110px, setengah diagonal ~60-70px > 60)
     let type;
     if (police) type = (unit && unit.emergency && (c.body === 'fire' || c.body === 'medic')) ? c.body : 'police';
-    else type = CAR_TYPE[c.body] || 'sedanL';
+    // CARS v18: varian visual — jenis yang digambar bisa berbeda dari
+    // c.body (sedanL -> suv/race, van -> delivery). carVariant() deterministik
+    // (hash cruise/posisi spawn) dan mengecualikan taksi pink, mobil pemain,
+    // polisi/militer, truk lapis baja. Type 'hero'/'armored' tak tersentuh.
+    else type = carVariant(c) || CAR_TYPE[c.body] || 'sedanL';
     const lod = distPx(c.x, c.y, hx0, hy0) < 250 ? undefined : 'low';
     drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, taxi: c.body === 'taxi', tl: tlGain, door: c.doorAngle || 0, doorSide: c.doorSide || -1 }); // R36V2-TAXI: papan TAXI + strip kotak (cars3d.js) — digabung R38 tlGain
   };

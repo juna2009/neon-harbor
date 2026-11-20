@@ -5,6 +5,7 @@ import { BRIDGE } from './drawbridge.js';
 import { PRESETS } from './timeofday.js';
 import { drawMarket3D } from './market.js'; // R35-F9: night market stalls + string lights (post-cut)
 import { activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
+import { carVariant } from './vehicles.js'; // CARS v18: varian visual (suv/race/delivery)
 // Neon Harbor 3D title-screen — software 3D engine, Canvas 2D only, no libs.
 // Perspective projection + painter's algorithm. Deterministic (seeded).
 let x, W = 1280, H = 800, CX = W / 2, HOR = H * .46;
@@ -1020,13 +1021,32 @@ function inRange(wx, wy, fwdMax, latMax) {
 let rimOn = true; // warm rim light while the sun is up (set per frame)
 let chaseTL = 1; // R38: taillight gain for the chase renderer (set per frame from daylight — same steps as TITLE_PAL.tlGain)
 function tlC(r, g, b) { return 'rgb(' + ((r * chaseTL) | 0) + ',' + ((g * chaseTL) | 0) + ',' + ((b * chaseTL) | 0) + ')'; }
+// CARS v18 — jenis mobil untuk car3d: varian visual dulu (carVariant,
+// deterministik), lalu tipe dasar dari car.body. car.type TIDAK PERNAH
+// di-set di mana pun (cabang VT/fitur di bawah mati hari ini) — jadi
+// tipe dasar dipetakan di sini dari body. JANGAN PERNAH varian: taksi
+// pink, mobil pemain, polisi/militer, truk lapis baja (carVariant sudah
+// mengecualikannya). SedanL traffic -> suv, sedanL parkir -> race,
+// van -> delivery. Medic -> 'ambulance' (nama cabang VT di car3d).
+function canvasCarType(car) {
+  const v = carVariant(car);
+  if (v) return v;
+  if (car.body === 'bus') return 'bus';
+  if (car.body === 'fire') return 'fire';
+  if (car.body === 'medic') return 'ambulance';
+  if (car.body === 'apc') return 'apc';
+  if (car.body === 'van') return 'van';
+  if (car.body === 'pickup') return 'pickup';
+  if (car.body === 'taxi') return 'taxi';
+  return 'sedan';
+}
 function car3d(wx, wy, angle, len, wid, color, o) {
   let L = len * CS, Wd = wid * CS;
   const bodyH = o.hero ? 0.72 : 0.8;
   if (o.hero) Wd *= 1.08; // F2: hero car reads wider / lower
   // T2: vehicle-type recipes (T1 supplies o.type from traffic.js; default sedan).
   // Only body height changes here — the type features live at the end of car3d.
-  const VT = { bus: 2.1, fire: 1.7, ambulance: 1.55, apc: 1.35, van: 1.7, pickup: 1.15, taxi: 1 }[o.type || 'sedan'] || 1;
+  const VT = { bus: 2.1, fire: 1.7, ambulance: 1.55, apc: 1.35, van: 1.7, pickup: 1.15, taxi: 1, suv: 1.45, race: 1.0, delivery: 1.7 }[o.type || 'sedan'] || 1;
   const BH = bodyH * VT;
   const cx = wx * CS, cz = wy * CS;
   const dep = Math.hypot(cx - ccX, cz - ccZ);
@@ -1158,6 +1178,27 @@ function car3d(wx, wy, angle, len, wid, color, o) {
     for (const s of [-1, 1]) {
       const lx = (-fz) * s * (Wd / 2 + 0.03), lz = fx * s * (Wd / 2 + 0.03);
       box3(cx + lx, 0.62, cz + lz, 0.05, 0.12, L * 0.7, angle, '#14141a', dep);
+    }
+  } else if (o.type === 'suv') {
+    // CARS v18 — SUV Canvas: ban serep di muka belakang + rel atap.
+    // (Bodi sudah lebih tinggi lewat VT 1,45 — itu pembeda utamanya.)
+    vQuad(cx, cz, angle, -L / 2 - 0.08, 0, 0.5, 0.6, 1.1, '#14141a');
+    vQuad(cx, cz, angle, -L / 2 - 0.1, 0, 0.22, 0.74, 0.96, '#9aa0a8');
+    box3(cx, 1.5, cz, Wd * 0.6, 0.06, L * 0.5, angle, '#14141a', dep);
+  } else if (o.type === 'race') {
+    // CARS v18 — RACE Canvas: spoiler belakang + garis balap di atap +
+    // splitter depan. (Bodi sama rendahnya dengan sedan — VT 1,0.)
+    box3(cx - fx * (L * 0.48), BH + 0.05, cz - fz * (L * 0.48), Wd * 0.9, 0.08, 0.3, angle, '#14141a', dep);
+    box3(cx, 1.5, cz, 0.3, 0.05, L * 0.7, angle, '#e8e8e8', dep);
+    box3(cx + fx * (L * 0.5), 0.15, cz + fz * (L * 0.5), Wd * 0.8, 0.1, 0.2, angle, '#14141a', dep);
+  } else if (o.type === 'delivery') {
+    // CARS v18 — DELIVERY Canvas: panel atap TEAL (boks warna usaha, di
+    // atap kargo di belakang kabin) + sambungan pintu geser di flank.
+    // TANPA palang merah / tangga / strip amber (B8).
+    box3(cx - fx * (L * 0.41), BH + 0.02, cz - fz * (L * 0.41), Wd * 0.7, 0.06, L * 0.18, angle, '#298c99', dep);
+    for (const s of [-1, 1]) {
+      const lx = (-fz) * s * (Wd / 2 + 0.03), lz = fx * s * (Wd / 2 + 0.03);
+      box3(cx + fx * (L * 0.1) + lx, 0.9, cz + fz * (L * 0.1) + lz, 0.05, 0.9, 0.08, angle, '#14141a', dep);
     }
   }
   if (o.pol) {
@@ -2509,11 +2550,11 @@ export function drawChase3D(ctx, state) {
   // parked + moving traffic
   for (const car of state.traffic.parked) {
     if (!car.alive || !inRange(car.x, car.y, 150, 100)) continue;
-    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: car.type });
+    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: canvasCarType(car) });
   }
   for (const car of state.traffic.cars) {
     if (!car.alive || !inRange(car.x, car.y, 150, 100)) continue;
-    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: car.type });
+    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: canvasCarType(car) });
   }
   if (state.armored && state.armored.truck && state.armored.truck.alive && inRange(state.armored.truck.x, state.armored.truck.y, 150, 100)) {
     const tr = state.armored.truck;
@@ -2528,7 +2569,7 @@ export function drawChase3D(ctx, state) {
       if (unit.car.concrete) {
         box3(unit.car.x * CS, 0.15, unit.car.y * CS, unit.car.width * CS, 2.2, unit.car.length * CS, unit.car.angle, '#6b6f75', Math.hypot(unit.car.x * CS - ccX, unit.car.y * CS - ccZ));
       } else {
-        car3d(unit.car.x, unit.car.y, unit.car.angle, unit.car.length, unit.car.width, unit.car.color || '#2f6fd0', { pol: true, t, type: unit.car.type });
+        car3d(unit.car.x, unit.car.y, unit.car.angle, unit.car.length, unit.car.width, unit.car.color || '#2f6fd0', { pol: true, t, type: canvasCarType(unit.car) });
       }
     } else if (unit.kind === 'boat') {
       if (!inRange(unit.x, unit.y, 150, 100)) continue;
