@@ -33,6 +33,19 @@ function nearTree(city, x, y, w, d) {
   }
   return false;
 }
+// GEDUNG-BLD: hash lokal (badan sama dengan h2/hash2) untuk variasi
+// kanopi + peti — market.js tidak mengimpor apa pun.
+function mh(x, y) { let v = (x * 73856093) ^ (y * 19349663); v = Math.imul(v ^ (v >>> 13), 1274126177); return ((v ^ (v >>> 16)) >>> 0) / 4294967296; }
+function marketCrateSpot(city, s, st) {
+  // Satu peti per baris kios, di sisi LUAR (jauh dari aisle tengah + di
+  // luar rect stall — B8). Baris utara -> peti di utara kios, baris
+  // selatan -> di selatan. Kembali null bila peti menabrak pohon.
+  const north = st.y < s.y + s.h / 2;
+  const top = north ? st.y - 22 : st.y + st.d + 6;
+  const cx = st.x + st.w / 2, cy = top + 8;
+  if (nearTree(city, cx - 8, cy - 8, 16, 16)) return null;
+  return { x: cx, y: cy };
+}
 // Stall rects (world px): two rows, centre aisle kept clear for walking
 // and for the firing lane. {x, y, w, d, hue} — d is the depth (world y).
 export function marketStalls(city) {
@@ -111,13 +124,23 @@ export function drawMarket3D(H, city, nightF) {
   H.box3(sx, 1.3, cz, 0.35, 1.5, 7, 0, lit ? '#ff4d9d' : '#b8455a', pd);
   H.box3(sx, 2.85, cz, 0.45, 0.28, 7.3, 0, lit ? '#37e0e6' : '#2f6b5a', pd);
   // stalls: wooden counter + colourful goods + two-tone striped awning.
-  for (const st of marketStalls(city)) {
+  // GEDUNG-BLD: kanopi hijau/merah (Poly Pizza Market Stalls) + 1 peti
+  // kayu per baris di sisi luar kios (B8).
+  const stalls = marketStalls(city);
+  let crateRow = null;
+  for (const st of stalls) {
     const scx = (st.x + st.w / 2) * H.CS, scz = (st.y + st.d / 2) * H.CS;
     const sw = st.w * H.CS, sd = st.d * H.CS;
     H.box3(scx, 0, scz, sd, 1.1, sw, 0, '#7a4a28', pd);
     H.box3(scx, 1.1, scz, sd * 0.6, 0.35, sw * 0.8, 0, st.hue, pd);
-    H.box3(scx - sw / 4, 1.9, scz, sd + 0.6, 0.18, sw / 2 + 0.3, 0, st.hue, pd);
+    const can = mh(st.x, st.y) < 0.5 ? '#2e7d32' : '#c0392b';
+    H.box3(scx - sw / 4, 1.9, scz, sd + 0.6, 0.18, sw / 2 + 0.3, 0, can, pd);
     H.box3(scx + sw / 4, 1.9, scz, sd + 0.6, 0.18, sw / 2 + 0.3, 0, '#fff3d6', pd);
+    if (crateRow !== st.y) {
+      crateRow = st.y;
+      const crate = marketCrateSpot(city, s, st);
+      if (crate) H.box3(crate.x * H.CS, 0, crate.y * H.CS, 1.6, 1.0, 1.6, 0, '#7a4a28', pd);
+    }
   }
   // string lights: 4 poles + sagging spans of warm bulbs across the aisle.
   const poles = [[s.x + 18, s.y + 18], [s.x + s.w - 18, s.y + 18], [s.x + 18, s.y + s.h - 18], [s.x + s.w - 18, s.y + s.h - 18]];

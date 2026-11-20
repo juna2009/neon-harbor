@@ -24,6 +24,21 @@ function hash2(a, b) {
   v = Math.imul(v ^ (v >>> 13), 1274126177);
   return ((v ^ (v >>> 16)) >>> 0) / 4294967296;
 }
+// GEDUNG-BLD (Poly Pizza CC0 — rebuild prosedural): remap fasad kuning +
+// tipe gedung. Rumus SAMA dengan city3d.js (hash2 == h2) supaya kedua
+// renderer sepakat (B10). Bata merah 1 dari 4 varian remap (~25%).
+function facQ(bx, by) { return hash2(bx ^ by, bx + by); }
+function facRemap(hex, bx, by) {
+  if (hex !== '#c98a3d' && hex !== '#a85a32') return hex;
+  const q = facQ(bx, by);
+  return q < 0.25 ? '#a4442f' : q < 0.5 ? '#8a8f98' : q < 0.75 ? '#5a6b8a' : '#c9b8a3';
+}
+function bldType(b) {
+  if (b.district === 0 && b.roof === 1) return 1; // town
+  if (b.district === 1 && b.height === 3) return 2; // apart
+  if ((b.color === '#c98a3d' || b.color === '#a85a32') && facQ(b.x, b.y) < 0.25) return 3; // brick
+  return 0; // plain
+}
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 // 1A-TREES: cache slot (px game, dibulatkan) -> jatuh di dalam footprint gedung.
 // Posisi slot kamera-relatif stabil antar frame (along dijepit mod 16), jadi
@@ -154,21 +169,41 @@ void main(){
     vec3 glass = mix(vec3(0.07, 0.09, 0.13), uHz * 0.7 + vec3(0.04), 0.35); // R2: kaca lebih gelap/dingin
     base = mix(base, glass, win * (1.0 - lit) * uWinGlass); // SIANG v2: jendela mati tetap terbaca
     emit = win * lit;
+    // GEDUNG-BLD kisi jendela (0 vertex): tiang tengah vertikal di
+    // jendela punched + ambang tengah horizontal di semua tipe — bingkai
+    // saja (di atas) masih terbaca stiker kaca dari dekat.
+    if (wtype < 0.5) {
+      float mullV = step(0.46, cell.x) * step(cell.x, 0.54);
+      base = mix(base, vec3(0.08, 0.09, 0.11), win * mullV * 0.7);
+    }
+    float mullH = step(0.47, cell.y) * step(cell.y, 0.53);
+    base = mix(base, vec3(0.08, 0.09, 0.11), win * mullH * 0.7);
     // Lantai dasar (y < 2.6): etalase kaca + tiang; awning (2.6-3.1); pita neon (3.1-3.7).
-    float shop = step(vU.y, 2.6);
+    // GEDUNG-BLD: varian residensial (vM 0.25, dari bld() — town/brick)
+    // vs toko. Residensial: plinth bata + pintu masuk reses berlengkung,
+    // tanpa etalase/awning/neon.
+    float res = step(0.1, vM);
+    float shop = step(vU.y, 2.6) * (1.0 - res);
     emit *= 1.0 - shop; // jendela menyala tidak berlaku di etalase
     vec3 shopGlass = mix(vec3(0.12, 0.14, 0.18), vec3(0.50, 0.32, 0.15), fract(bh * 3.7 + floor(vU.x / 1.1) * 0.37) * 0.8); // R2: kaca toko lebih terang, bukan pagar
     base = mix(base, shopGlass, shop * 0.92);
     float mull = step(0.90, fract(vU.x / 1.1)); // tiang etalase tiap 1.1 unit
     base = mix(base, vec3(0.08, 0.09, 0.11), shop * mull * 0.55); // R2: mullion lebih lembut
-    float awn = step(2.6, vU.y) * step(vU.y, 3.1);
+    float awn = step(2.6, vU.y) * step(vU.y, 3.1) * (1.0 - res);
     float stripe = step(0.5, fract(vU.x / 0.8));
     vec3 awnCol = mix(vec3(0.75, 0.15, 0.25), vec3(0.95, 0.92, 0.85), stripe);
     base = mix(base, awnCol, awn);
-    float neonB = step(3.1, vU.y) * step(vU.y, 3.7);
+    float neonB = step(3.1, vU.y) * step(vU.y, 3.7) * (1.0 - res);
     vec3 neonCol = mix(vec3(1.0, 0.18, 0.55), mix(vec3(0.05, 0.85, 0.95), vec3(1.0, 0.62, 0.12), step(0.66, bh)), step(0.33, bh));
     base = mix(base, neonCol * 1.6, neonB);
     emit = max(emit, neonB * 0.85);
+    float plinth = step(vU.y, 0.9) * res;
+    base = mix(base, vec3(0.55, 0.32, 0.22), plinth * 0.85);
+    float doorX = abs(fract(vU.x * 0.05 + bh) - 0.5);
+    float arch = 2.1 + 0.5 * cos(doorX / 0.045 * 1.5708);
+    float door = step(doorX, 0.045) * step(vU.y, arch) * res;
+    base = mix(base, vec3(0.10, 0.08, 0.07), door * 0.9);
+    emit *= 1.0 - door; // pintu reses tidak menyala walau jendela di belakangnya menyala
   } else if (vM < 1.5) { // cat mobil 3 lapis ala Forza (bible §1.3) + Fresnel palsu
     spec = 0.9; shin = 60.0;
     float fr = pow(1.0 - max(dot(N, V), 0.0), 3.0);
@@ -772,14 +807,18 @@ function boat(B, G, cx, cz, yaw, len, wid, paint, opts) {
 // lantai atas setback (tinggi>=3) / lis atap (rendah) + rooftop props di
 // atap setback: tangki air SILINDER + antena + dish + AC. Tapak/posisi
 // TIDAK berubah (kolisi + minimap aman); hanya siluet + atap dibentuk ulang.
-function bld(B, G, b, idx, facK) { // SIANG v2: facK = pengali kecerahan fasad ikut preset (siang 0.72; lainnya 0.55 = lama)
+function bld(B, G, b, idx, facK, face) { // SIANG v2: facK = pengali kecerahan fasad ikut preset (siang 0.72; lainnya 0.55 = lama); face = muka jalan (S/N/E/W) dari buildFrame
   const cx = (b.x + b.w / 2) * S, cz = (b.y + b.h / 2) * S;
   const w = b.w * S, d = b.h * S;
   const h = (b.height || 2) * 6.5;
-  const col = hx(b.color || '#333344').map((v) => v * (facK === undefined ? 0.55 : facK));
+  const col = hx(facRemap(b.color || '#333344', b.x, b.y)).map((v) => v * (facK === undefined ? 0.55 : facK));
   const dark = col.map((v) => v * 0.82);
   const ch = Math.min(w, d) * 0.12;
-  deboxPoly(B, cx, 0, cz, deboxRingRect(w, d, ch), h, col, 0); // massa chamfer
+  const bType = bldType(b); // 0 plain, 1 town, 2 apart, 3 brick
+  // GEDUNG-BLD: lantai dasar residensial (town/brick) vs toko — mat 0.25
+  // di massa gedung saja; shader membaca vM untuk plinth + pintu (B10:
+  // varian yang sama dengan Canvas bld3). Setback/parapet tetap mat 0.
+  deboxPoly(B, cx, 0, cz, deboxRingRect(w, d, ch), h, col, (bType === 1 || bType === 3) ? 0.25 : 0); // massa chamfer
   const tall = (b.height || 2) >= 3;
   const topY = tall ? h + 3.0 : h; // atap setback (tinggi) / atap utama (rendah)
   if (tall) { // lantai atas setback (menara berundak, bukan menara balok)
@@ -803,6 +842,46 @@ function bld(B, G, b, idx, facK) { // SIANG v2: facK = pengali kecerahan fasad i
       boxR(B, cx + w * 0.10, topY + 0.7, cz + d * 0.12, ds, 0.15, ds, 0, 0.6, [0.6, 0.6, 0.65], 5);
     }
     box(B, cx + w * 0.14, topY + 0.4, cz - d * 0.12, w * 0.16, 0.8, d * 0.16, DARK, 5); // AC rooftop
+  }
+  // GEDUNG-BLD atap limas genteng merah (Town House) — hanya gedung rendah
+  // (tanpa setback + tanpa props atap, jadi tidak ada tabrakan — B6).
+  // 5 vertex (deboxCone 4-ring). Parapet 0.96x tetap: limas 0.84x di
+  // dalamnya, puncak 2.2 di atas parapet 0.5.
+  if (bType === 1 && !tall) {
+    const ca2 = w * 0.42, cd2 = d * 0.42;
+    deboxCone(B, cx, topY, cz, [[-ca2, -cd2], [ca2, -cd2], [ca2, cd2], [-ca2, cd2]], 2.2, [0.62, 0.25, 0.16], 5);
+  }
+  // GEDUNG-BLD pedimen (brick) + balkon (apart) di muka jalan.
+  // Basis muka: (nx,nz) normal keluar; P(u,o,y) = titik di muka (u =
+  // sepanjang muka dari pusat, o = keluar dari muka). Pedimen = 1 quad
+  // degenerasi (4 vertex); balkon = slab + bibir (8 vertex per lantai).
+  // Balkon di-skip bila neon blade vertikal ada di gedung itu (muka yang
+  // sama — blade di hash2(idx,53)<0.45); balkon di y h*0.45/0.75, di atas
+  // papan nama pintu (y 3.55-3.95) dan di luar jangkauan neon sign tengah
+  // (rC geser +-0.15 lebar muka). Pintu enterable di tengah muka aman:
+  // pedimen di puncak, balkon di atas, pilaster tidak ada di sini.
+  if ((bType === 3 || bType === 2) && face) {
+    let nx = 0, nz = 0;
+    if (face === 'S') nz = 1;
+    else if (face === 'N') nz = -1;
+    else if (face === 'E') nx = 1;
+    else nx = -1;
+    const fz = face === 'S' ? cz + d / 2 : face === 'N' ? cz - d / 2 : face === 'E' ? cx + w / 2 : cx - w / 2;
+    const fw = face === 'S' || face === 'N' ? w : d;
+    const P = (u, o, y) => (face === 'S' ? [cx + u, y, fz + o] : face === 'N' ? [cx + u, y, fz - o] : face === 'E' ? [fz + o, y, cz + u] : [fz - o, y, cz + u]);
+    const N3 = [nx, 0, nz];
+    if (bType === 3) {
+      const pw = fw * 0.22;
+      quad(B, P(-pw, 0.06, h - 2.0), P(pw, 0.06, h - 2.0), P(0, 0.06, h + 0.05), P(0, 0.06, h + 0.05), N3, [[0, 0], [1, 0], [0.5, 1], [0.5, 1]], [0.92, 0.88, 0.78], 5);
+    }
+    if (bType === 2 && hash2(idx, 53) >= 0.45) {
+      const bC = (hash2(idx, 71) - 0.5) * fw * 0.3;
+      const hw2 = Math.min(3, fw * 0.18);
+      for (const fy of [h * 0.45, h * 0.75]) {
+        quad(B, P(bC - hw2, 0.05, fy), P(bC + hw2, 0.05, fy), P(bC + hw2, 1.25, fy), P(bC - hw2, 1.25, fy), [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], [0.47, 0.46, 0.44], 5);
+        quad(B, P(bC - hw2, 1.25, fy), P(bC + hw2, 1.25, fy), P(bC + hw2, 1.25, fy + 0.5), P(bC - hw2, 1.25, fy + 0.5), N3, [[0, 0], [1, 0], [1, 1], [0, 1]], [0.35, 0.34, 0.33], 5);
+      }
+    }
   }
   if (b.landmark === 'lighthouse') {
     box(B, cx, h + 2.2, cz, 1.2, 3.2, 1.2, [0.9, 0.88, 0.8], 5);
@@ -1574,7 +1653,22 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     const ddz = Math.max(bMinZ - camZ, 0, camZ - bMaxZ);
     if (Math.hypot(ddx, ddz) < 12) { bi++; continue; }
     if(INT&&INT.hideShell(state,b)){bi++;continue;} // R41: Jax di dalam -> cangkang sembunyi (interior terlihat)
-    bld(OP, GL, b, bi, tod.facK);
+    // GEDUNG-BLD: muka jalan = sisi ke jalan terdekat (rumus sama dengan
+    // doorSide() interiors.js) — untuk pedimen/balkon di bld().
+    let bFace = 'S';
+    {
+      const gaps = { S: 1e9, W: 1e9, N: 1e9, E: 1e9 };
+      for (const rx of city.roadsV) {
+        if (rx < b.x) gaps.W = Math.min(gaps.W, b.x - rx);
+        if (rx > b.x + b.w) gaps.E = Math.min(gaps.E, rx - (b.x + b.w));
+      }
+      for (const ry of city.roadsH) {
+        if (ry < b.y) gaps.N = Math.min(gaps.N, b.y - ry);
+        if (ry > b.y + b.h) gaps.S = Math.min(gaps.S, ry - (b.y + b.h));
+      }
+      for (const s of ['W', 'N', 'E']) if (gaps[s] < gaps[bFace]) bFace = s;
+    }
+    bld(OP, GL, b, bi, tod.facK, bFace);
     if (DIRSH) groundShadow(cx * S, cy * S, b.w * S, b.h * S, (b.height || 2) * 6.5); // R36 POSTFX: bayangan gedung sore/pagi juga (dulu cuma siang)
     bi++;
   }
@@ -1731,13 +1825,34 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       box(OP, mSx, 1.3, mCz + 3.2, 0.3, 2.6, 0.3, [0.14, 0.12, 0.16], 5);
       box(OP, mSx, 2.05, mCz, 0.35, 1.5, 7, [0.55, 0.17, 0.35], 4);
       box(OP, mSx, 2.92, mCz, 0.45, 0.28, 7.3, [0.12, 0.5, 0.55], 4);
-      for (const st of marketStalls(city)) {
+      const mStalls = marketStalls(city);
+      let mCrateRow = null;
+      for (const st of mStalls) {
         const scx = (st.x + st.w / 2) * S, scz = (st.y + st.d / 2) * S;
         const sw = st.w * S, sd = st.d * S;
         box(OP, scx, 0.55, scz, sw, 1.1, sd, [0.35, 0.22, 0.12], 5);
         box(OP, scx, 1.28, scz, sw * 0.6, 0.35, sd * 0.8, hx(st.hue), 5);
-        box(OP, scx - sw / 4, 1.99, scz, sw / 2 + 0.3, 0.18, sd + 0.6, hx(st.hue).map((v) => v * 0.55), 4);
+        // GEDUNG-BLD: kanopi hijau/merah (Poly Pizza) — hash sama dengan Canvas.
+        const canC = hash2(st.x, st.y) < 0.5 ? hx('#2e7d32') : hx('#c0392b');
+        box(OP, scx - sw / 4, 1.99, scz, sw / 2 + 0.3, 0.18, sd + 0.6, canC.map((v) => v * 0.55), 4);
         box(OP, scx + sw / 4, 1.99, scz, sw / 2 + 0.3, 0.18, sd + 0.6, [0.55, 0.5, 0.42], 4);
+        // GEDUNG-BLD: 1 peti kayu per baris, sisi luar kios (B8 — jauh dari
+        // aisle + di luar rect stall; skip bila menabrak pohon). 24 vertex
+        // per peti (1 box); potong pertama bila peak vertex tidak muat.
+        if (mCrateRow !== st.y) {
+          mCrateRow = st.y;
+          const north = st.y < mSite.y + mSite.h / 2;
+          const cTop = north ? st.y - 22 : st.y + st.d + 6;
+          const ccx = st.x + st.w / 2, ccy = cTop + 8;
+          let blocked = false;
+          for (const t of city.trees || []) {
+            const nx = Math.max(ccx - 8, Math.min(t.x, ccx + 8));
+            const ny = Math.max(ccy - 8, Math.min(t.y, ccy + 8));
+            const dx = t.x - nx, dy = t.y - ny;
+            if (dx * dx + dy * dy < (t.r + 4) * (t.r + 4)) { blocked = true; break; }
+          }
+          if (!blocked) box(OP, ccx * S, 0.5, ccy * S, 1.6, 1.0, 1.6, [0.35, 0.22, 0.12], 5);
+        }
       }
       const mPoles = [[mSite.x + 18, mSite.y + 18], [mSite.x + mSite.w - 18, mSite.y + 18], [mSite.x + 18, mSite.y + mSite.h - 18], [mSite.x + mSite.w - 18, mSite.y + mSite.h - 18]];
       for (const [mPx, mPy] of mPoles) {

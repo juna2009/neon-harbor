@@ -644,6 +644,28 @@ function hx3(hex) {
   }
   return c;
 }
+// GEDUNG-BLD (Poly Pizza CC0 — rebuild prosedural, BUKAN file .glb):
+// ROOF_COLORS (city.js, PRE-CUT) berisi dua dasar kuning-coklat (#c98a3d,
+// #a85a32) yang di grade sunset terbaca kuning (Juna 21:51 WIB). Remap
+// deterministik dari posisi statis gedung — hash SAMA di city3d.js dan
+// webgl2.js (h2 == hash2) supaya Canvas dan WebGL2 sepakat (B10). Bata
+// merah HANYA 1 dari 4 varian remap (~25% gedung yang di-remap, 3/13 di
+// seed 7); sisanya abu / biru-slate / beige.
+// Tipe gedung dari field statis (district/height/roof/warna-remap) —
+// pemetaan §2 IMPACT: Town House = ruko Old Town atap genteng, Large
+// Building = apartemen Downtown, Big Building = bata berpedimen.
+function facQ(bx, by) { return h2(bx ^ by, bx + by); }
+function facRemap(hex, bx, by) {
+  if (hex !== '#c98a3d' && hex !== '#a85a32') return hex;
+  const q = facQ(bx, by);
+  return q < 0.25 ? '#a4442f' : q < 0.5 ? '#8a8f98' : q < 0.75 ? '#5a6b8a' : '#c9b8a3';
+}
+function bldType(b) {
+  if (b.district === 0 && b.roof === 1) return 1; // town
+  if (b.district === 1 && b.height === 3) return 2; // apart
+  if ((b.color === '#c98a3d' || b.color === '#a85a32') && facQ(b.x, b.y) < 0.25) return 3; // brick
+  return 0; // plain
+}
 // chase camera state (module-level: persists across frames, snaps on teleport)
 let ccYaw = 0, ccX = 0, ccZ = 0, ccInit = false, ccLast = 0, ccHX = 0, ccHY = 0;
 let cfX = 0, cfZ = 1; // camera forward in world XZ
@@ -1411,10 +1433,11 @@ function bld3(b, nightF, t) {
   const w = b.w * CS, d = b.h * CS;
   // T2: facade tint varies per building (same district palette, never flat)
   const tv = 0.85 + h2(b.x * 5 + 1, b.y * 3 + 2) * 0.3;
-  const bc = hx3(b.color);
+  const bc = hx3(facRemap(b.color, b.x, b.y)); // GEDUNG-BLD: kuning -> abu/biru/bata/beige
   const tint = '#' + bc.map(v => Math.min(255, Math.round(v * tv)).toString(16).padStart(2, '0')).join('');
+  const bType = bldType(b); // 0 plain, 1 town, 2 apart, 3 brick
   box3(bx, 0, bz, w, h3, d, 0, tint, dep);
-  let ch=0,ca=0;if(!b.landmark&&b.roof&&dep<200){ch=2.5+h2(b.x+5,b.y+3)*2+(b.district===2?2:0);ca=b.roof>1?.785:0;const k=b.roof>1?.55:.66;box3(bx,h3,bz,w*k,ch+(b.roof>1?1.5:0),d*k,ca,tint,dep);}
+  let ch=0,ca=0;if(!b.landmark&&b.roof&&dep<200){ch=2.5+h2(b.x+5,b.y+3)*2+(b.district===2?2:0);ca=b.roof>1?.785:0;const k=b.roof>1?.55:.66;box3(bx,h3,bz,w*k,ch+(b.roof>1?1.5:0),d*k,ca,bType===1?'#a4442f':tint,dep);}
   if (b.landmark === 'lighthouse') {
     vQuad(bx, bz, 0, d / 2 + 0.1, 0, w * 0.8, h3 * 0.3, h3 * 0.42, '#c0392b');
     vQuad(bx, bz, 0, d / 2 + 0.1, 0, w * 0.8, h3 * 0.62, h3 * 0.74, '#c0392b');
@@ -1431,6 +1454,11 @@ function bld3(b, nightF, t) {
   // at dep 100 reads 165x266 px on screen; its near face is at ~90 and
   // must not be windowless. (Probe: (229.9,58.1) dep 100.3, winN 0.)
   const depNear = dep - Math.max(w, d) / 2;
+  // GEDUNG-BLD dormer town: kotak kecil di bubungan atap miring (alas
+  // tertanam 0.8, puncak 1.2 di atas atap). Hanya bila atap miring ada
+  // (ch>0) — atap datar punya props AC/antena/tangki (B6), dormer tidak
+  // pernah ke sana. Jendela dormer digambar di loop muka (fi==0).
+  if (bType === 1 && ch && depNear < 90) box3(bx, h3 + ch - 0.8, bz, 2.0, 2.0, 2.0, 0, '#5a3d24', dep);
   if (depNear < 120) {
     // JETFIX-2 Bug 2 (same root cause as box3): the old gate used the
     // distance from the BUILDING CENTRE (ccZ - bz etc), so a face counted
@@ -1490,6 +1518,9 @@ function bld3(b, nightF, t) {
         // (depNear < 70): far faces are too small for frames to read.
         if (depNear < 70) vQuad(bx, bz, f.a, f.off + 0.11, rOff, ww + 0.28, y0 - 0.14, y1 + 0.14, 'rgba(12,14,20,0.9)', fDep);
         vQuad(bx, bz, f.a, f.off + 0.12, rOff, ww, y0, y1, mix(c, hz(dep)), fDep);
+        // GEDUNG-BLD kisi: tiang tengah vertikal di tiap jendela muka
+        // terdekat (baca sebagai jendela berbingkai, bukan stiker kaca).
+        if (depNear < 40 && fi === 0) vQuad(bx, bz, f.a, f.off + 0.13, rOff, 0.09, y0, y1, 'rgba(12,14,20,0.85)', fDep);
       }
       // T2: floor lines — one dark line per ~3 floors stops the slab look
       vQuad(bx, bz, f.a, f.off + 0.1, 0, f.span * 0.96, h3 * 0.33, h3 * 0.33 + 0.3, 'rgba(0,0,0,0.22)', fDep);
@@ -1513,14 +1544,77 @@ function bld3(b, nightF, t) {
       vQuad(bx, bz, f.a, f.off + 0.1, 0, f.span * 0.96, h3 * 0.45, h3 * 0.45 + 0.35, 'rgba(0,0,0,0.25)', fDep);
       // cornice: dark band just under the roofline
       vQuad(bx, bz, f.a, f.off + 0.11, 0, f.span * 0.98, h3 - 1.7, h3 - 1.15, 'rgba(0,0,0,0.35)', fDep);
+      // GEDUNG-BLD quoin/pilaster di sudut muka terdekat (fi==0): town =
+      // pilaster batu pucat; brick = quoin balok selang-seling terang/gelap
+      // (acuan Big Building). Di ujung span, di luar jendela terluar.
+      if ((bType === 1 || bType === 3) && depNear < 70 && fi === 0) {
+        for (const sgn of [-1, 1]) {
+          const rC = sgn * (f.span / 2 - 0.3);
+          if (bType === 3) {
+            let k = 0;
+            for (let y0 = 0.3; y0 < h3 - 1; y0 += 2.2, k += 1) {
+              vQuad(bx, bz, f.a, f.off + 0.11, rC, 0.65, y0, Math.min(y0 + 1.9, h3 - 0.5), mix(k % 2 ? [150, 140, 125] : [215, 205, 185], hz(dep)), fDep);
+            }
+          } else {
+            vQuad(bx, bz, f.a, f.off + 0.11, rC, 0.6, 0.1, h3 - 0.5, mix([205, 195, 175], hz(dep)), fDep);
+          }
+        }
+      }
+      // GEDUNG-BLD pedimen brick: segitiga krem di puncak muka terdekat
+      // (QW menerima 3 titik; alas h3-2.2, puncak h3+0.05).
+      if (bType === 3 && depNear < 70 && fi === 0) {
+        const pOff = f.off + 0.12, pW = f.span * 0.22;
+        QW([
+          [bx + fx0 * pOff + rx0 * (-pW), h3 - 2.2, bz + fz0 * pOff + rz0 * (-pW)],
+          [bx + fx0 * pOff + rx0 * pW, h3 - 2.2, bz + fz0 * pOff + rz0 * pW],
+          [bx + fx0 * pOff, h3 + 0.05, bz + fz0 * pOff],
+        ], mix([232, 222, 200], hz(dep)), fDep);
+      }
+      // GEDUNG-BLD jendela dormer town (kotak dormer digambar di atas,
+      // di bubungan): kaca kecil di muka dormer menghadap kamera.
+      if (bType === 1 && ch && depNear < 90 && fi === 0) {
+        const dq = h2(b.x * 13 + 1, b.y * 7);
+        const dc = nightF > 0.3 ? (dq < 0.5 ? [255, 205, 120] : [36, 44, 60]) : (dq < 0.42 ? [255, 205, 120] : [42, 54, 74]);
+        const dDep = fwdD(bx + fx0 * 1.05, bz + fz0 * 1.05) - 0.5;
+        vQuad(bx, bz, f.a, 1.05, 0, 1.1, h3 + ch - 0.2, h3 + ch + 0.7, mix(dc, hz(dep)), dDep);
+      }
+      // GEDUNG-BLD balkon apartemen (Large Building: balkon tiap lantai):
+      // slab horizontal + bibir depan di 2 lantai atas (di atas semua
+      // signage vertikal yang mentok di y 12). Hanya muka terdekat.
+      if (bType === 2 && depNear < 90 && fi === 0) {
+        const bC = (h2(b.x * 3, b.y * 5) - 0.5) * f.span * 0.3;
+        for (const fy of [h3 * 0.45, h3 * 0.75]) {
+          const f0 = f.off + 0.05, f1 = f.off + 1.25, r0 = bC - 3, r1 = bC + 3;
+          const P2 = (r, f, y) => [bx + fx0 * f + rx0 * r, y, bz + fz0 * f + rz0 * r];
+          QW([P2(r0, f0, fy), P2(r1, f0, fy), P2(r1, f1, fy), P2(r0, f1, fy)], mix([120, 118, 112], hz(dep)), fDep);
+          QW([P2(r0, f1, fy), P2(r1, f1, fy), P2(r1, f1, fy + 0.5), P2(r0, f1, fy + 0.5)], mix([90, 88, 84], hz(dep)), fDep);
+        }
+      }
       if (fi === 0) {
         // base strip grounds the slab; V1 warm rim on the top edge at low sun
         vQuad(bx, bz, f.a, f.off + 0.12, 0, f.span * 0.96, 0.1, 1.3, 'rgba(0,0,0,0.35)', fDep);
         if (rimOn && nightF < 0.55) vQuad(bx, bz, f.a, f.off + 0.14, 0, f.span * 0.96, h3 - 0.7, h3 - 0.05, mix([255, 179, 92], hz(dep)), fDep);
         else if (nightF > 0.55) vQuad(bx, bz, f.a, f.off + 0.12, 0, f.span * 0.96, h3 - 0.4, h3 - 0.05, b.neon, fDep);
-        // ground-floor storefronts: lit shop fronts break up blank walls at
-        // street level (warm amber / cyan / pink neon) — always on at dusk/night
-        if (nightF > 0.2) {
+        // GEDUNG-BLD lantai dasar residensial (town/brick): plinth bata +
+        // pintu lengkung kayu (bertangga) + 2 jendela kecil — ganti 3
+        // etalase neon. Digambar di semua TOD (bukan hanya malam) supaya
+        // lantai dasar tidak polos di siang. Bukan gedung enterable: pintu
+        // interior tidak digambar di Canvas chase (B4 tidak kena).
+        if (bType === 1 || bType === 3) {
+          vQuad(bx, bz, f.a, f.off + 0.11, 0, f.span * 0.96, 0.1, 0.95, mix([164, 68, 47], hz(dep)), fDep);
+          const dC = h2(b.x * 5, b.y * 3) < 0.5 ? -f.span * 0.18 : f.span * 0.18;
+          vQuad(bx, bz, f.a, f.off + 0.12, dC, 1.9, 0.95, 2.6, mix([92, 58, 32], hz(dep)), fDep);
+          vQuad(bx, bz, f.a, f.off + 0.12, dC, 1.5, 2.6, 2.9, mix([92, 58, 32], hz(dep)), fDep);
+          vQuad(bx, bz, f.a, f.off + 0.12, dC, 0.9, 2.9, 3.15, mix([92, 58, 32], hz(dep)), fDep);
+          for (const sgn of [-1, 1]) {
+            const wC = dC + sgn * f.span * 0.26;
+            const wq = h2(b.x * 7 + (sgn > 0 ? 5 : 0), b.y * 3);
+            const wc2 = nightF > 0.3 ? (wq < 0.5 ? [255, 205, 120] : [36, 44, 60]) : (wq < 0.42 ? [255, 205, 120] : [42, 54, 74]);
+            vQuad(bx, bz, f.a, f.off + 0.12, wC, 1.3, 1.0, 2.4, mix(wc2, hz(dep)), fDep);
+          }
+        } else if (nightF > 0.2) {
+          // ground-floor storefronts: lit shop fronts break up blank walls at
+          // street level (warm amber / cyan / pink neon) — always on at dusk/night
           for (let s = 0; s < 3; s += 1) {
             const rOff = -f.span / 2 + f.span * (s + 0.5) / 3;
             const sc = s % 3 === 0 ? [255, 179, 92] : s % 3 === 1 ? [5, 217, 232] : [255, 42, 109];
