@@ -1791,6 +1791,26 @@ export function drawChase3D(ctx, state) {
   // frame as it climbs (takeoff feel) instead of being pinned to one spot.
   if (p.inPlane && p.plane) camH = 4.4 + (p.plane.alt || 0) * 0.12 * 0.9;
   cfX = fx; cfZ = fz;
+  // WORLD-SNAP (fix palm-scroll, DIAG-A): prop slots are anchored to a
+  // WORLD grid along the road axis, not fixed offsets from the camera.
+  // camAlong = camera position along the view direction; a slot's `along`
+  // is a multiple of its spacing, so each prop sits still in the world
+  // while visible and new slots enter from far ahead as the camera moves.
+  // Side/variation are derived from the WORLD slot index, never the
+  // on-screen index, so a palm never swaps sides or changes fronds when
+  // a slot enters/leaves. Hysteresis: 3D props are only drawn at
+  // fwd >= 12 so a slot popping in at a sharp turn stays out of the lens.
+  const camAlong = ccX * cfX + ccZ * cfZ;
+  const snapGrid = (a, spacing, phase) =>
+    Math.floor((a - phase) / spacing) * spacing + phase;
+  const slotWorld = (along, lat) => { // (world along, lat) -> [x, z] 3D
+    const d = along - camAlong;
+    return [ccX + cfX * d + (-cfZ) * lat, ccZ + cfZ * d + cfX * lat];
+  };
+  const slotWorldP = (along, lat) => { // -> [x, y] px game
+    const q = slotWorld(along, lat);
+    return [q[0] / CS, q[1] / CS];
+  };
   // sky
   const g = x.createLinearGradient(0, 0, 0, HOR + 60);
   g.addColorStop(0, 'rgb(' + sky.top.join(',') + ')');
@@ -2419,47 +2439,62 @@ export function drawChase3D(ctx, state) {
     return true;
   };
   const ewRoad = Math.abs(cfX) >= Math.abs(cfZ);
-  for (const lat of [roadLat - 2.2, roadLat + 2.2]) { // bekas ban dua lajur (fwd -6..60 — dari belakang hero, dasar layar)
-    const a = fwdP(-6, lat), b = fwdP(60, lat);
-    if (ewRoad) flatQuad(a[0], a[1] - 4.5, b[0], a[1] + 4.5, 0.07, 'rgba(20,20,24,0.35)');
-    else flatQuad(a[0] - 4.5, a[1], a[0] + 4.5, b[1], 0.07, 'rgba(20,20,24,0.35)');
+  for (const lat of [roadLat - 2.2, roadLat + 2.2]) { // bekas ban dua lajur — segmen 6 unit di-snap ke grid dunia (dulu satu quad fwd -6..60 menempel kamera)
+    const seg0 = snapGrid(camAlong - 6, 6, 0), seg1 = snapGrid(camAlong + 60, 6, 0);
+    for (let a = seg0; a < seg1; a += 6) {
+      const p0 = slotWorldP(a, lat), p1 = slotWorldP(a + 6, lat);
+      if (ewRoad) flatQuad(p0[0], p0[1] - 4.5, p1[0], p0[1] + 4.5, 0.07, 'rgba(20,20,24,0.35)');
+      else flatQuad(p0[0] - 4.5, p0[1], p0[0] + 4.5, p1[1], 0.07, 'rgba(20,20,24,0.35)');
+    }
   }
-  { const m = fwdP(24, roadLat + 2.6); flatQuad(m[0] - 6, m[1] - 6, m[0] + 6, m[1] + 6, 0.07, 'rgba(20,20,24,0.6)'); } // manhole lajur kanan
-  { const p = fwdP(38, roadLat - 2.4); flatQuad(p[0] - 16, p[1] - 11, p[0] + 16, p[1] + 11, 0.07, 'rgba(20,20,24,0.5)'); } // tambalan aspal
-  { // panah lajur (batang + kepala segitiga, searah jalan) — y .11, di atas marka tengah
-    const s = fwdU(28.4, roadLat), hb = fwdU(30.4, roadLat), ht = fwdU(32.0, roadLat), sp = fwdP(28.4, roadLat);
+  { const mAlong = snapGrid(camAlong + 24, 64, 0), mFwd = mAlong - camAlong; // manhole lajur kanan — grid 64 unit
+    if (mFwd >= 12 && mFwd < 175) { const m = slotWorldP(mAlong, roadLat + 2.6); flatQuad(m[0] - 6, m[1] - 6, m[0] + 6, m[1] + 6, 0.07, 'rgba(20,20,24,0.6)'); } }
+  { const pAlong = snapGrid(camAlong + 38, 64, 32), pFwd = pAlong - camAlong; // tambalan aspal — grid 64 unit, fase 32 (selang-seling dgn manhole)
+    if (pFwd >= 12 && pFwd < 175) { const p = slotWorldP(pAlong, roadLat - 2.4); flatQuad(p[0] - 16, p[1] - 11, p[0] + 16, p[1] + 11, 0.07, 'rgba(20,20,24,0.5)'); } }
+  { // panah lajur (batang + kepala segitiga, searah jalan) — y .11, di atas marka tengah; grid 128 unit
+    const arAlong = snapGrid(camAlong + 28.4, 128, 0), arFwd = arAlong - camAlong;
+    if (arFwd >= 12 && arFwd < 175) {
+    const s = slotWorld(arAlong, roadLat), hb = slotWorld(arAlong + 2.0, roadLat), ht = slotWorld(arAlong + 3.6, roadLat), sp = slotWorldP(arAlong, roadLat);
     if (ewRoad) { flatQuad(sp[0] - 12, sp[1] - 2.5, sp[0] + 12, sp[1] + 2.5, 0.11, '#e8e8e6');
       QW([[ht[0], 0.11, ht[1]], [hb[0], 0.11, hb[1] - 0.8], [hb[0], 0.11, hb[1] + 0.8], [ht[0], 0.11, ht[1]]], '#e8e8e6', 30); }
     else { flatQuad(sp[0] - 2.5, sp[1] - 12, sp[0] + 2.5, sp[1] + 12, 0.11, '#e8e8e6');
       QW([[ht[0], 0.11, ht[1]], [hb[0] - 0.8, 0.11, hb[1]], [hb[0] + 0.8, 0.11, hb[1]], [ht[0], 0.11, ht[1]]], '#e8e8e6', 30); }
+    }
   }
-  for (let f = -6; f <= 66; f += 12) for (const lat of [roadLat - 5.4, roadLat + 5.4]) { // sambungan ubin trotoar (dari fwd -6, dasar layar)
-    const j = fwdP(f, lat);
+  for (let a = snapGrid(camAlong - 6, 12, 0); a <= camAlong + 66; a += 12) for (const lat of [roadLat - 5.4, roadLat + 5.4]) { // sambungan ubin trotoar — grid 12 unit (dulu fwd -6..66 tetap); lateral ±5.4 Street 2
+    const j = slotWorldP(a, lat);
     if (ewRoad) flatQuad(j[0] - 0.7, j[1] - 3.5, j[0] + 0.7, j[1] + 3.5, 0.08, 'rgba(20,20,24,0.5)');
     else flatQuad(j[0] - 3.5, j[1] - 0.7, j[0] + 3.5, j[1] + 0.7, 0.08, 'rgba(20,20,24,0.5)');
   }
-  if (fwdClear(16, roadLat + 5.2)) { // halte: bangku kayu + rambu biru (trotoar kanan)
-    const bn = fwdU(16, roadLat + 5.2), bb = fwdU(16, roadLat + 5.45), lg1 = fwdU(15.2, roadLat + 5.2), lg2 = fwdU(16.8, roadLat + 5.2), yaw = ewRoad ? Math.PI / 2 : 0; // box3: w ikut "right" — jalan E-W (sumbu x) butuh yaw pi/2 supaya panjang bangku sejajar jalan
-    box3(lg1[0], 0, lg1[1], 0.12, 0.55, 0.12, 0, '#3a2c1c', 16); // kaki bangku (alas 0 -> dudukan)
-    box3(lg2[0], 0, lg2[1], 0.12, 0.55, 0.12, 0, '#3a2c1c', 16);
-    box3(bn[0], 0.55, bn[1], 1.9, 0.14, 0.55, yaw, '#6b4a2f', 16);
-    box3(bb[0], 0.6, bb[1], 1.9, 0.6, 0.1, yaw, '#5d3f28', 16); // sandaran naik dari dudukan (alas 0.6, bukan 0.95 — dulu melayang)
-    const sg = fwdU(19, roadLat + 5.2);
-    box3(sg[0], 0, sg[1], 0.14, 2.6, 0.14, 0, '#3a3340', 19);
-    box3(sg[0], 2.3, sg[1], 0.95, 0.65, 0.1, yaw, '#2456c8', 19); // panel menimpa ujung tiang
-  }
-  if (fwdClear(24, roadLat - 5.2)) { // tempat sampah hijau (trotoar kiri)
-    const tb = fwdU(24, roadLat - 5.2);
-    box3(tb[0], 0, tb[1], 0.55, 0.95, 0.55, 0, '#2a6b45', 24);
-    box3(tb[0], 0.95, tb[1], 0.6, 0.12, 0.6, 0, '#1d4e33', 24);
-  }
+  { const bnAlong = snapGrid(camAlong + 16, 128, 0), bnFwd = bnAlong - camAlong; // halte: bangku kayu + rambu biru (trotoar kanan) — grid 128 unit; lateral +5.2 Street 2
+  if (bnFwd >= 12 && bnFwd < 175 && fwdClear(bnFwd, roadLat + 5.2)) {
+    const bn = fwdU(bnFwd, roadLat + 5.2), bb = fwdU(bnFwd, roadLat + 5.45), lg1 = fwdU(bnFwd - 0.8, roadLat + 5.2), lg2 = fwdU(bnFwd + 0.8, roadLat + 5.2), yaw = ewRoad ? Math.PI / 2 : 0; // box3: w ikut "right" — jalan E-W (sumbu x) butuh yaw pi/2 supaya panjang bangku sejajar jalan
+    box3(lg1[0], 0, lg1[1], 0.12, 0.55, 0.12, 0, '#3a2c1c', bnFwd); // kaki bangku (alas 0 -> dudukan)
+    box3(lg2[0], 0, lg2[1], 0.12, 0.55, 0.12, 0, '#3a2c1c', bnFwd);
+    box3(bn[0], 0.55, bn[1], 1.9, 0.14, 0.55, yaw, '#6b4a2f', bnFwd);
+    box3(bb[0], 0.6, bb[1], 1.9, 0.6, 0.1, yaw, '#5d3f28', bnFwd); // sandaran naik dari dudukan (alas 0.6, bukan 0.95 — dulu melayang)
+    const sg = fwdU(bnFwd + 3, roadLat + 5.2);
+    box3(sg[0], 0, sg[1], 0.14, 2.6, 0.14, 0, '#3a3340', bnFwd + 3);
+    box3(sg[0], 2.3, sg[1], 0.95, 0.65, 0.1, yaw, '#2456c8', bnFwd + 3); // panel menimpa ujung tiang
+  } }
+  { const tbAlong = snapGrid(camAlong + 24, 128, 0), tbFwd = tbAlong - camAlong; // tempat sampah hijau (trotoar kiri) — grid 128 unit; lateral −5.2 Street 2
+  if (tbFwd >= 12 && tbFwd < 175 && fwdClear(tbFwd, roadLat - 5.2)) {
+    const tb = fwdU(tbFwd, roadLat - 5.2);
+    box3(tb[0], 0, tb[1], 0.55, 0.95, 0.55, 0, '#2a6b45', tbFwd);
+    box3(tb[0], 0.95, tb[1], 0.6, 0.12, 0.6, 0, '#1d4e33', tbFwd);
+  } }
   // round 21: fill the dark flanks — lamp posts on both sidewalks every
   // ~45 units (pole + lit head + light pool) and palm silhouettes every
-  // ~90 units alternating sides (trunk + fronds, dark + warm rim).
-  // Positions are camera-relative, so they fill whatever street the chase
-  // is on; all variation is h2-gated, no randomness, no wall clock.
+  // ~55 units alternating sides (trunk + fronds, dark + warm rim).
+  // WORLD-SNAP (DIAG-A): slots are snapped to a WORLD grid along the road
+  // axis — they no longer sit at fixed offsets from the camera. All
+  // variation is h2-gated, no randomness, no wall clock.
   // Lamp/palm laterals use roadLat ± walkLat (JF4, defined above).
-  if (p.inCar) for (let fwd = 26; fwd < 175; fwd += 45) {
+  if (p.inCar) {
+    const lampBase = snapGrid(camAlong + 26, 45, 0);
+    for (let k = 0; k < 4; k += 1) {
+      const along = lampBase + k * 45, fwd = along - camAlong;
+      if (fwd < 12 || fwd >= 175) continue;
     for (const lat of [roadLat - walkLat, roadLat + walkLat]) {
       const lx = ccX + cfX * fwd + (-cfZ) * lat, lz = ccZ + cfZ * fwd + cfX * lat;
       const wxp = lx / CS, wzp = lz / CS;
@@ -2479,10 +2514,16 @@ export function drawChase3D(ctx, state) {
       vQuad(axp, azp, ccYaw, 0, 0, 0.5, 4.75, 4.95, '#ffd9a0');
       flatQuad(axp / CS - 26, azp / CS - 26, axp / CS + 26, azp / CS + 26, 0.08, 'rgba(255,200,120,0.10)'); // kolam cahaya di bawah kepala
     }
+    }
   }
-  if (p.inCar) for (let pi = 0; pi < 3; pi += 1) {
-    const fwd = 30 + pi * 55, lat = roadLat + (pi % 2 === 0 ? -1 : 1) * walkLat;
-    const pxp = ccX + cfX * fwd + (-cfZ) * lat, pzp = ccZ + cfZ * fwd + cfX * lat;
+  if (p.inCar) {
+    const palmBase = snapGrid(camAlong + 30, 55, 0);
+    for (let k = 0; k < 3; k += 1) {
+      const along = palmBase + k * 55, fwd = along - camAlong;
+      if (fwd < 12 || fwd >= 175) continue;
+      const wi = Math.round(along / 55); // indeks DUNIA — sisi + variasi stabil saat slot masuk/keluar
+      const lat = roadLat + (wi % 2 === 0 ? -1 : 1) * walkLat;
+      const [pxp, pzp] = slotWorld(along, lat);
     const wxp = pxp / CS, wzp = pzp / CS;
     if (!inRange(wxp, wzp, 175, 135)) continue;
     if (slotInBldg(city, wxp, wzp)) continue; // 1A-TREES: palem di dalam gedung (saat belok) -> lewati
@@ -2500,10 +2541,10 @@ export function drawChase3D(ctx, state) {
     // asphalt: tip stays >=38px from the centreline (POLEFIX2 rule);
     // full 1.9 toward the sidewalk/buildings. Coconut cluster anchors
     // the crown so the frond bases read as one palm, not loose strokes.
-    const pcy = 7.2, ptz = hz(pdep), pgn = hx3('#4a9e4f'), psd = pi % 2 === 0 ? -1 : 1;
+    const pcy = 7.2, ptz = hz(pdep), pgn = hx3('#4a9e4f'), psd = wi % 2 === 0 ? -1 : 1;
     box3(pxp, 6.85, pzp, 0.45, 0.45, 0.45, 0, '#2a1a10', pdep);
     for (let fi = 0; fi < 8; fi += 1) {
-      const fa = h2(pi, 31) * 6.283 + fi * 0.785;
+      const fa = h2(wi, 31) * 6.283 + fi * 0.785;
       const fx = Math.cos(fa), fz = Math.sin(fa);
       const ftr = psd * (fx * cfZ - fz * cfX); // 1 = straight at the road
       const frn = 1.9 - 0.9 * Math.max(0, ftr);
@@ -2526,7 +2567,7 @@ export function drawChase3D(ctx, state) {
     // tidak menjuntai ke jalan.
     const pgl = hx3('#5cb85f');
     for (let fi = 0; fi < 6; fi += 1) {
-      const fa = h2(pi, 47) * 6.283 + fi * 1.047 + 0.52;
+      const fa = h2(wi, 47) * 6.283 + fi * 1.047 + 0.52;
       const fx = Math.cos(fa), fz = Math.sin(fa);
       const ftr = psd * (fx * cfZ - fz * cfX);
       const frn = 1.3 - 0.4 * Math.max(0, ftr);
@@ -2539,6 +2580,7 @@ export function drawChase3D(ctx, state) {
           [pxp + fx * frn * t0, y0 + w0, pzp + fz * frn * t0]],
           sh(pgl, 0.9 - 0.1 * sg, ptz), pdep);
       }
+    }
     }
   }
   // street lamps at night: glowing dots at nearby intersections
