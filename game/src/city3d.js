@@ -3,7 +3,7 @@ import { WATER_X } from './city.js';
 import { BRIDGE } from './drawbridge.js';
 import { PRESETS } from './timeofday.js';
 import { drawMarket3D } from './market.js'; // R35-F9: night market stalls + string lights (post-cut)
-import { STUNT_RAMPS, activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
+import { activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
 // Neon Harbor 3D title-screen — software 3D engine, Canvas 2D only, no libs.
 // Perspective projection + painter's algorithm. Deterministic (seeded).
 let x, W = 1280, H = 800, CX = W / 2, HOR = H * .46;
@@ -795,42 +795,6 @@ function inRange(wx, wy, fwdMax, latMax) {
 let rimOn = true; // warm rim light while the sun is up (set per frame)
 let chaseTL = 1; // R38: taillight gain for the chase renderer (set per frame from daylight — same steps as TITLE_PAL.tlGain)
 function tlC(r, g, b) { return 'rgb(' + ((r * chaseTL) | 0) + ',' + ((g * chaseTL) | 0) + ',' + ((b * chaseTL) | 0) + ')'; }
-// ---- R35-F7-RAMP-START (F7-A stunt jumps, canvas fallback) ----
-// R35-F7: stunt ramp — 3 LOW rising yellow steps (0.18/0.36/0.54 — the
-// 4-step 1.28-high version read as a giant staircase in the first WebGL2
-// shot) + chevron approach on the road, with a depth-sorted floating
-// label. FIX3-A: width 56 -> 36 (road 80: asphalt visible each side) +
-// steps alternate yellow/dark (was two near-identical yellows merging into
-// one flat slab) — mirror of the webgl2.js block, same numbers. World px
-// in, CS-scaled out (same convention as car3d). ONE
-// block: everything F7-A in this file is this function + the loop below
-// (F7-RAMP-START..END). Lamps, tokens, buildings and roads are NOT
-// touched (zona R36/R38).
-function drawRamp3D(r, showLabel) {
-  const fx = Math.cos(r.angle), fz = Math.sin(r.angle);
-  const dep = Math.hypot(r.x * CS - ccX, r.y * CS - ccZ);
-  for (let i = 0; i < 2; i += 1) {
-    const ox = (r.x - fx * (35 + i * 14)) * CS, oz = (r.y - fz * (35 + i * 14)) * CS;
-    box3(ox, 0.05, oz, 36 * CS, 0.08, 10 * CS, r.angle, i % 2 ? '#14141a' : '#ffe55c', dep);
-  }
-  for (let i = 0; i < 3; i += 1) {
-    const ox = (r.x + fx * (-21 + i * 14)) * CS, oz = (r.y + fz * (-21 + i * 14)) * CS;
-    box3(ox, 0.05, oz, 36 * CS, 0.18 * (i + 1), 14 * CS, r.angle, i % 2 ? '#1f1f24' : '#ffe14d', dep);
-  }
-  const lp = cP(r.x * CS, 3.4, r.y * CS);
-  // DIAG-C: label hanya bila showLabel (ramp terdekat yang belum selesai,
-  // dan tidak selama toast stunt tampil) — dua ramp segaris di y=1120
-  // (Sunset Straight 1520 + East Harbor Jump 1700) menumpukkan labelnya.
-  if (showLabel && lp) {
-    ops.push({ d: lp[2], f() {
-      x.save();
-      x.font = 'bold ' + Math.round(cl(900 / lp[2], 11, 20)) + 'px sans-serif'; x.textAlign = 'center';
-      x.fillStyle = '#ffd23e'; x.fillText('STUNT JUMP ▲', lp[0], lp[1]);
-      x.restore();
-    } });
-  }
-}
-// ---- R35-F7-RAMP-END (F7-A stunt jumps, canvas fallback) ----
 function car3d(wx, wy, angle, len, wid, color, o) {
   let L = len * CS, Wd = wid * CS;
   const bodyH = o.hero ? 0.72 : 0.8;
@@ -2223,26 +2187,9 @@ export function drawChase3D(ctx, state) {
       x.fillStyle = '#ffd23e'; x.fillText(tgt.label, lp[0], lp[1]); x.restore();
     }
   }
-  // ---- R35-F7-RAMP-START (F7-A ramps + F7-B job beacon, canvas fallback) ----
-  // Stunt ramps on the road + active district-job beacon (cyan, same shape
-  // as the mission beacon above so it reads as a waypoint). ONE block.
-  // DIAG-C: label HANYA untuk ramp terdekat yang belum selesai — Sunset
-  // Straight (1520) + East Harbor Jump (1700) segaris di y=1120 sehingga
-  // dua label "STUNT JUMP ▲" bertumpuk di tengah layar; label ramp yang
-  // sudah selesai juga disembunyikan (geometri ramp tetap jadi landmark),
-  // dan semua label disembunyikan selama toast stunt tampil.
-  const _jd = jobsState(state);
-  const _stuntToast = _jd.toast && _jd.toast.text === 'STUNT JUMP!';
-  let _nearRamp = null, _nearD = Infinity;
-  for (const r of STUNT_RAMPS) {
-    if (!inRange(r.x, r.y, 160, 120)) continue;
-    const d = Math.hypot(r.x - p.x, r.y - p.y);
-    if (d < _nearD) { _nearD = d; _nearRamp = r; }
-  }
-  for (const r of STUNT_RAMPS) {
-    if (inRange(r.x, r.y, 160, 120))
-      drawRamp3D(r, r === _nearRamp && !_jd.rampDone[r.name] && !_stuntToast);
-  }
+  // ---- R35-F7-JOB-START (F7-B job beacon, canvas fallback) ----
+  // Active district-job beacon (cyan, same shape as the mission beacon
+  // above so it reads as a waypoint).
   const _job = activeJob(jobsState(state));
   if (_job && inRange(_job.tx, _job.ty, 160, 120)) {
     const txp = _job.tx * CS, tzp = _job.ty * CS;
@@ -2259,7 +2206,7 @@ export function drawChase3D(ctx, state) {
       } });
     }
   }
-  // ---- R35-F7-RAMP-END ----
+  // ---- R35-F7-JOB-END ----
   // parked + moving traffic
   for (const car of state.traffic.parked) {
     if (!car.alive || !inRange(car.x, car.y, 150, 100)) continue;

@@ -385,7 +385,7 @@ export function drawHud2(c, st, best, ui, view) {
   const collected = st.collectibles.filter((k) => k.taken).length;
   careerNoteScreen(null); // R35-F3: closes a title-opened overlay on play
   careerObserve(st, best); // R35-F3: mission tracking + completion latch
-  const jh = jobsHud(st); // R35-F7: stunt jumps + district jobs + exports
+  const jh = jobsHud(st); // R35-F7: district jobs + exports
   // ---- top-left cluster: stats panel + radio pill (anchor 0,0) ----
   hudCluster(c, 0, 0, 0, 0, s, () => {
   drawPanel(c, 12, 12, 284, 176, C.neonCyan);
@@ -417,7 +417,7 @@ export function drawHud2(c, st, best, ui, view) {
   // R35-F1: crew panel (radio ends y234).
   drawCrewPanel(c, st, 12, 244, 284);
   });
-  // ---- right rail: district jobs / stunts / exports (R35-F7) ----
+  // ---- right rail: district jobs / exports (R35-F7) ----
   // F7-B jobs panel + F7-A/F7-C counters. RIGHT rail, y 540..644 (MERGE
   // FIX: the F7 slot y336..440 collided with the PD panel in the merged
   // build — F2's district panel (y170..334, H164 fixed) pushes the PD
@@ -437,7 +437,7 @@ export function drawHud2(c, st, best, ui, view) {
   } else {
     T(c, 'ALL JOBS DONE — HARBOR LEGEND', W2 - 300, 578, 13, '#7be382', 'left', 'bold');
   }
-  T(c, '▲ STUNT JUMPS ' + jh.stunts + '/' + jh.stuntsTotal + '   ◆ EXPORTS ' + jh.exportsDone + '/' + jh.exportsTotal, W2 - 300, 628, 11, '#eef1f5', 'left', 'bold');
+  T(c, '◆ EXPORTS ' + jh.exportsDone + '/' + jh.exportsTotal, W2 - 300, 628, 11, '#eef1f5', 'left', 'bold');
   });
   // ---- top-center cluster: day readout + ROAD TO #1 (anchor W2/2,0) ----
   hudCluster(c, W2 / 2, 0, SW / 2, 0, s, () => {
@@ -573,7 +573,7 @@ export function drawHud2(c, st, best, ui, view) {
     c.restore();
   }
   });
-  // ---- top-center toast: stunt / job / export reward banner (R35-F7) ----
+  // ---- top-center toast: job / export reward banner (R35-F7) ----
   // Under the ROAD TO #1 card (ends ~y 96), drawn last so it sits on top.
   if (jh.toast) {
     hudCluster(c, W2 / 2, 0, SW / 2, 0, s, () => {
@@ -788,7 +788,7 @@ export function drawTitle2(c, view, best, prog, backdrop, live) {
   T(c, 'BEST CASH $' + best.toLocaleString('en-US'), W2 / 2, bcY + 13, 13, C.cash, 'center', 'bold');
   // R35-F7: new-features strip, bottom-right (clock is bottom-left,
   // BEST CASH bottom-center).
-  const nf = 'NEW: STUNT JUMPS · DISTRICT JOBS · EXPORT LIST';
+  const nf = 'NEW: DISTRICT JOBS · EXPORT LIST';
   c.font = 'bold 12px ' + FONT;
   const nw = c.measureText(nf).width + 28;
   drawPill(c, W2 - nw - 12, H2 - 36, nw, 24, '#0e1420e6', C.neonYellow);

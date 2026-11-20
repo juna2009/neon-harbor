@@ -7,7 +7,7 @@ import { PRESETS, webglUniforms } from './timeofday.js';
 import { drawCarRealistic } from './cars3d.js'; // R26: cars3d v15d di game/src/
 import { drawCruiseShips } from './ships3d.js'; // R27b: kapal pesiar + yacht (statis, visual saja)
 import { marketSite, marketStalls } from './market.js'; // R35-F9: night market (Pasar Malam) — geometri dari market.js
-import { STUNT_RAMPS, activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
+import { activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
 // R41 Worker C (pintu+interior): dynamic import — 0 byte dossier (scanner
 // hanya baca static import). INT=null sampai modul termuat; semua hook di
 // bawah guard `if(INT)`, jadi game jalan normal sebelum/saat gagal muat.
@@ -1557,31 +1557,10 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       }
     }
   }
-  // ---- R35-F7-RAMP-START (F7-A stunt ramps + F7-B job beacon, WebGL2) ----
-  // ONE block: everything F7 in this file. Stunt ramps = 2 chevron boxes +
-  // 3 LOW rising yellow steps (0.18/0.36/0.54 high — the 4-step 1.28-high
-  // version read as a giant staircase filling the frame in the first shot).
-  // FIX3-A: width 56 -> 36 (road is 80: 22 asphalt visible each side, no
-  // more yellow plate covering the road) + steps alternate yellow/dark
-  // (was two near-identical yellows that merged into one flat slab at
-  // chase-cam grazing angle). Heights/positions/trigger untouched (jobs.js).
-  // boxR yaw = PI/2 - angle so local +Z is the ramp facing; job beacon =
-  // cyan ground marker + vertical beam (same deboxBeam shape as the
-  // token's gold beam). Lamps, tokens, buildings and roads are NOT
+  // ---- R35-F7-JOB-START (F7-B job beacon, WebGL2) ----
+  // Job beacon = cyan ground marker + vertical beam (same deboxBeam shape
+  // as the token's gold beam). Lamps, tokens, buildings and roads are NOT
   // touched (zona R36/R38).
-  for (const r of STUNT_RAMPS) {
-    if (!near(r.x, r.y, R) || !vis(r.x, r.y, 90)) continue;
-    const ry = Math.PI / 2 - r.angle;
-    const fx = Math.cos(r.angle), fz = Math.sin(r.angle);
-    for (let i = 0; i < 2; i += 1) {
-      const h = 0.08;
-      boxR(OP, (r.x - fx * (35 + i * 14)) * S, 0.02 + h / 2, (r.y - fz * (35 + i * 14)) * S, 36 * S, h, 10 * S, ry, 0, i % 2 ? [0.08, 0.08, 0.1] : [1, 0.95, 0.35], 16);
-    }
-    for (let i = 0; i < 3; i += 1) {
-      const h = 0.18 * (i + 1);
-      boxR(OP, (r.x + fx * (-21 + i * 14)) * S, 0.02 + h / 2, (r.y + fz * (-21 + i * 14)) * S, 36 * S, h, 14 * S, ry, 0, i % 2 ? [0.12, 0.12, 0.14] : [1, 0.9, 0.3], 16);
-    }
-  }
   {
     const _job = activeJob(jobsState(state));
     if (_job && near(_job.tx, _job.ty, R) && vis(_job.tx, _job.ty, 90)) {
@@ -1589,7 +1568,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       deboxBeam(OP, _job.tx * S, 0.1, _job.ty * S, _job.tx * S, 2.4, _job.ty * S, 0.3, [0.22, 0.88, 0.9], 4);
     }
   }
-  // ---- R35-F7-RAMP-END ----
+  // ---- R35-F7-JOB-END ----
 
 
   // Gedung (dekat hero saja) + taman + pohon.

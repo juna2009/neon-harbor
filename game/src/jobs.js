@@ -1,4 +1,5 @@
-// R35-F7: Stunt Jumps + District Jobs + Export List.
+// R35-F7: District Jobs + Export List.
+// (F7-A stunt jumps removed entirely — RAMP-REMOVE, keputusan Juna.)
 // Post-cut module: imported ONLY from post-cut files (webgl2.js +
 // city3d.js for the per-draw tick, ui2.js for the HUD/garage panels).
 // NEVER import this from a counted file: the dossier's import-order walk
@@ -7,10 +8,10 @@
 // survives the spread copies render.js hands to the HUD); it resets when
 // the world restarts (state.elapsed drops well below the max seen).
 //
-// CUT ORDER (koordinator R35): F7-C Export List dulu, lalu F7-A Stunt
-// Jumps, lalu F7-B District Jobs. Tiap sub-fitur punya SEKSI SENDIRI di
-// file ini (banner F7-A / F7-B / F7-C) + blok UI-nya sendiri di ui2.js /
-// city3d.js / webgl2.js (lihat STATUS.md untuk nomor baris persis).
+// CUT ORDER (koordinator R35): F7-C Export List dulu, lalu F7-B
+// District Jobs. Tiap sub-fitur punya SEKSI SENDIRI di file ini
+// (banner F7-B / F7-C) + blok UI-nya sendiri di ui2.js / city3d.js /
+// webgl2.js (lihat STATUS.md untuk nomor baris persis).
 // Mencoret satu sub-fitur = hapus seksinya + pemanggilan tick-nya di
 // tickJobs() + blok UI-nya; hook draw-path tetap selama minimal satu
 // sub-fitur tersisa (hapus juga kalau ketiganya dicoret).
@@ -24,11 +25,6 @@ function freshJobs() {
     // F7-B district jobs
     jobList: DISTRICT_JOBS.map((j) => ({ ...j, done: false })),
     jobsDone: 0,
-    // F7-A stunt jumps
-    rampDone: {},
-    stunts: 0,
-    lastStunt: 0,
-    air: null,
     // F7-C export list
     exports: {},
     exportsDone: 0,
@@ -54,13 +50,6 @@ export function jobsState(state) {
   return J;
 }
 
-function angDiff(a, b) {
-  let d = a - b;
-  while (d > Math.PI) d -= Math.PI * 2;
-  while (d < -Math.PI) d += Math.PI * 2;
-  return d;
-}
-
 // Per-tick hook — called from the 3D DRAW path (webgl2.js buildFrame +
 // city3d.js drawChase3D), once per draw, with the REAL state. NOT from
 // cinematic.js update(): the shot page only paints twice and never runs
@@ -77,13 +66,8 @@ export function tickJobs(state, dt) {
     J.toast.t -= d;
     if (J.toast.t <= 0) J.toast = null;
   }
-  if (J.air) {
-    J.air.t += d;
-    if (J.air.t >= J.air.dur) J.air = null;
-  }
   const p = state.player;
   const car = p.inCar && p.car ? p.car : null;
-  tickStunts(state, J, car, p);
   tickDistrictJobs(state, J, car, p);
   tickExports(state, J, car, p);
 }
@@ -99,60 +83,12 @@ export function jobsHud(state) {
     J,
     job,
     jobDist: job ? Math.round(Math.hypot(hx - job.tx, hy - job.ty)) : 0,
-    stunts: J.stunts,
-    stuntsTotal: STUNT_RAMPS.length,
     jobsDone: J.jobsDone,
     jobsTotal: J.jobList.length,
     exportsDone: J.exportsDone,
     exportsTotal: EXPORT_LIST.length,
     toast: J.toast,
   };
-}
-
-// ============================ F7-A: STUNT JUMPS ============================
-// 5 ramps on straight road stretches. Cross one in the player's car at
-// >= 200 u/s, facing along the ramp, and the car goes airborne
-// (J.air drives the toast + airLiftOf; the 3D lift visual was cut — see
-// STATUS.md) for ~1-1.4 s and pays cash. Each ramp counts once per run.
-// Trigger window along [-60, +120]: the jump registers as the car crosses
-// AND just after leaving the ramp — wide enough that the first rendered
-// frame after a staged shot (car already ~55-80 u past the ramp) still
-// catches it. Render: drawRamp3D + loop in city3d.js, block in webgl2.js.
-export const STUNT_RAMPS = [
-  { name: 'Sunset Straight', x: 1520, y: 1120, angle: 0, minSpeed: 200 },
-  { name: 'East Harbor Jump', x: 1700, y: 1120, angle: 0, minSpeed: 200 }, // ahead of the staged hero (ends ~1590), before the first staged car (1790) — visible in the chase3d shot
-  { name: 'Market Launch', x: 640, y: 480, angle: 0, minSpeed: 200 },
-  { name: 'Stadium Drop', x: 800, y: 640, angle: Math.PI / 2, minSpeed: 200 },
-  { name: 'Dockside Flyer', x: 2080, y: 1280, angle: -Math.PI / 2, minSpeed: 200 },
-];
-
-function tickStunts(state, J, car) {
-  if (!car || J.air || car.speed < 200) return;
-  for (const r of STUNT_RAMPS) {
-    if (J.rampDone[r.name]) continue;
-    const ca = Math.cos(r.angle), sa = Math.sin(r.angle);
-    const dx = car.x - r.x, dy = car.y - r.y;
-    const along = dx * ca + dy * sa, lat = -dx * sa + dy * ca;
-    if (along > -60 && along < 120 && Math.abs(lat) < 38 && Math.abs(angDiff(car.angle, r.angle)) < 0.7) {
-      const reward = Math.round((150 + (car.speed - 200) * 0.1) / 10) * 10;
-      J.rampDone[r.name] = true;
-      J.stunts += 1;
-      J.lastStunt = reward;
-      J.air = { t: 0, dur: 0.9 + car.speed / 900, name: r.name };
-      state.cash += reward;
-      J.toast = { text: 'STUNT JUMP!', sub: r.name + '  +$' + reward, t: 4 };
-      break;
-    }
-  }
-}
-
-// Airborne lift (0..2.2 units) — state machine only; no 3D lift visual
-// (cut for merge safety, see STATUS.md). Node-tested via test-jobs.mjs.
-export function airLiftOf(state) {
-  const J = state.city && state.city.jobs;
-  if (!J || !J.air) return 0;
-  const k = Math.min(1, J.air.t / J.air.dur);
-  return Math.sin(Math.PI * k) * 2.2;
 }
 
 // ============================ F7-B: DISTRICT JOBS ============================
