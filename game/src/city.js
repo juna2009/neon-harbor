@@ -81,10 +81,10 @@ export function buildCity(rng) {
   const trees = [];
   for (let i = 0; i < roadsV.length - 1; i += 1) {
     for (let j = 0; j < roadsH.length - 1; j += 1) {
-      const bx = roadsV[i] + ROAD_W / 2 + 20;
-      const by = roadsH[j] + ROAD_W / 2 + 20;
-      const bw = BLOCK - ROAD_W - 40;
-      const bh = BLOCK - ROAD_W - 40;
+      const bx = roadsV[i] + ROAD_W / 2 + 40;
+      const by = roadsH[j] + ROAD_W / 2 + 40;
+      const bw = BLOCK - ROAD_W - 80;
+      const bh = BLOCK - ROAD_W - 80;
       if (bx + bw > WATER_X - 20) continue;
       // #26: blocks (2140,220)/(2140,1500) overlap the marina/docks pier — never parks.
       // #25: last parkable block (2140,1180) is forced to a park when the RNG made none,
@@ -150,7 +150,7 @@ export function buildCity(rng) {
   const hydrants = [{ x: 852, y: 1388, burst: false }];
   while (hydrants.length < 8 && candidates.length) {
     const pt = candidates.splice(rng.int(0, candidates.length - 1), 1)[0];
-    const x = pt.x + 52, y = pt.y + 52;
+    const x = pt.x + 60, y = pt.y + 60;
     if (!buildingAt({ buildings }, x, y, 5)) hydrants.push({ x, y, burst: false });
   }
   return {

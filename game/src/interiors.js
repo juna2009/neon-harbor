@@ -14,10 +14,15 @@
 //   cafe    "Neon Café"     — gedung penuh terdekat ke blok (1280,320)
 //   hideout "Jax Hideout"   — gedung penuh terdekat ke blok (640,1600)
 //   casino  landmark casino (gedung terdekat ke (1440,800), apa pun ukurannya)
-// Aturan pilih: gedung penuh (w,h >= 180px) terdekat ke anchor dalam 520px;
-// kalau tidak ada, gedung terdekat apa pun. Lighthouse (44x44) DICORET —
-// terlalu kecil untuk interior; gas station DICORET — bukan gedung; semua
-// gedung lain DICORET — hanya 4 kunci ini yang bisa dimasuki.
+// Aturan pilih: gedung penuh (w,h >= 150px) terdekat ke anchor dalam 520px;
+// kalau tidak ada, gedung terdekat apa pun. TROTOAR: blok besar menyusut
+// 200->160, jadi ambang ikut turun (180->150) — kalau tetap 180, TIDAK ADA
+// gedung yang lolos dan shop/cafe/hideout jatuh ke gedung kecil 72px
+// (inner 52px, su 0.45) padahal gedung besar 160px tersedia (inner 140px,
+// su 0.7 = layout penuh, guard sumbu pintu tidak terpicu). Lighthouse
+// (44x44) DICORET — terlalu kecil untuk interior; gas station DICORET —
+// bukan gedung; semua gedung lain DICORET — hanya 4 kunci ini yang bisa
+// dimasuki.
 // Pintu: di sisi gedung yang paling dekat ke jalan (tie-break S,W,N,E),
 // di tengah sisi itu (aman dari chamfer sudut). Interior diskalakan ke ukuran
 // gedung (kasino 102px di seed tertentu tetap dapat interior, versi ringkas).
@@ -273,7 +278,7 @@ function pickNear(city, ax, ay, excludeLandmarks) {
     if (excludeLandmarks && b.landmark) continue;
     const d = dist(b.x + b.w / 2, b.y + b.h / 2, ax, ay);
     if (d < bestD) { bestD = d; best = b; }
-    if (b.w >= 180 && b.h >= 180 && d < 520 && d < bestBigD) { bestBigD = d; bestBig = b; }
+    if (b.w >= 150 && b.h >= 150 && d < 520 && d < bestBigD) { bestBigD = d; bestBig = b; }
   }
   return bestBig || best;
 }

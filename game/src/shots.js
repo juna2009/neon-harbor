@@ -286,22 +286,22 @@ export function stageShot(name, world) {
     // at chase distance that reads as "standing in the road". The north
     // ped moves to -56 (shadow 48..64 clears the asphalt; it stays
     // visible — it stands in the gap at the north building's east edge,
-    // x 1707 vs the building ending at 1710). The SOUTH ped must stay
-    // at +48: at +56 it is 6u behind the south building face (y=1170)
-    // and the depth-sorted chase view paints the face OVER it — probe
-    // (seed 7, re-shoot): ped2@56 invisible, ped2@48 visible standing
-    // on the sidewalk. The "on the road" read at +48 came from the
-    // live green ped overlapping it at off 44, which is hidden below
-    // (item 12b) — with that gone, ped2@48 reads as on the sidewalk.
-    // Live spawn (createPedestrians, walk line 49) is NOT touched — the
-    // same root cause lives there for the traffic-AI round (see STATUS).
+    // x 1707 vs the building ending at 1710). The SOUTH ped was kept
+    // at +48 because at +56 it sat 6u behind the south building face
+    // (y=1170) and the depth-sorted chase view painted the face OVER
+    // it (probe seed 7: ped2@56 invisible). TROTOAR moved the facade
+    // to y=1200, so +56 now stands 24u clear of the face — both photo
+    // peds sit at ±56, mid-sidewalk (48..80). The old "on the road"
+    // read at +48 also came from the live green ped overlapping it at
+    // off 44, hidden below (item 12b).
+    // Live spawn (createPedestrians, walk line 60) is NOT touched here.
     stagePhotoPeds(world, [
       { x: cp.x + 120, y: 1120 - 56 },
-      { x: cp.x + 260, y: 1120 + 48 },
+      { x: cp.x + 260, y: 1120 + 56 },
     ]);
     if (name === 'chase3d') {
-      // R38 (item 12b): live peds in the visible stretch walk at ±40 —
-      // ON the visual asphalt (44) — and read as standing in the road
+      // R38 (item 12b): live peds that drifted to |off| 30..52 sit ON
+      // the visual asphalt (44) — and read as standing in the road
       // exactly like the staged ones (green shirt at (1797,1164),
       // red shirt at (2066,1160) in the before-shot). Push them to the
       // only (R33b pattern: hide/move live actors for the shot, gameplay

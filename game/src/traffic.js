@@ -210,7 +210,7 @@ export function createPedestrians(city, rng) {
     let x;
     let y;
     let angle;
-    const off = rng.chance(0.5) ? ROAD_W / 2 + 9 : -ROAD_W / 2 - 9;
+    const off = rng.chance(0.5) ? ROAD_W / 2 + 20 : -ROAD_W / 2 - 20;
     if (vertical) {
       const rx = rng.pick(city.roadsV);
       x = rx + off;
@@ -251,7 +251,7 @@ export function createPedestrians(city, rng) {
     flee: 0, alive: true, walkPhase: 1.6, photo: 0, flashTimer: 0, hero: 'mara',
   });
   // R27c: no ped spawns walking ALONG a vehicle lane; departure corridor stays clear.
-  const SIDE = ROAD_W / 2 + 9; // 49 — sidewalk offset, same as random spawns
+  const SIDE = ROAD_W / 2 + 20; // 60 — sidewalk offset, same as random spawns
   const spawnRoad = city.roadsH.find((ry) => Math.abs(ry - city.playerStart.y) < 1)
     ?? city.playerStart.y;
   for (const ped of peds) {

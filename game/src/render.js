@@ -124,8 +124,8 @@ export function createRenderer(canvas) {
     g.closePath();
     g.fill();
     g.fillStyle = COLORS.sidewalk;
-    for (const rx of city.roadsV) g.fillRect(rx - 60, 0, 120, WORLD_H);
-    for (const ry of city.roadsH) g.fillRect(0, ry - 60, WATER_X, 120);
+    for (const rx of city.roadsV) g.fillRect(rx - 80, 0, 160, WORLD_H);
+    for (const ry of city.roadsH) g.fillRect(0, ry - 80, WATER_X, 160);
     g.fillStyle = COLORS.road;
     for (const rx of city.roadsV) g.fillRect(rx - 40, 0, 80, WORLD_H);
     for (const ry of city.roadsH) g.fillRect(0, ry - 40, WATER_X, 80);

@@ -83,7 +83,7 @@ export const NIGHT_RACE_PRIZE = 500;
 export const COLORS = {
   grass: '#2e6b3a',
   grassDark: '#276031',
-  sidewalk: '#9aa0a8',
+  sidewalk: '#a6a6a6',
   road: '#33373d',
   roadLine: '#e8d44d',
   water: '#1d6f9e',

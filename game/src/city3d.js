@@ -303,14 +303,14 @@ function frame(t){
   // first visible quad starts (dz=24). Haze is 0 this close, so a single
   // warm tone is right; the dashes, hero car and glow break it up.
   Q([-12,0,camZ+2],[12,0,camZ+2],[12,0,camZ+24],[-12,0,camZ+24],shW([58,47,53],1,0),2);
-  Q([-16,.1,camZ+2],[-12,.1,camZ+2],[-12,.1,camZ+24],[-16,.1,camZ+24],sh([80,70,76],1,0),2);
-  Q([12,.1,camZ+2],[16,.1,camZ+2],[16,.1,camZ+24],[12,.1,camZ+24],sh([80,70,76],1,0),2);
-  Q([-64,0,camZ+2],[-16,0,camZ+2],[-16,0,camZ+24],[-64,0,camZ+24],shW([48,38,44],1,0),2);
+  Q([-20,.1,camZ+2],[-12,.1,camZ+2],[-12,.1,camZ+24],[-20,.1,camZ+24],sh([80,70,76],1,0),2);
+  Q([12,.1,camZ+2],[20,.1,camZ+2],[20,.1,camZ+24],[12,.1,camZ+24],sh([80,70,76],1,0),2);
+  Q([-64,0,camZ+2],[-20,0,camZ+2],[-20,0,camZ+24],[-64,0,camZ+24],shW([48,38,44],1,0),2);
   // R36 PANTAI (title): strip kanan (x 16..64) = pasir pantai, bukan
   // trotoar gelap — tone pasir + jejak di apron dekat kamera juga.
   // R40-D: tepi kanan ikut coast() (berlekuk) + 2 bercak tone supaya apron
   // pasir dekat kamera tidak lempeng beige.
-  Q([16,0,camZ+2],[coast(camZ+2),0,camZ+2],[coast(camZ+24),0,camZ+24],[16,0,camZ+24],shW([196,164,116],1,0),2);
+  Q([20,0,camZ+2],[coast(camZ+2),0,camZ+2],[coast(camZ+24),0,camZ+24],[20,0,camZ+24],shW([196,164,116],1,0),2);
   Q([24,.05,camZ+8],[24.9,.05,camZ+8],[24.9,.05,camZ+11],[24,.05,camZ+11],mix([150,120,80],0),2);
   Q([40,.05,camZ+14],[40.7,.05,camZ+14],[40.7,.05,camZ+14.7],[40,.05,camZ+14.7],mix([235,220,190],0),2);
   Q([30,.05,camZ+5],[31.8,.05,camZ+5],[31.8,.05,camZ+6.4],[30,.05,camZ+6.4],mix([170,140,95],0),2);
@@ -323,36 +323,36 @@ function frame(t){
     // a flat expanse. (City install: tyre tracks / dark patches / cracks
     // removed — asphalt + markings + zebra only, per Juna 20:30 WIB.)
     Q([-12,0,z],[12,0,z],[12,0,z+30],[-12,0,z+30],shW([58+v*6,47+v*5,53+v*5],1,hz(d)),d);
-    Q([-16,.1,z],[-12,.1,z],[-12,.1,z+30],[-16,.1,z+30],sh([80,70,76],1,hz(d)),d);
-    Q([12,.1,z],[16,.1,z],[16,.1,z+30],[12,.1,z+30],sh([80,70,76],1,hz(d)),d);
+    Q([-20,.1,z],[-12,.1,z],[-12,.1,z+30],[-20,.1,z+30],sh([80,70,76],1,hz(d)),d);
+    Q([12,.1,z],[20,.1,z],[20,.1,z+30],[12,.1,z+30],sh([80,70,76],1,hz(d)),d);
     Q([-11.7,.06,z],[-11.4,.06,z],[-11.4,.06,z+30],[-11.7,.06,z+30],mix([220,200,170],hz(d)),d);
     Q([11.4,.06,z],[11.7,.06,z],[11.7,.06,z+30],[11.4,.06,z+30],mix([220,200,170],hz(d)),d);}
   // R31 title foreground: flanking ground — the frame's lower half was flat
-  // #241a20 void beyond the sidewalks (|x|>16). Warm pavement strips with
+  // #241a20 void beyond the sidewalks (|x|>20). Warm pavement strips with
   // per-segment variation + curb lines, haze-faded like the road, so the
   // foreground reads as a street, not black. Right strip runs to the water
   // (x=64) as the harbor promenade.
   for(let z=Math.floor((camZ-30)/30)*30;z<camZ+430;z+=30){const d=z-camZ,v=h2(7,z);
-    Q([-64,0,z],[-16,0,z],[-16,0,z+30],[-64,0,z+30],shW([46+v*8,36+v*6,42+v*6],1,hz(d)),d);
+    Q([-64,0,z],[-20,0,z],[-20,0,z+30],[-64,0,z+30],shW([46+v*8,36+v*6,42+v*6],1,hz(d)),d);
     // R36 PANTAI (title): strip kanan = pasir bertekstur (bukan hamparan
     // datar) — tone jitter + jejak kaki + kerang, per segmen 30 unit.
     // R40-D: tepi kanan ikut coast() (berlekuk) + 2 bercak tone kecil per
     // segmen supaya pasir tidak lempeng beige (grain halus = tugas C).
-    Q([16,0,z],[coast(z),0,z],[coast(z+30),0,z+30],[16,0,z+30],shW([196+v*14,164+v*10,116+v*8],1,hz(d)),d);
+    Q([20,0,z],[coast(z),0,z],[coast(z+30),0,z+30],[20,0,z+30],shW([196+v*14,164+v*10,116+v*8],1,hz(d)),d);
     if(h2(23,z)<.45){const fx=22+h2(29,z)*30;Q([fx,.05,z+6],[fx+.9,.05,z+6],[fx+.9,.05,z+9],[fx,.05,z+9],mix([150,120,80],hz(d)),d);}
     if(h2(41,z)<.3){const sx2=20+h2(43,z)*32;Q([sx2,.05,z+16],[sx2+.7,.05,z+16],[sx2+.7,.05,z+16.7],[sx2,.05,z+16.7],mix([235,220,190],hz(d)),d);}
     if(h2(53,z)<.4){const fx2=24+h2(59,z)*28;Q([fx2,.05,z+22],[fx2+.8,.05,z+22],[fx2+.8,.05,z+24.5],[fx2,.05,z+24.5],mix([140,112,74],hz(d)),d);}
     if(h2(89,z)<.8){const px2=20+h2(97,z)*30,pz2=z+4+h2(101,z)*18;Q([px2,.05,pz2],[px2+3,.05,pz2],[px2+3,.05,pz2+2.2],[px2,.05,pz2+2.2],mix([170,140,95],hz(d)),d);}
     if(h2(103,z)<.6){const px3=22+h2(107,z)*28,pz3=z+8+h2(109,z)*16;Q([px3,.05,pz3],[px3+2.6,.05,pz3],[px3+2.6,.05,pz3+2],[px3,.05,pz3+2],mix([215,185,140],hz(d)),d);}
     if(h2(113,z)<.5){const px4=24+h2(117,z)*26,pz4=z+14+h2(119,z)*12;Q([px4,.05,pz4],[px4+2.2,.05,pz4],[px4+2.2,.05,pz4+1.8],[px4,.05,pz4+1.8],mix([150,120,80],hz(d)),d);}
-    Q([-16.4,.08,z],[-16,.08,z],[-16,.08,z+30],[-16.4,.08,z+30],mix([150,132,120],hz(d)),d);
-    Q([16,.08,z],[16.4,.08,z],[16.4,.08,z+30],[16,.08,z+30],mix([150,132,120],hz(d)),d);}
+    Q([-20.4,.08,z],[-20,.08,z],[-20,.08,z+30],[-20.4,.08,z+30],mix([150,132,120],hz(d)),d);
+    Q([20,.08,z],[20.4,.08,z],[20.4,.08,z+30],[20,.08,z+30],mix([150,132,120],hz(d)),d);}
   // R36-ROADS item 16: kiri bawah title datar (gradasi cokelat polos) — sambungan
-  // ubin trotoar + prop foreground di strip kiri (x -64..-16, dekat kamera, di
+  // ubin trotoar + prop foreground di strip kiri (x -64..-20, dekat kamera, di
   // luar jalan |x|<12 dan di luar mobil hero). Q() urutan sisip: prop di sini
   // menimpa tanah tapi di bawah mobil/lampu (yang di-emit sesudahnya).
   for(let z=camZ+10;z<camZ+70;z+=15){const d=z-camZ;
-    Q([-64,.02,z],[-16,.02,z],[-16,.02,z+.35],[-64,.02,z+.35],mix([38,30,34],hz(d)),d);}
+    Q([-64,.02,z],[-20,.02,z],[-20,.02,z+.35],[-64,.02,z+.35],mix([38,30,34],hz(d)),d);}
   {const z=camZ+14; // hidran merah (depan + atas + kubah)
     Q([-22.8,0,z],[-21.2,0,z],[-21.2,1.6,z],[-22.8,1.6,z],mix([200,60,55],hz(14)),14);
     Q([-22.8,1.6,z],[-21.2,1.6,z],[-21.2,1.6,z-.9],[-22.8,1.6,z-.9],mix([140,40,40],hz(14)),14);
@@ -2057,17 +2057,18 @@ export function drawChase3D(ctx, state) {
   drawMarket3D({ box3, vQuad, flatQuad, inRange, sh, hx3, hz, CS, dist: (wx, wy) => Math.hypot(wx * CS - ccX, wy * CS - ccZ) }, city, nightF);
   // roads + sidewalks + center dashes, segmented per 320 px
   // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44;
-  // A-LITE (wave 2): ROAD_W 72->80, asphalt 44->48, sidewalk 58->60, so
+  // A-LITE (wave 2): ROAD_W 72->80, asphalt 44->48, sidewalk 58->60;
+  // TROTOAR: sidewalk 60->80, so the strip is 32 px, not 12 px.
   // cars sit clearly clear of the flanking buildings. VISUAL ONLY
   // (drawChase3D paint): ROAD_W/gameplay/collision untouched. Building
-  // faces stay at 60 (city.js), so a 12 px sidewalk strip remains;
+  // faces stay at 80 (city.js), so a 32 px sidewalk strip remains;
   // parked cars (+16, traffic.js) sit well inside the asphalt, as
   // parallel-parked cars do.
   for (const rx of city.roadsV) {
     for (let gy = -320; gy < WORLD_H + 320; gy += 320) {
       if (!inRange(rx, gy + 160, 175, 135)) continue;
       const rd = Math.hypot(rx * CS - ccX, (gy + 160) * CS - ccZ);
-      flatQuad(rx - 60, gy, rx + 60, gy + 320, 0.05, sh(hx3('#9aa0a8'), shadeK, hz(rd)));
+      flatQuad(rx - 80, gy, rx + 80, gy + 320, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
       flatQuad(rx - 48, gy, rx + 48, gy + 320, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
       for (let d0 = gy + 24; d0 < gy + 320; d0 += 128) {
         if (!inRange(rx, d0 + 16, 115, 75)) continue;
@@ -2087,7 +2088,7 @@ export function drawChase3D(ctx, state) {
       const clip = rd < 80;
       const x1 = clip ? Math.min(gx + 320, WATER_X) : gx + 320;
       if (x1 <= gx) continue;
-      flatQuad(gx, ry - 60, x1, ry + 60, 0.05, sh(hx3('#9aa0a8'), shadeK, hz(rd)));
+      flatQuad(gx, ry - 80, x1, ry + 80, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
       flatQuad(gx, ry - 48, x1, ry + 48, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
       for (let d0 = gx + 24; d0 < gx + 320 && (!clip || d0 < WATER_X); d0 += 128) {
         if (!inRange(d0 + 16, ry, 115, 75)) continue;
@@ -2417,8 +2418,8 @@ export function drawChase3D(ctx, state) {
     return (roadX * CS - ccX) * -cfZ;
   })();
   // POLEFIX2: lamps + palms sit HARD on the sidewalk, flush with the
-  // building line — walkLat 5.2 (52px from the road centreline: 12px
-  // past the 40px asphalt edge, 8px off the 60px facade). JF4's 4.3
+  // building line — walkLat 7.2 (72px from the road centreline: 24px
+  // past the 48px asphalt edge, 8px off the 80px facade). JF4's 4.3
   // (mid-sidewalk, 7px past the edge) FAILED on screen: at the
   // chase-cam's grazing angle the 7px strip projects to a sliver, so
   // the trunk base still read as standing on the asphalt edge and the
@@ -2427,7 +2428,7 @@ export function drawChase3D(ctx, state) {
   // Palms use EXACTLY walkLat now (JF4's +h2*0.3 drifted them to 5.1,
   // inside the wall). Fronds shortened 3.4 -> 2.0 so the canopy's inner
   // tip (42px) clears the 40px road edge instead of overhanging it.
-  const walkLat = 5.2; // sidewalk outer edge, in 3D units (52px from road centre)
+  const walkLat = 7.2; // sidewalk outer edge, in 3D units (72px from road centre)
   // R36-ROADS (fallback Canvas): tekstur jalan dekat kamera + prop trotoar.
   // VISUAL ONLY — padanan versi WebGL2 di webgl2.js (roadSeg/atFU).
   const fwdU = (f, lat) => [ccX + cfX * f + (-cfZ) * lat, ccZ + cfZ * f + cfX * lat]; // (maju, lateral) unit -> [x, z] 3D
@@ -2461,25 +2462,25 @@ export function drawChase3D(ctx, state) {
       QW([[ht[0], 0.11, ht[1]], [hb[0] - 0.8, 0.11, hb[1]], [hb[0] + 0.8, 0.11, hb[1]], [ht[0], 0.11, ht[1]]], '#e8e8e6', 30); }
     }
   }
-  for (let a = snapGrid(camAlong - 6, 12, 0); a <= camAlong + 66; a += 12) for (const lat of [roadLat - 5.4, roadLat + 5.4]) { // sambungan ubin trotoar — grid 12 unit (dulu fwd -6..66 tetap); lateral ±5.4 Street 2
+  for (let a = snapGrid(camAlong - 6, 12, 0); a <= camAlong + 66; a += 12) for (const lat of [roadLat - 6.4, roadLat + 6.4]) { // sambungan ubin trotoar — grid 12 unit (dulu fwd -6..66 tetap); lateral ±6.4 (tengah trotoar baru) Street 2
     const j = slotWorldP(a, lat);
     if (ewRoad) flatQuad(j[0] - 0.7, j[1] - 3.5, j[0] + 0.7, j[1] + 3.5, 0.08, 'rgba(20,20,24,0.5)');
     else flatQuad(j[0] - 3.5, j[1] - 0.7, j[0] + 3.5, j[1] + 0.7, 0.08, 'rgba(20,20,24,0.5)');
   }
-  { const bnAlong = snapGrid(camAlong + 16, 128, 0), bnFwd = bnAlong - camAlong; // halte: bangku kayu + rambu biru (trotoar kanan) — grid 128 unit; lateral +5.2 Street 2
-  if (bnFwd >= 12 && bnFwd < 175 && fwdClear(bnFwd, roadLat + 5.2)) {
-    const bn = fwdU(bnFwd, roadLat + 5.2), bb = fwdU(bnFwd, roadLat + 5.45), lg1 = fwdU(bnFwd - 0.8, roadLat + 5.2), lg2 = fwdU(bnFwd + 0.8, roadLat + 5.2), yaw = ewRoad ? Math.PI / 2 : 0; // box3: w ikut "right" — jalan E-W (sumbu x) butuh yaw pi/2 supaya panjang bangku sejajar jalan
+  { const bnAlong = snapGrid(camAlong + 16, 128, 0), bnFwd = bnAlong - camAlong; // halte: bangku kayu + rambu biru (trotoar kanan) — grid 128 unit; lateral +7.2 Street 2
+  if (bnFwd >= 12 && bnFwd < 175 && fwdClear(bnFwd, roadLat + 7.2)) {
+    const bn = fwdU(bnFwd, roadLat + 7.2), bb = fwdU(bnFwd, roadLat + 7.45), lg1 = fwdU(bnFwd - 0.8, roadLat + 7.2), lg2 = fwdU(bnFwd + 0.8, roadLat + 7.2), yaw = ewRoad ? Math.PI / 2 : 0; // box3: w ikut "right" — jalan E-W (sumbu x) butuh yaw pi/2 supaya panjang bangku sejajar jalan
     box3(lg1[0], 0, lg1[1], 0.12, 0.55, 0.12, 0, '#3a2c1c', bnFwd); // kaki bangku (alas 0 -> dudukan)
     box3(lg2[0], 0, lg2[1], 0.12, 0.55, 0.12, 0, '#3a2c1c', bnFwd);
     box3(bn[0], 0.55, bn[1], 1.9, 0.14, 0.55, yaw, '#6b4a2f', bnFwd);
     box3(bb[0], 0.6, bb[1], 1.9, 0.6, 0.1, yaw, '#5d3f28', bnFwd); // sandaran naik dari dudukan (alas 0.6, bukan 0.95 — dulu melayang)
-    const sg = fwdU(bnFwd + 3, roadLat + 5.2);
+    const sg = fwdU(bnFwd + 3, roadLat + 7.2);
     box3(sg[0], 0, sg[1], 0.14, 2.6, 0.14, 0, '#3a3340', bnFwd + 3);
     box3(sg[0], 2.3, sg[1], 0.95, 0.65, 0.1, yaw, '#2456c8', bnFwd + 3); // panel menimpa ujung tiang
   } }
-  { const tbAlong = snapGrid(camAlong + 24, 128, 0), tbFwd = tbAlong - camAlong; // tempat sampah hijau (trotoar kiri) — grid 128 unit; lateral −5.2 Street 2
-  if (tbFwd >= 12 && tbFwd < 175 && fwdClear(tbFwd, roadLat - 5.2)) {
-    const tb = fwdU(tbFwd, roadLat - 5.2);
+  { const tbAlong = snapGrid(camAlong + 24, 128, 0), tbFwd = tbAlong - camAlong; // tempat sampah hijau (trotoar kiri) — grid 128 unit; lateral −7.2 Street 2
+  if (tbFwd >= 12 && tbFwd < 175 && fwdClear(tbFwd, roadLat - 7.2)) {
+    const tb = fwdU(tbFwd, roadLat - 7.2);
     box3(tb[0], 0, tb[1], 0.55, 0.95, 0.55, 0, '#2a6b45', tbFwd);
     box3(tb[0], 0.95, tb[1], 0.6, 0.12, 0.6, 0, '#1d4e33', tbFwd);
   } }
