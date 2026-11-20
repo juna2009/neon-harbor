@@ -9,21 +9,20 @@ export const CHECKPOINT_KEY = 'neon-harbor-checkpoint';
 export const SETTINGS_KEY = 'neon-harbor-settings';
 export const PLAYER = {
   radius: 14,
-  walkSpeed: 100,
-  runSpeed: 160,
+  walkSpeed: 80,
+  runSpeed: 130,
   health: 100,
   pistolAmmo: 24,
   pistolReserve: 120,
   bulletSpeed: 760,
   fireInterval: 0.22,
 };
-// R41: radian fase jalan per px jarak tempuh (Jax + semua NPC jalan kaki).
-// 1 langkah = π rad → ~39 px/langkah: jalan Jax 100 px/dtk ≈ 2,5 langkah/dtk
-// (gait manusia santai), lari 160 ≈ 4,1, NPC 28–52 ≈ 0,7–1,3 (stroll pelan),
+// R41: radian fase jalan per px jarak tempuh (Jax + semua NPC).
+// 1 langkah = π rad → ~39 px/langkah: jalan Jax 80 px/dtk ≈ 2,04 langkah/dtk
+// (gait manusia santai), lari 130 ≈ 3,31, NPC 28–52 ≈ 0,7–1,3 (stroll pelan),
 // lari ketakutan 150 ≈ 3,8. Fase maju dari JARAK, bukan waktu — kalau diam,
-// kaki diam (anti-meluncur). Kalibrasi visual, bukan geometri: stride
-// geometris kaki (~14 px) akan menuntut 12 langkah/dtk untuk Jax — itu yang
-// terbaca robotik. R39: frame sprite = floor(walkPhase / (π/2)) % 4.
+// kaki diam (anti-meluncur). Kalibrasi visual: stride geometris (~14 px)
+// menuntut 12 langkah/dtk — itu yang terbaca robotik. R39: frame = floor(walkPhase/(π/2))%4.
 export const WALK_PHASE_PER_PX = 0.08;
 export const WEAPONS = {
   pistol: {

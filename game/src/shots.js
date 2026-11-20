@@ -355,7 +355,7 @@ export function stageShot(name, world) {
     // bukan shot dossier. Shot mode tidak menjalankan loop main.js, jadi
     // updateOnFoot tidak pernah dipanggil: state.onfoot + state.view3d
     // di-set langsung di sini. Jax di-stage di trotoar y=431 (scout Worker
-    // A v4: bersih x=100..1790) lalu jalan ke timur 0,6 dtk. SMOOTH-WALK: Jax di-stage di x=1045 (bukan 1000) supaya dgn walkSpeed 100 ia tetap berakhir di x=1105 (60 px) — dan dunia hanya di-step 36x seperti R41, jadi traffic/ped di posisi yang SAMA dgn shot R41 (walkFor 1,05 dtk sempat menggeser traffic hingga mobil merah menutupi Jax). walkPlayer
+    // A v4: bersih x=100..1790) lalu jalan ke timur 0,6 dtk. WALK-NATURAL: Jax di-stage di x=1064 supaya dgn walkSpeed 80 + ramp akselerasi ia tetap berakhir di x=1105 (~41 px, bukan 48 px — ramp makan ~7 px di 0,6 dtk pertama) — dan dunia hanya di-step 36x seperti R41, jadi traffic/ped di posisi yang SAMA dgn shot R41 (walkFor 1,05 dtk sempat menggeser traffic hingga mobil merah menutupi Jax). walkPlayer
     // mengarahkan p.angle ke mouse scripted (640,400) — begitu Jax lewat
     // titik itu angle berbalik π — jadi angle di-set eksplisit 0 (timur,
     // arah jalan) sesudah walkFor, kalau tidak kamera behind malah jadi
@@ -366,7 +366,7 @@ export function stageShot(name, world) {
     const mode = name === 'onfoot-pov' ? 0 : name === 'onfoot-front' ? 2 : 1;
     setLight(world, 0.9);
     state.view3d = true;
-    placePlayerOnFoot(world, 1045, 431); // SMOOTH-WALK: 1045 + 60 px (0,6 dtk @100) = 1105, sama dgn R41
+    placePlayerOnFoot(world, 1064, 431); // WALK-NATURAL: 1064 + ~41 px (0,6 dtk @80 + ramp) = 1105, sama dgn R41
     stagePed(world, 1250, 431);
     stagePed(world, 1400, 432);
     stagePed(world, 850, 431);
