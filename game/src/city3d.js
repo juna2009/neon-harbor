@@ -10,6 +10,23 @@ let x, W = 1280, H = 800, CX = W / 2, HOR = H * .46;
 let S=1337;const R=()=>((S=S*1664525+1013904223>>>0)/4294967296);
 const cl=(v,a,b)=>v<a?a:v>b?b:v;
 const h2=(a,b)=>{let v=(a*73856093)^(b*19349663);v=Math.imul(v^(v>>>13),1274126177);return((v^(v>>>16))>>>0)/4294967296;};
+// 1A-TREES: cache titik (px game, dibulatkan) -> di-dalam-gedung; posisi prop
+// kamera-relatif stabil antar frame, jadi cache hit terus; invalidasi bila
+// array buildings berganti (seed/load baru).
+const _bldHitCache = new Map();
+let _bldHitCity = null;
+function slotInBldg(city, wx, wy) { // true bila titik (px game) di dalam footprint gedung
+  if (city.buildings !== _bldHitCity) { _bldHitCache.clear(); _bldHitCity = city.buildings; }
+  const key = Math.round(wx) + ',' + Math.round(wy);
+  let hit = _bldHitCache.get(key);
+  if (hit === undefined) {
+    hit = false;
+    for (const b of city.buildings || []) if (wx > b.x && wx < b.x + b.w && wy > b.y && wy < b.y + b.h) { hit = true; break; }
+    if (_bldHitCache.size > 2000) _bldHitCache.clear();
+    _bldHitCache.set(key, hit);
+  }
+  return hit;
+}
 const F=640,HZ=[255,150,110];
 const mix=(c,t)=>'rgb('+c.map((v,i)=>Math.round(v+(HZ[i]-v)*t)).join(',')+')';
 const sh=(c,b,t)=>mix(c.map(v=>Math.min(255,v*b|0)),t);
@@ -102,7 +119,37 @@ function bld(b){const{x,z,w,d,h,c}=b,zf=z-d/2,zb=z+d/2,dep=zf-camZ;if(dep<35)ret
   // pantul langit [105,135,170] bila tidak menyala.
   const gw=h2(b.bi,77)<WINLIT,gc=gw?[200,150,90]:noon?[105,135,170]:[30,38,52];
   Q([x-w/2+.6,.3,zf],[x+w/2-.6,.3,zf],[x+w/2-.6,1.9,zf],[x-w/2+.6,1.9,zf],mix(gc,hz(dep)),dep);
-  Q([x-w/2+.6,2,zf],[x+w/2-.6,2,zf],[x+w/2-.6,2.55,zf],[x-w/2+.6,2.55,zf],mix([150,45,55],hz(dep)),dep);}
+  Q([x-w/2+.6,2,zf],[x+w/2-.6,2,zf],[x+w/2-.6,2.55,zf],[x-w/2+.6,2.55,zf],mix([150,45,55],hz(dep)),dep);
+  // 1A-TITLE flank ground floor (Juna 06:14): the road-facing flank (sx)
+  // was a flat colour field — no windows, no shop, no door. Mirror the
+  // front storefront onto it: glass etalase + red awning + door. SAFE vs
+  // IMPACT 2.4 bug (1): wins() draws windows ONLY on the front face (zf),
+  // so the flank has no window rows at all — y 0.3-2.55 (front
+  // ground-floor band) can never cover a window. Door = tall glass pane
+  // + pale stone frame (kusen), never a black line (bug 4).
+  // NOTE — name board DROPPED (see PATCH-REPORT.md): a fascia band at
+  // y 2.6-3.7 never renders — Q() stores the corner array in `d`, so the
+  // depth sort is a no-op and ops paint in insertion order (B is
+  // near->far), so each building's front occludes the previous
+  // building's flank above the front's bottom edge. A post-loop fascia
+  // would paint over the NEXT building's floor-1 windows on screen —
+  // exactly bug (5). Only the strip below that edge (the glass/awning/
+  // door wedge) is visible, and a name does not fit in it.
+  const so=sx+(x>0?-0.06:0.06),zf2=zf+0.6,zb2=zb-0.6;
+  Q([so,.3,zf2],[so,.3,zb2],[so,1.9,zb2],[so,1.9,zf2],mix(gc,hz(dep)),dep);
+  Q([so,2,zf2],[so,2,zb2],[so,2.55,zb2],[so,2.55,zf2],mix([150,45,55],hz(dep)),dep);
+  // door: 4.5u wide (a 1.8u door compresses to a 2-6px slit on the
+  // receding flank — IMPACT 2.4 bug 4, "pintu terbaca garis hitam").
+  // Tall (to 2.5, breaking the awning line) + glass tone clearly
+  // distinct from the etalase + pale stone frame, so it reads as an
+  // entrance, not a seam. Frame 0.3u so it survives as ~1px at dep 63.
+  const zd=zf2+h2(b.bi,83)*(zb2-zf2-4.5),dw=4.5;
+  const dgc=gw?[235,190,120]:noon?[70,95,130]:[18,24,34];
+  Q([so,.3,zd],[so,.3,zd+dw],[so,2.5,zd+dw],[so,2.5,zd],mix(dgc,hz(dep)),dep);
+  Q([so,.3,zd],[so,.3,zd+.3],[so,2.5,zd+.3],[so,2.5,zd],mix([205,195,175],hz(dep)),dep);
+  Q([so,.3,zd+dw-.3],[so,.3,zd+dw],[so,2.5,zd+dw],[so,2.5,zd+dw-.3],mix([205,195,175],hz(dep)),dep);
+  Q([so,2.4,zd],[so,2.4,zd+dw],[so,2.55,zd+dw],[so,2.55,zd],mix([205,195,175],hz(dep)),dep);
+  Q([so,.9,zd+dw-.45],[so,.9,zd+dw-.25],[so,1.3,zd+dw-.25],[so,1.3,zd+dw-.45],mix([220,200,160],hz(dep)),dep);}
 function car(o){const{x,z,w,h,l,c}=o,zb=z-l/2,zf=z+l/2,dep=zb-camZ,t=hz(dep);
   Q([x-w/2,0,zb],[x+w/2,0,zb],[x+w/2-.5,h,zb],[x-w/2+.5,h,zb],sh(c,.95,t),dep);
   Q([x-w/2+.5,h*.55,zb-.06],[x+w/2-.5,h*.55,zb-.06],[x+w/2-.5,h*.9,zb-.06],[x-w/2+.5,h*.9,zb-.06],mix([70,90,130],t),dep);
@@ -483,9 +530,18 @@ function frame(t){
   // trapesium hitam besar: flare +0.8/sisi + alpha .45 tepi keras, padahal
   // matahari siang ~57° = bayangan pendek di bawah mobil). Tepi lunak dari
   // 2 lapis: luar samar sedikit lebih lebar, dalam lebih gelap seukuran mobil.
-  const carShad=(cx,cz,w,l)=>{const L=PAL.shadowLen,z0=Math.max(cz-l/2-L,camZ+2.5),sx2=-0.15*L;
-    Q([cx-w/2-.55+sx2,.02,z0],[cx+w/2+.55+sx2,.02,z0],[cx+w/2+.3,.02,cz+l/2],[cx-w/2-.3,.02,cz+l/2],'rgba(0,0,0,'+(PAL.shadowA*0.35)+')',cz-camZ);
-    Q([cx-w/2-.25+sx2,.02,z0],[cx+w/2+.25+sx2,.02,z0],[cx+w/2,.02,cz+l/2],[cx-w/2,.02,cz+l/2],'rgba(0,0,0,'+PAL.shadowA+')',cz-camZ);};
+  // 1A-TITLE black-blotch fix (Juna 06:14; diagnosis Q5: hero shadow is
+  // the prime suspect — measured tone 55-61 vs asphalt ~100 in pagi).
+  // The preset shadowLen/shadowA are NOT touched (fix1: timeofday presets
+  // stay as-is); the effective shadow is shortened + softened here, in
+  // carShad only: L = 40% of preset, capped at 4 (sore 16 -> 4, pagi
+  // 9 -> 3.6, siang 1.8 -> 0.72, malam 5 -> 2), alpha x0.7. The shadow
+  // still anchors the car (visible contact shadow just behind it) but no
+  // longer runs as a black wedge to the bottom of the frame. Lamp
+  // shadows (:499) are thin 0.6u streaks at the road edge — untouched.
+  const carShad=(cx,cz,w,l)=>{const L=Math.min(PAL.shadowLen*0.4,4),A=PAL.shadowA*0.7,z0=Math.max(cz-l/2-L,camZ+2.5),sx2=-0.15*L;
+    Q([cx-w/2-.55+sx2,.02,z0],[cx+w/2+.55+sx2,.02,z0],[cx+w/2+.3,.02,cz+l/2],[cx-w/2-.3,.02,cz+l/2],'rgba(0,0,0,'+(A*0.35)+')',cz-camZ);
+    Q([cx-w/2-.25+sx2,.02,z0],[cx+w/2+.25+sx2,.02,z0],[cx+w/2,.02,cz+l/2],[cx-w/2,.02,cz+l/2],'rgba(0,0,0,'+A+')',cz-camZ);};
   carShad(0,camZ+17,3.6,6.6);car({x:0,z:camZ+17,w:3.6,h:1.5,l:6.6,c:[180,45,65],hero:1}); // R36V2: hero title merah gelap (Huracan; dulu [30,30,44] navy — samakan keluarga merah hero 3D)
   carShad(-5.5,camZ+48,3.2,6.2);car({x:-5.5,z:camZ+48,w:3.2,h:1.5,l:6.2,c:[12,12,16],pol:1});
   carShad(6,camZ+88,3.2,6);car({x:6,z:camZ+88,w:3.2,h:1.4,l:6,c:[200,90,30]});
@@ -1870,8 +1926,8 @@ export function drawChase3D(ctx, state) {
     for (let d0 = 540; d0 < 780; d0 += 40) flatQuad(2258, d0, 2262, d0 + 20, 0.09, '#e8d44d'); // centreline
     flatQuad(2224, 524, 2296, 532, 0.09, '#e8e4d8'); // threshold N
     flatQuad(2224, 768, 2296, 776, 0.09, '#e8e4d8'); // threshold S
-    flatQuad(2336, 532, 2368, 564, 0.05, sh(hx3('#7d838c'), shadeK, sdt)); // rocket pad
-    flatQuad(2344, 540, 2360, 556, 0.07, '#c98a3d');
+    flatQuad(2312, 532, 2344, 564, 0.05, sh(hx3('#7d838c'), shadeK, sdt)); // rocket pad
+    flatQuad(2320, 540, 2336, 556, 0.07, '#c98a3d');
     const hdep = Math.hypot(2166 * CS - ccX, 680 * CS - ccZ);
     box3(2166 * CS, 0.02, 680 * CS, 10, 6, 8, 0, '#7d838c', hdep); // hangar
     // WIN-FIX (VB-14): the south door glow was at fOff 4.1 — INSIDE the box
@@ -1921,19 +1977,19 @@ export function drawChase3D(ctx, state) {
       vQuad(2166 * CS, 680 * CS, Math.PI / 2, 5.1, -3.2, 1.2, wy, wy + 1.0, 'rgba(255,205,120,0.95)');
       vQuad(2166 * CS, 680 * CS, Math.PI / 2, 5.12, -3.2, 0.1, wy, wy + 1.0, 'rgba(10,10,16,0.7)');
     }
-    box3(2138 * CS, 0.02, 518 * CS, 3.6, 14, 3.6, 0, '#8a8f98', hdep); // tower
+    box3(2138 * CS, 0.02, 538 * CS, 3.6, 14, 3.6, 0, '#8a8f98', hdep); // tower
     // WIN-FIX (VB-14): the tower window band was one flat pale slab
     // (2.4x2.5, no divisions) on an otherwise blank face. Dark frame +
     // 3 panes + transom, plus a second row lower (still above the
     // hangar's roofline from this camera).
-    vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.87, 0, 2.6, 8.9, 11.6, 'rgba(10,10,16,0.85)');
-    for (const wx of [-0.8, 0, 0.8]) vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.9, wx, 0.66, 9, 11.5, 'rgba(255,205,120,0.95)');
-    vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.92, 0, 2.4, 10.15, 10.3, 'rgba(10,10,16,0.7)');
-    vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.87, 0, 2.6, 6.5, 8.6, 'rgba(10,10,16,0.85)');
-    for (const wx of [-0.8, 0, 0.8]) vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.9, wx, 0.66, 6.6, 8.5, 'rgba(255,205,120,0.9)');
-    box3(2138 * CS, 14, 518 * CS, 0.18, 3.2, 0.18, 0, '#3a3f47', hdep); // antenna
-    vQuad(2138 * CS, 518 * CS, Math.PI / 2, 1.9, 0, 0.3, 17.1, 17.4, '#ff4040'); // tip light
-    for (const tk of [[2352, 700], [2352, 744]]) {
+    vQuad(2138 * CS, 538 * CS, Math.PI / 2, 1.87, 0, 2.6, 8.9, 11.6, 'rgba(10,10,16,0.85)');
+    for (const wx of [-0.8, 0, 0.8]) vQuad(2138 * CS, 538 * CS, Math.PI / 2, 1.9, wx, 0.66, 9, 11.5, 'rgba(255,205,120,0.95)');
+    vQuad(2138 * CS, 538 * CS, Math.PI / 2, 1.92, 0, 2.4, 10.15, 10.3, 'rgba(10,10,16,0.7)');
+    vQuad(2138 * CS, 538 * CS, Math.PI / 2, 1.87, 0, 2.6, 6.5, 8.6, 'rgba(10,10,16,0.85)');
+    for (const wx of [-0.8, 0, 0.8]) vQuad(2138 * CS, 538 * CS, Math.PI / 2, 1.9, wx, 0.66, 6.6, 8.5, 'rgba(255,205,120,0.9)');
+    box3(2138 * CS, 14, 538 * CS, 0.18, 3.2, 0.18, 0, '#3a3f47', hdep); // antenna
+    vQuad(2138 * CS, 538 * CS, Math.PI / 2, 1.9, 0, 0.3, 17.1, 17.4, '#ff4040'); // tip light
+    for (const tk of [[2344, 700], [2344, 744]]) {
       box3(tk[0] * CS, 0.02, tk[1] * CS, 3.2, 2.6, 3.2, 0, '#c8ccd4', hdep); // fuel tank
       box3(tk[0] * CS, 2.6, tk[1] * CS, 3.4, 0.2, 3.4, 0, '#9aa0a8', hdep);
     }
@@ -2064,9 +2120,9 @@ export function drawChase3D(ctx, state) {
   if (inRange(docks.x + docks.w / 2, docks.y + docks.h / 2, 130, 110)) {
     flatQuad(docks.x, docks.y, docks.x + docks.w, docks.y + docks.h, 0.1, '#6b5a44');
     const dep = Math.hypot((docks.x + 64) * CS - ccX, (docks.y + 140) * CS - ccZ);
-    for (let i = 0; i < 3; i += 1) box3((docks.x + 38) * CS, 0.1, (docks.y + 34 + i * 56) * CS, 6, 2.2, 4.4, 0, ['#b8455a', '#4a7fb5', '#3f8f6f'][i], dep);
-    box3((docks.x + 96) * CS, 0.1, (docks.y + 262) * CS, 1.2, 15, 1.2, 0, '#c98a3d', dep);
-    box3((docks.x + 96) * CS, 14, (docks.y + 262) * CS, 1.2, 1.2, 12, 0, '#c98a3d', dep);
+    for (let i = 0; i < 3; i += 1) box3((docks.x + 8) * CS, 0.1, (docks.y + 34 + i * 56) * CS, 6, 2.2, 4.4, 0, ['#b8455a', '#4a7fb5', '#3f8f6f'][i], dep);
+    box3((docks.x + 20) * CS, 0.1, (docks.y + 80) * CS, 1.2, 15, 1.2, 0, '#c98a3d', dep);
+    box3((docks.x + 20) * CS, 14, (docks.y + 80) * CS, 1.2, 1.2, 12, 0, '#c98a3d', dep);
   }
   if (inRange(marina.x + marina.w / 2, marina.y + marina.h / 2, 130, 110)) {
     flatQuad(marina.x, marina.y, marina.x + marina.w, marina.y + marina.h, 0.1, '#6b5a44');
@@ -2095,7 +2151,8 @@ export function drawChase3D(ctx, state) {
   if (gas && inRange(gas.x + gas.w / 2, gas.y + gas.h / 2, 120, 100)) {
     const dep = Math.hypot((gas.x + gas.w / 2) * CS - ccX, (gas.y + gas.h / 2) * CS - ccZ);
     flatQuad(gas.x, gas.y, gas.x + gas.w, gas.y + gas.h, 0.07, '#7d8183');
-    box3((gas.x + gas.w / 2) * CS, 3.6, (gas.y + 30) * CS, gas.w * CS * 0.7, 0.5, 8, 0, '#292f3c', dep);
+    box3((gas.x + gas.w / 2) * CS, 3.6, (gas.y + 100) * CS, gas.w * CS, 0.5, 8, 0, '#292f3c', dep);
+    for (const px of [870, 1032]) for (const pz of [1570, 1610]) box3(px * CS, 1.65, pz * CS, 0.7, 3.3, 0.7, 0, '#c6cbd0', dep); // tiang kanopi
     for (const pump of gas.pumps) {
       if (pump.alive) box3(pump.x * CS, 0.07, pump.y * CS, 1.6, 2.2, 0.8, 0, '#cc3e45', dep);
     }
@@ -2384,6 +2441,7 @@ export function drawChase3D(ctx, state) {
       const lx = ccX + cfX * fwd + (-cfZ) * lat, lz = ccZ + cfZ * fwd + cfX * lat;
       const wxp = lx / CS, wzp = lz / CS;
       if (!inRange(wxp, wzp, 175, 135)) continue;
+      if (slotInBldg(city, wxp, wzp)) continue; // 1A-TREES: tiang di dalam gedung (saat belok) -> lewati
       const ldep = Math.hypot(lx - ccX, lz - ccZ);
       // R36-ROADS item 9: tiang 0.18 gelap + quad kuning vertikal 0.9 di ujung
       // tiang — di kejauhan tiang hilang, quad kebaca kotak kuning melayang.
@@ -2404,6 +2462,7 @@ export function drawChase3D(ctx, state) {
     const pxp = ccX + cfX * fwd + (-cfZ) * lat, pzp = ccZ + cfZ * fwd + cfX * lat;
     const wxp = pxp / CS, wzp = pzp / CS;
     if (!inRange(wxp, wzp, 175, 135)) continue;
+    if (slotInBldg(city, wxp, wzp)) continue; // 1A-TREES: palem di dalam gedung (saat belok) -> lewati
     // R36: palem ke-3 (fwd 140) mendarat di laut (x~2837 > WATER_X 2448) —
     // lewati palem di luar daratan.
     if (wxp > 2420 || wxp < 30 || wzp < 30 || wzp > 1890) continue;

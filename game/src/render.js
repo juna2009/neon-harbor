@@ -113,8 +113,8 @@ export function createRenderer(canvas) {
     g.fillStyle = COLORS.water;
     g.fillRect(WATER_X, 0, WORLD_W - WATER_X, WORLD_H);
     drawPier(g, city.docks.x, city.docks.y, city.docks.w, city.docks.h);
-    for (let i = 0; i < 3; i += 1) drawContainer(g, city.docks.x + 8, city.docks.y + 12 + i * 56, 60, 44, i);
-    drawCrane(g, city.docks.x + 96, city.docks.y + 262, 150);
+    for (let i = 0; i < 3; i += 1) drawContainer(g, city.docks.x-22, city.docks.y + 12 + i * 56, 60, 44, i);
+    drawCrane(g, city.docks.x + 20, city.docks.y + 80, 150);
     drawPier(g, city.marina.x, city.marina.y, city.marina.w, city.marina.h);
     g.fillStyle = '#ffffff';
     g.beginPath();
@@ -125,10 +125,10 @@ export function createRenderer(canvas) {
     g.fill();
     g.fillStyle = COLORS.sidewalk;
     for (const rx of city.roadsV) g.fillRect(rx - 52, 0, 104, WORLD_H);
-    for (const ry of city.roadsH) g.fillRect(0, ry - 52, WORLD_W, 104);
+    for (const ry of city.roadsH) g.fillRect(0, ry - 52, WATER_X, 104);
     g.fillStyle = COLORS.road;
     for (const rx of city.roadsV) g.fillRect(rx - 36, 0, 72, WORLD_H);
-    for (const ry of city.roadsH) g.fillRect(0, ry - 36, WORLD_W, 72);
+    for (const ry of city.roadsH) g.fillRect(0, ry - 36, WATER_X, 72);
     g.fillStyle = COLORS.roadLine;
     for (const rx of city.roadsV) {
       for (let y = 0; y < WORLD_H; y += 64) g.fillRect(rx - 2, y + 12, 4, 32);
@@ -274,8 +274,8 @@ export function createRenderer(canvas) {
     ctx.fillStyle = '#7d8183'; ctx.fillRect(gas.x, gas.y, gas.w, gas.h);
     ctx.strokeStyle = '#f2db96'; ctx.lineWidth = 3;
     ctx.strokeRect(gas.x + 8, gas.y + 8, gas.w - 16, gas.h - 16);
-    ctx.fillStyle = '#292f3c'; ctx.fillRect(gas.x + 14, gas.y + 25, gas.w - 28, 55);
-    ctx.fillStyle = '#ee594d'; ctx.fillRect(gas.x + 14, gas.y + 25, gas.w - 28, 7);
+    ctx.fillStyle = '#292f3c'; ctx.fillRect(gas.x + 14, gas.y + 41, gas.w - 28, 55);
+    ctx.fillStyle = '#ee594d'; ctx.fillRect(gas.x + 14, gas.y + 41, gas.w - 28, 7);
     ctx.fillStyle = '#c6cbd0';
     for (const dx of [20, gas.w - 28]) for (const dy of [40, 100]) ctx.fillRect(gas.x + dx, gas.y + dy, 7, 30);
     ctx.fillStyle = '#ffffff'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';

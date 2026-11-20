@@ -45,6 +45,8 @@ export function createTraffic(city, rng) {
   cab.body = 'taxi';
   cab.color = '#ff7fc0';
   cab.pink = true;
+  // #17: no parked car in an intersection box (±52) — nudge +104 (320-apart grid: never lands in another box).
+  const clearBox = (a, rs) => { for (const r of rs) if (Math.abs(a - r) < 52) return a + 104; return a; };
   const parked = [];
   for (let i = 0; i < 12; i += 1) {
     const vertical = rng.chance(0.5);
@@ -52,10 +54,10 @@ export function createTraffic(city, rng) {
     const color = body === 'taxi' ? '#f7c948' : rng.pick(city.carColors);
     if (vertical) {
       const rx = rng.pick(city.roadsV);
-      parked.push(makeCar(rx + 16, rng.range(200, WORLD_H - 200), PI2, color, 'parked', body));
+      parked.push(makeCar(rx + 16, clearBox(rng.range(200, WORLD_H - 200), city.roadsH), PI2, color, 'parked', body));
     } else {
       const ry = rng.pick(city.roadsH);
-      parked.push(makeCar(rng.range(200, WATER_X - 200), ry + 16, 0, color, 'parked', body));
+      parked.push(makeCar(clearBox(rng.range(200, WATER_X - 200), city.roadsV), ry + 16, 0, color, 'parked', body));
     }
   }
   return { cars, parked };
@@ -148,8 +150,7 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
         }
       }
     }
-    // A-01c: keep cars on their lane — a car off-lane (e.g. 5u) blocks the oncoming
-    // lane (side 23 < 26) and head-on deadlocks it. Not while turning.
+    // A-01c: keep cars on their lane — an off-lane car blocks the oncoming lane (side 23 < 26). Not while turning.
     if (!car.turning && car.laneTarget === undefined) car.laneTarget = car.road + (car.axis === 'v' ? 14 : -14) * car.dir;
     if (car.laneTarget !== undefined) {
       const coord = car.axis === 'v' ? 'x' : 'y';
@@ -179,8 +180,7 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
     if (car.x > WORLD_W + 60) car.x = -40;
     if (car.y < -60) car.y = WORLD_H - 40;
     if (car.y > WORLD_H + 60) car.y = -40;
-    // A-01 unstick: only H yields (V never reverses). Reverse runs along the AXIS,
-    // not the angle; a mid-turn car backs out while still rotating. Turn state untouched.
+    // A-01 unstick: only H yields (V never reverses); reverse runs along the AXIS, not the angle.
     if (car.back > 0) {
       car.back -= dt;
       car[car.axis === 'v' ? 'y' : 'x'] -= car.dir * 70 * dt;
@@ -237,10 +237,9 @@ export function createPedestrians(city, rng) {
       flashTimer: 0,
     });
   }
-  // R27c: hero peds stand on the SIDEWALK, not the road centreline (before: both
-  // stood on road y=480 and were run over ~5s into every drive). Jax on the NORTH
-  // sidewalk (y=440): the south lane (y=504) is 16u from the south sidewalk —
-  // inside the 26u run-over radius; north is 64u away, safe at any speed.
+  // R27c: hero peds on the NORTH sidewalk (y=440), not the road (before: both
+  // stood on y=480, run over ~5s into every drive). South lane y=504 is 16u
+  // from the south sidewalk — inside the 26u run-over radius; north is 64u away.
   peds.push({
     x: 540, y: 440, angle: 0, speed: 40,
     color: '#6b4423', skin: '#d8a077', pants: '#1c1f24', hat: 0, build: 'wide',
@@ -251,7 +250,7 @@ export function createPedestrians(city, rng) {
     color: '#8a1f28', skin: '#e8b98a', pants: '#2a1214', hat: 0, build: 'slim',
     flee: 0, alive: true, walkPhase: 1.6, photo: 0, flashTimer: 0, hero: 'mara',
   });
-  // R27c: no ped may spawn walking ALONG a vehicle lane; the player's departure corridor stays clear.
+  // R27c: no ped spawns walking ALONG a vehicle lane; departure corridor stays clear.
   const SIDE = ROAD_W / 2 + 4; // 40 — sidewalk offset, same as random spawns
   const spawnRoad = city.roadsH.find((ry) => Math.abs(ry - city.playerStart.y) < 1)
     ?? city.playerStart.y;
@@ -274,8 +273,7 @@ export function createPedestrians(city, rng) {
         }
       }
     }
-    // Departure corridor: the car leaves in the south lane (y=504), so anything
-    // here is inside the 26u run-over radius; move it to the far (north) sidewalk.
+    // Departure corridor: the car leaves in the south lane (y=504) — move anything here to the far (north) sidewalk.
     if (Math.abs(ped.y - spawnRoad) <= SIDE
       && ped.x >= city.playerStart.x - 40 && ped.x <= city.playerStart.x + 420) {
       ped.y = spawnRoad - SIDE;
@@ -287,8 +285,7 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
   const flashes = [];
   for (const ped of peds) {
     if (!ped.alive) continue;
-    // R41: walk phase advances by DISTANCE travelled (not dt), so a standing ped's
-    // feet freeze instead of sliding; fleeing (150 px/s) steps faster than strolling.
+    // R41: walk phase advances by DISTANCE travelled (not dt) — standing peds' feet freeze.
     const ox = ped.x, oy = ped.y;
     if (chase && ped.flee <= 0) {
       const cdx = ped.x - chase.x;

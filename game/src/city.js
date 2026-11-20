@@ -55,22 +55,6 @@ export function nearestIntersection(city, x, y) {
   }
   return best;
 }
-export function nearestRoadPoint(city, x, y) {
-  let bestV = city.roadsV[0];
-  let bestD = Infinity;
-  for (const rx of city.roadsV) {
-    const d = Math.abs(rx - x);
-    if (d < bestD) { bestD = d; bestV = rx; }
-  }
-  let bestH = city.roadsH[0];
-  bestD = Infinity;
-  for (const ry of city.roadsH) {
-    const d = Math.abs(ry - y);
-    if (d < bestD) { bestD = d; bestH = ry; }
-  }
-  if (Math.abs(bestV - x) <= Math.abs(bestH - y)) return { x: bestV, y };
-  return { x, y: bestH };
-}
 export function pathBlocked(city, x1, y1, x2, y2) {
   for (let t = 0.15; t < 1; t += 0.15) {
     const x = x1 + (x2 - x1) * t;
@@ -102,7 +86,10 @@ export function buildCity(rng) {
       const bw = BLOCK - ROAD_W - 28;
       const bh = BLOCK - ROAD_W - 28;
       if (bx + bw > WATER_X - 20) continue;
-      if (rng.chance(0.16)) {
+      // #26: blocks (2130,210)/(2130,1490) overlap the marina/docks pier — never parks.
+      // #25: last parkable block (2130,1170) is forced to a park when the RNG made none,
+      // so Pasar Malam always exists (seed 3 had 0 parks). Chance still rolls every block.
+      if ((rng.chance(0.16) || (i === 6 && j === 3 && !parks.length)) && !(bx + bw > 2280 && (by < 280 || by + bh > 1480))) {
         parks.push({ x: bx, y: by, w: bw, h: bh });
         for (let t = 0; t < 7; t += 1) {
           trees.push({ x: bx + rng.range(16, bw - 16), y: by + rng.range(16, bh - 16), r: rng.range(8, 13) });

@@ -15,9 +15,9 @@ export const SPACEPORT = {
   x: 2080, y: 480, w: 320, h: 320,
   runway: { x: 2220, y: 520, w: 80, h: 260 },
   hangar: { x: 2116, y: 640, w: 100, h: 80 },
-  pad: { x: 2352, y: 548, r: 32 },
-  tower: { x: 2120, y: 500, w: 36, h: 36 },
-  tanks: [{ x: 2352, y: 700, r: 16 }, { x: 2352, y: 744, r: 16 }],
+  pad: { x: 2328, y: 548, r: 32 },
+  tower: { x: 2120, y: 520, w: 36, h: 36 },
+  tanks: [{ x: 2344, y: 700, r: 16 }, { x: 2344, y: 744, r: 16 }],
   planePark: { x: 2204, y: 680, angle: 0 },
   gate: { x: 2080, y: 640 },
 };
@@ -319,13 +319,15 @@ function label(ctx, text, x, y, size, color, align) {
 
 export function drawSpaceport(ctx, state, time) {
   const r = SPACEPORT;
-  // Concrete apron.
+  // Concrete apron, cut to the interior block (2130..2350 x 530..750) so
+  // the surrounding roads stay fully visible (was full 2080..2400 x
+  // 480..800, covering half of each road in 2D).
   ctx.fillStyle = '#33383f';
-  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.fillRect(r.x + 50, r.y + 50, r.w - 100, r.h - 100);
   ctx.strokeStyle = 'rgba(255,210,62,0.55)';
   ctx.lineWidth = 2;
   ctx.setLineDash([14, 10]);
-  ctx.strokeRect(r.x + 4, r.y + 4, r.w - 8, r.h - 8);
+  ctx.strokeRect(r.x + 54, r.y + 54, r.w - 108, r.h - 108);
   ctx.setLineDash([]);
   // Long low-sun shadows (G6): everything casts south, away from the northern sun.
   const sunDir = { x: 0.22, y: 1 };
@@ -341,9 +343,9 @@ export function drawSpaceport(ctx, state, time) {
   longShadow(r.hangar.x, r.hangar.y, r.hangar.w, r.hangar.h);
   longShadow(r.tower.x, r.tower.y, r.tower.w, r.tower.h);
   longShadow(r.pad.x - 20, r.pad.y - 20, 40, 40);
-  // Palm silhouettes framing the apron (G5).
-  drawPalm(ctx, r.x + 26, r.y + 300, 1.1, time);
-  drawPalm(ctx, r.x + 300, r.y + 296, 0.95, time);
+  // Palm silhouettes framing the apron (G5). 1A-TREES #15: SW+SE digeser ke dlm apron (dulu (2106,780)/(2380,776) = di tengah jalan).
+  drawPalm(ctx, r.x + 40, r.y + 280, 1.1, time);
+  drawPalm(ctx, r.x + 280, r.y + 280, 0.95, time);
   drawPalm(ctx, r.x + 52, r.y + 40, 0.85, time);
   // Runway.
   const rw = r.runway;
@@ -451,7 +453,7 @@ export function drawSpaceport(ctx, state, time) {
   }
   ctx.save();
   ctx.shadowColor = '#37e0e6'; ctx.shadowBlur = 10;
-  label(ctx, 'HARBOR AEROSPACE', r.x + r.w / 2, r.y + r.h - 12, 12, '#37e0e6');
+  label(ctx, 'HARBOR AEROSPACE', r.x + r.w / 2, r.y + r.h - 62, 12, '#37e0e6');
   ctx.restore();
 }
 

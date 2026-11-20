@@ -25,6 +25,23 @@ function hash2(a, b) {
   return ((v ^ (v >>> 16)) >>> 0) / 4294967296;
 }
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+// 1A-TREES: cache slot (px game, dibulatkan) -> jatuh di dalam footprint gedung.
+// Posisi slot kamera-relatif stabil antar frame (along dijepit mod 16), jadi
+// cache hit terus; invalidasi bila array buildings berganti (seed/load baru).
+const _bldHitCache = new Map();
+let _bldHitCity = null;
+function slotInBuilding(city, wx, wy) { // true bila titik (px game) di dalam footprint gedung
+  if (city.buildings !== _bldHitCity) { _bldHitCache.clear(); _bldHitCity = city.buildings; }
+  const key = Math.round(wx) + ',' + Math.round(wy);
+  let hit = _bldHitCache.get(key);
+  if (hit === undefined) {
+    hit = false;
+    for (const b of city.buildings || []) if (wx > b.x && wx < b.x + b.w && wy > b.y && wy < b.y + b.h) { hit = true; break; }
+    if (_bldHitCache.size > 2000) _bldHitCache.clear();
+    _bldHitCache.set(key, hit);
+  }
+  return hit;
+}
 const angDiff = (a, b) => {
   let d = a - b;
   while (d > Math.PI) d -= Math.PI * 2;
@@ -843,10 +860,9 @@ function lamp(B, G, x, z, k, dx, dz) {
 // Pita vertikal (lebar di sumbu Y) kebaca daun penuh dari samping;
 // normal horizontal tegak lurus arah pelepah supaya shading matahari
 // R27c tetap jalan. Tanpa culling di WebGL2, semua pelepah tampil.
-function palm(B, x, z, sa, sc) { // R36 v3: sc = skala tinggi (1 normal; slot jauh >1 supaya mahkota muncul di atas palem dekat)
+function palm(B, x, z, sa, sc, road) { // R36 v3: sc = skala tinggi (1 normal; slot jauh >1 supaya mahkota muncul di atas palem dekat); road = [rx,rz] unit dr batang ke sumbu jalan (opsional, utk slot tepi jalan)
   sc = sc || 1;
-  const ang = hash2(Math.round(x), Math.round(z)) * Math.PI * 2;
-  const lx = Math.cos(ang) * 0.9, lz = Math.sin(ang) * 0.9; // arah lengkung batang
+  const lx = 0, lz = 0; // 1A-TREES: batang TEGAK — dulu condong 0.9u (~10 deg lean), mahkota menyimpang dr pangkal
   const TRUNK = [0.45, 0.33, 0.20]; // R36 v3: cokelat terang (batang tipis gelap = tak kebaca di sore; dulu [0.34,0.24,0.15])
   deboxBeam(B, x, 0, z, x + lx * 0.30, 1.8 * sc, z + lz * 0.30, 0.34 * sc, TRUNK, 5);
   deboxBeam(B, x + lx * 0.30, 1.8 * sc, z + lz * 0.30, x + lx * 0.65, 3.5 * sc, z + lz * 0.65, 0.30 * sc, TRUNK, 5);
@@ -863,6 +879,7 @@ function palm(B, x, z, sa, sc) { // R36 v3: sc = skala tinggi (1 normal; slot ja
   // Normal miring menarik ambient langit + komponen-Y matahari seperti
   // pelepah lama, tapi geometri tetap pita vertikal (kebaca daun).
   const frond = (dx, dz, L, rise, drop, w0, col) => {
+    if (road) { const tw = dx * road[0] + dz * road[1]; if (tw > 0) L = Math.min(L, 1.0 / tw); } // 1A-TREES (POLEFIX2): pelepah ke arah jalan dipendekkan — ujung tajuk >=38px dr sumbu jalan
     const nn = norm([-dz, 0.9, dx]);
     const fs = 1 - sa.w * (1 - (dx * sa.x + dz * sa.z)) / 4; // R36: lantai 0.8 (dulu /2 = 0.6, dobel-gelap dgn shader)
     const c = [col[0] * fs, col[1] * fs, col[2] * fs];
@@ -877,7 +894,7 @@ function palm(B, x, z, sa, sc) { // R36 v3: sc = skala tinggi (1 normal; slot ja
   };
   for (let k = 0; k < 8; k += 1) { // lapis bawah: 8 pelepah panjang menjuntai
     const a = (k / 8) * Math.PI * 2 + hash2(Math.round(x), k) * 0.5;
-    const L = 1.7 + hash2(k, Math.round(z)) * 0.6;
+    const L = 1.1 + hash2(k, Math.round(z)) * 0.5; // 1A-TREES: L maks 2.3 -> 1.6u
     frond(Math.cos(a), Math.sin(a), L * sc, 0.5 * sc, -1.0 * sc, 0.30 * sc, GREENS[k % 2]);
   }
   for (let k = 0; k < 6; k += 1) { // lapis atas: 6 pelepah pendek menjulang (offset setengah langkah)
@@ -933,17 +950,16 @@ function fishBoat(B, x, z, alongX) {
 // bertumpuk, bukan satu kubus) — variasi di trotoar selain palem.
 function shadeTree(B, x, z, sa, sc) { // R36 v3: sc = skala (sama dgn palm)
   sc = sc || 1;
-  const ang = hash2(Math.round(x), Math.round(z)) * Math.PI * 2;
-  const lx = Math.cos(ang) * 0.4, lz = Math.sin(ang) * 0.4;
+  const lx = 0, lz = 0; // 1A-TREES: batang TEGAK (dulu condong 0.4u)
   const TRUNK = [0.45, 0.33, 0.20]; // R36 v3: sama dgn palem
   deboxBeam(B, x, 0, z, x + lx * 0.5, 1.6 * sc, z + lz * 0.5, 0.42 * sc, TRUNK, 5);
   deboxBeam(B, x + lx * 0.5, 1.6 * sc, z + lz * 0.5, x + lx, 2.9 * sc, z + lz, 0.34 * sc, TRUNK, 5);
   const tx = x + lx, tz = z + lz;
   const fs = 1 - sa.w * 0.15;
   const G1 = [0.25 * fs, 0.60 * fs, 0.31 * fs], G2 = [0.31 * fs, 0.70 * fs, 0.37 * fs], G3 = [0.19 * fs, 0.50 * fs, 0.25 * fs]; // R36 v4: lebih terang lagi (sore: gumpal gelap vs fasad gelap = tak kebaca)
-  box(B, tx, 3.6 * sc, tz, 3.0 * sc, 1.6 * sc, 3.0 * sc, G1, 5); // gumpal utama (R36: lebih besar supaya kebaca dari chase-cam)
-  box(B, tx + 0.8 * sc, 4.3 * sc, tz - 0.4 * sc, 1.9 * sc, 1.1 * sc, 1.9 * sc, G2, 5); // gumpal atas (terang)
-  box(B, tx - 0.8 * sc, 3.1 * sc, tz + 0.5 * sc, 1.8 * sc, 1.1 * sc, 1.8 * sc, G3, 5); // gumpal bawah (gelap)
+  box(B, tx, 3.6 * sc, tz, 2.0 * sc, 1.6 * sc, 2.0 * sc, G1, 5); // gumpal utama 1A-TREES: 3.0 -> 2.0u (ujung tajuk >=38px dr sumbu jalan; 2.2 memberi 37px)
+  box(B, tx + 0.5 * sc, 4.3 * sc, tz - 0.4 * sc, 1.0 * sc, 1.1 * sc, 1.0 * sc, G2, 5); // gumpal atas (terang) — jangkauan samping <=1.0u
+  box(B, tx - 0.5 * sc, 3.1 * sc, tz + 0.5 * sc, 1.0 * sc, 1.1 * sc, 1.0 * sc, G3, 5); // gumpal bawah (gelap) — jangkauan samping <=1.0u
   box(B, tx, 5.0 * sc, tz, 1.2 * sc, 0.8 * sc, 1.2 * sc, G2, 5); // pucuk
 }
 // HELI R36v2 (revisi target NHPD-01): badan BIRU GELAP + kaca kokpit besar,
@@ -1636,6 +1652,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     let a0 = camAlong + 20;
     a0 += (8 - mod16(a0) + 16) % 16; // tengah blok pertama ≥20 unit di depan kamera
     const clash = (wx, wy) => {
+      if (slotInBuilding(city, wx, wy)) return true; // 1A-TREES: slot jatuh di dalam footprint gedung (saat belok) -> geser/lewati
       for (const pd of state.peds || []) if (pd.alive !== false && Math.hypot(pd.x - wx, pd.y - wy) < 20) return true;
       for (const cl of state.collectibles || []) if (!cl.taken && Math.hypot(cl.x - wx, cl.y - wy) < 25) return true;
       return false;
@@ -1665,9 +1682,9 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       const wxu = cam.eye[0] + fx2 * (along - camAlong) + rx2 * (roadLat + side * 4.8);
       const wyu = cam.eye[2] + fz2 * (along - camAlong) + rz2 * (roadLat + side * 4.8);
       if (Math.hypot(wxu - cam.eye[0], wyu - cam.eye[2]) < 12) continue;
-      const scK = 1 + k * 0.12; // R36 v4: jauh = lebih tinggi (0.07 kurang: mahkota jauh tetap di depan fasad)
+      const scK = k === 2 ? 1.0 : 1 + k * 0.12; // 1A-TREES: slot k=2 (shade tree) tanpa skala (dulu 1.24); R36 v4: jauh = lebih tinggi
       if (k === 2) shadeTree(OP, wxu, wyu, sunA, scK);
-      else palm(OP, wxu, wyu, sunA, scK);
+      else palm(OP, wxu, wyu, sunA, scK, [-side * rx2, -side * rz2]); // 1A-TREES: arah dr batang ke sumbu jalan, utk clamp pelepah (POLEFIX2)
       if (DIRSH) groundShadow(wxu, wyu, 1.2, 1.2, (k === 2 ? 4.8 : 5.1) * scK);
     }
   }
@@ -1780,15 +1797,15 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     box(OP, (mr.x + mr.w / 2) * S, 0.25, (mr.y + mr.h / 2) * S, mr.w * S, 0.5, mr.h * S, [0.35, 0.30, 0.22], 5);
     if (vis(2480, 680, 160) || vis(2530, 1750, 90)) drawCruiseShips(OP, GL); // R27b: kapal pesiar + yacht (statis, visual saja)
   }
-  // Pom bensin + garasi (kalau dekat).
+  // Pom bensin (kalau dekat).
   if (near(955, 1595, R) && vis(955, 1595, 150)) {
-    box(OP, 955 * S, 2.5, 1490 * S, 210 * S, 0.4, 60 * S, [0.7, 0.7, 0.72], 5); // kanopi
+    box(OP, 955 * S, 2.5, 1590 * S, 210 * S, 0.4, 60 * S, [0.7, 0.7, 0.72], 5); // kanopi
+    for (const px of [870, 1032]) for (const pz of [1570, 1610]) box(OP, px * S, 1.15, pz * S, 0.7, 2.3, 0.7, [0.78, 0.8, 0.82], 5); // tiang kanopi
     for (const px of [900, 960, 1020]) box(OP, px * S, 0.6, 1610 * S, 1.2, 1.2, 0.8, [0.9, 0.2, 0.2], 5);
   }
-  if (near(480, 1440, R) && vis(480, 1440, 60)) {
-    box(OP, 480 * S, 2.0, 1440 * S, 8, 4, 6, [0.15, 0.16, 0.22], 0);
-    billDir(OP, 480 * S, 4.5, 1440 * S - 3.1, 5, 1.0, [0, 0, -1], [0.05, 0.85, 0.95], 4);
-  }
+  // #7: garage 3D box removed — it stood in the middle of the (480,1440)
+  // intersection with no collision (cars drove through it). Flat 2D
+  // marker/label stays in render.js.
 
   // Drawbridge (x=2400, gap y 1640-1720).
   if (near(BRIDGE_POS.x, BRIDGE_POS.y, R) && vis(BRIDGE_POS.x, BRIDGE_POS.y, 100)) {
