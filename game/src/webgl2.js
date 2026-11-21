@@ -1488,10 +1488,82 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // berlubang dan langit oranye terlihat menembus ke bawah horizon).
   flat(OP, hx0 * S, -0.1, hy0 * S, 340, 340, [0.11, 0.13, 0.10], 5);
 
-  // JET R36: landasan 09 minimal (spaceport TIDAK digambar webgl2.js —
-  // tanpa ini pesawat parkir terbaca di tengah jalan kota). Hanya aspal +
-  // garis tengah + lampu tepi; hangar/menara/pad = pekerjaan spaceport
-  // terpisah. Rect = SPACEPORT.runway space.js (x 2220-2300, y 520-780).
+  // SPACEPORT-A: launch pad 1DesignTool (rebuild prosedural — file GLB
+  // tidak masuk repo). WebGL2 sebelumnya TIDAK menggambar spaceport sama
+  // sekali (hanya landasan di bawah); pad r=32 di (2328,548) space.js
+  // kini digambar: hardstand + flame trench + mount oranye + tangga +
+  // water tower biru + flood-light + crawlerway ramp. Hangar/menara
+  // kontrol TETAP pekerjaan terpisah (bukan scope round ini).
+  // Rect = SPACEPORT.pad space.js (x 2328, y 548, r 32); skala dari
+  // SPACEPORT, bukan meter mentah (B3). Landasan (x 2220-2300) dan
+  // parkir HA-1 (2204,680) tidak tersentuh (B10).
+  if (near(2328, 548, 500)) {
+    const OR = [0.91, 0.42, 0.12], GY = [0.54, 0.56, 0.60], DK = [0.08, 0.09, 0.10];
+    flat(OP, 232.8, 0.04, 54.8, 3.6, 4.0, [0.49, 0.51, 0.55], 5); // hardstand
+    flat(OP, 232.8, 0.06, 52.85, 3.6, 0.1, [1.0, 0.62, 0.30], 5); // tepi oranye N
+    flat(OP, 232.8, 0.06, 56.75, 3.6, 0.1, [1.0, 0.62, 0.30], 5); // tepi oranye S
+    flat(OP, 231.05, 0.06, 54.8, 0.1, 4.0, [1.0, 0.62, 0.30], 5); // tepi oranye W
+    flat(OP, 234.55, 0.06, 54.8, 0.1, 4.0, [1.0, 0.62, 0.30], 5); // tepi oranye E
+    flat(OP, 232.8, 0.06, 54.8, 2.0, 0.6, DK, 5); // flame trench
+    // Launch mount: 4 kaki + meja oranye + lubang + 4 hold-down clamp.
+    // Meja di 4.2u — tepat di bawah mata chase-cam (4.4u) supaya permukaan
+    // meja + lubang terbaca dari selatan (lihat city3d.js).
+    // SCALE-FIX (SPACEPORT-A finisher): semua w/d di blok ini 10x
+    // kekecilan — Canvas box3 pakai SATUAN u (bukan px) untuk w/h/d,
+    // jadi meja 16u ditulis 1.6, kaki 2u ditulis 0.2, dst. Akibatnya
+    // pad WebGL2 jadi miniatur: meja 1.6u (collision rect city.js
+    // 2320–2336 = 16u!), tangga 0.3u (tak terlihat), tiang lampu
+    // 0.04u (benang). Disamakan ke Canvas; tris tak berubah.
+    for (const [lx, lz] of [[232.15, 54.35], [233.45, 54.35], [232.15, 55.25], [233.45, 55.25]])
+      box(OP, lx, 1.52, lz, 2.0, 3.0, 2.0, OR, 5);
+    box(OP, 232.8, 3.6, 54.8, 16, 1.2, 12, OR, 5);
+    flat(OP, 232.8, 4.22, 54.8, 0.7, 0.7, DK, 5); // lubang mount
+    for (const [cx2, cz2] of [[232.8, 54.35], [233.4, 54.8], [232.8, 55.25], [232.2, 54.8]])
+      box(OP, cx2, 4.7, cz2, 1.6, 1.0, 1.6, GY, 5);
+    // Tangga akses: 4 anak tangga naik ke sisi selatan mount (3u lebar).
+    const stepH2 = [1.1, 2.1, 3.1, 4.1];
+    for (let i = 0; i < 4; i += 1) box(OP, 232.8, stepH2[i] / 2, 56.45 - 0.3 * i, 3.0, stepH2[i], 3.0, GY, 5);
+    // Deluge water tower: 4 kaki + brace + tangki biru segi-8 + pita putih.
+    // Total 15.2u — elemen tertinggi pad (seperti referensi).
+    // TANK-FIX (SPACEPORT-A finisher): tinggi tangki 5u, bukan 0.5u —
+    // deboxPoly h adalah TINGGI (y0 alas), dan Canvas octPrism pakai 5
+    // (10→15u). 0.5u bikin tangki jadi piringan pipih yang tak terlihat
+    // dari darat di WebGL2 (bukti: semua frame WebGL2 lama tak ada
+    // tangki biru, sementara Canvas menampilkannya). Pita 0.8u, bukan
+    // 0.08u — sama, 10x kekecilan. Radius cincin JUGA 10x kekecilan
+    // (0.35 → 3.5u, sama dengan Canvas); tangki 0.7u lebarnya terbaca
+    // seperti jarum biru, bukan tangki. Tris tak berubah (bentuk sama).
+    for (const [tx2, tz2] of [[233.8, 53.7], [234.4, 53.7], [233.8, 54.3], [234.4, 54.3]])
+      box(OP, tx2, 5.02, tz2, 0.6, 10, 0.6, GY, 5);
+    box(OP, 234.1, 5.2, 54.0, 6.6, 0.4, 0.4, GY, 5);
+    box(OP, 234.1, 5.2, 54.0, 0.4, 0.4, 6.6, GY, 5);
+    deboxPoly(OP, 234.1, 10, 54.0, deboxRingCircle(3.5, 8), 5, [0.18, 0.44, 0.82], 5);
+    deboxPoly(OP, 234.1, 12.2, 54.0, deboxRingCircle(3.6, 8), 0.8, [0.91, 0.89, 0.84], 5);
+    deboxCone(OP, 234.1, 15, 54.0, deboxRingCircle(3.5, 8), 0.15, [0.15, 0.36, 0.68], 5);
+    // Flood-light: 2 tiang + kepala lampu di sudut slab.
+    for (const [mx2, mz2] of [[231.2, 53.0], [234.4, 56.6]]) {
+      box(OP, mx2, 4.52, mz2, 0.4, 9, 0.4, [0.23, 0.25, 0.28], 5);
+      box(OP, mx2, 9.4, mz2, 1.6, 0.8, 0.8, [0.13, 0.15, 0.17], 5);
+    }
+    // Service tower footing (alas kecil di barat mount).
+    box(OP, 231.4, 0.32, 54.8, 4, 0.6, 4, [0.42, 0.45, 0.50], 5);
+    // Crawlerway ramp: bidang miring ke selatan + curb oranye.
+    // RAMP-FIX (SPACEPORT-A finisher): tinggi 0.3u, bukan 1.2u — deck
+    // pad cuma 0.05u, step 1.15u di ujung utara bikin kaki pejalan kaki
+    // masuk ke lereng (game tidak mengikuti ketinggian tanah).
+    const rn = [0, 0.996, -0.089]; // normal bidang miring (naik 0.25u / 2.8u ke selatan)
+    quad(OP, [232.1, 0.05, 56.8], [233.5, 0.05, 56.8], [233.5, 0.3, 59.6], [232.1, 0.3, 59.6],
+      rn, [[0, 0], [1, 0], [1, 1], [0, 1]], [0.60, 0.63, 0.66], 5);
+    quad(OP, [232.0, 0.06, 56.8], [232.1, 0.06, 56.8], [232.1, 0.36, 59.6], [232.0, 0.36, 59.6],
+      rn, [[0, 0], [1, 0], [1, 1], [0, 1]], [1.0, 0.62, 0.30], 5);
+    quad(OP, [233.5, 0.06, 56.8], [233.6, 0.06, 56.8], [233.6, 0.36, 59.6], [233.5, 0.36, 59.6],
+      rn, [[0, 0], [1, 0], [1, 1], [0, 1]], [1.0, 0.62, 0.30], 5);
+  }
+
+  // JET R36: landasan 09 minimal (tanpa ini pesawat parkir terbaca di
+  // tengah jalan kota). Hanya aspal + garis tengah + lampu tepi; hangar/
+  // menara = pekerjaan spaceport terpisah. Rect = SPACEPORT.runway
+  // space.js (x 2220-2300, y 520-780).
   if (near(2260, 650, 500)) {
     flat(OP, 226, 0.04, 65, 8, 26, [0.12, 0.12, 0.14], 5);
     for (let dz = -11; dz <= 11; dz += 4) flat(OP, 226, 0.06, 65 + dz, 0.35, 1.8, [0.85, 0.85, 0.80], 5);

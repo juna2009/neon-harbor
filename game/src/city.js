@@ -34,6 +34,22 @@ export function collides(city, x, y, r) {
   // R41: celah pintu/interior (globalThis = aman di Node tanpa window).
   if (globalThis.__INT) { const v = globalThis.__INT.collide(city, x, y, r); if (v !== null) return v; }
   if (buildingAt(city, x, y, r) !== null) return true;
+  // SPACEPORT-A: launch pad mount + water tower legs are solid — the
+  // structures are visual (city3d.js/webgl2.js), not buildings, so they
+  // need their own rects. Pad (2328,548) space.js; clear of the runway
+  // (x<=2300) and the HA-1 park/takeoff path (2204,680).
+  if (x > 2320 - r && x < 2336 + r && y > 542 - r && y < 554 + r) return true;
+  if (x > 2337 - r && x < 2345 + r && y > 536 - r && y < 544 + r) return true;
+  // STAIRS-FIX (SPACEPORT-A finisher): the access stairs are 3u deep
+  // (x 2313-2343, y 540-580) and the crawlerway ramp runs to y=596 —
+  // both solid-looking geometry with no collision, so a player walking
+  // north stopped at the mount rect (y=568) INSIDE the staircase and
+  // vanished (drive-end proof: after-drive-end.jpg, Jax invisible).
+  // Blocking the stairs+ramp footprint stops the player at y=610 on
+  // flat ground, visible, feet on the ground — no sinking into the
+  // 0.3u ramp either. The mount rect above is now subsumed but kept
+  // (M1 checks the mount point as blocked).
+  if (x > 2313 - r && x < 2343 + r && y > 540 - r && y < 596 + r) return true;
   for (const t of city.trees || []) {
     const dx = x - t.x, dy = y - t.y;
     if (dx * dx + dy * dy < (r + t.r) * (r + t.r)) return true;

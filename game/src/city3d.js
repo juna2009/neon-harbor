@@ -980,6 +980,28 @@ function box3(cx, y0, cz, w, h, d, a, col, fogD, depOff) {
   if (g > hd) QW(f4, shadeK < 1 ? shW(c, 1.05 * shadeK + 0.22, t) : sh(c, 1.05 * shadeK, t), dep(f4));
   if (g < -hd) QW(f5, shadeK < 1 ? shW(c, 0.65 * shadeK + 0.22, t) : sh(c, 0.65 * shadeK, t), dep(f5));
 }
+// SPACEPORT-A: prisma segi-8 (tangki air silinder) — QW tidak punya
+// silinder; 8 sisi + atap segi-8, tiap sisi di-shade dari arah kamera
+// supaya terbaca bulat, bukan kotak (fuel tank di blok ini tetap box3).
+function octPrism(cx, y0, cz, r, h, hex, fogD) {
+  const t = fogD === undefined ? 0 : hz(fogD);
+  const tx = ccX - cx, tz = ccZ - cz, tl = Math.hypot(tx, tz) || 1;
+  const ux = tx / tl, uz = tz / tl;
+  const ring = [];
+  for (let i = 0; i < 8; i += 1) {
+    const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+    ring.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]);
+  }
+  for (let i = 0; i < 8; i += 1) {
+    const a = ring[i], b = ring[(i + 1) % 8];
+    const mx = (a[0] + b[0]) / 2 - cx, mz = (a[1] + b[1]) / 2 - cz;
+    const ml = Math.hypot(mx, mz) || 1;
+    const dot = Math.max(0, (mx / ml) * ux + (mz / ml) * uz);
+    QW([[a[0], y0, a[1]], [b[0], y0, b[1]], [b[0], y0 + h, b[1]], [a[0], y0 + h, a[1]]],
+      sh(hx3(hex), 0.62 + 0.38 * dot, t));
+  }
+  QW(ring.map((q) => [q[0], y0 + h, q[1]]), sh(hx3(hex), 1.25 * shadeK, t));
+}
 // vertical quad facing along yaw a, centered fOff forward / rOff right of (cx, cz)
 function vQuad(cx, cz, a, fOff, rOff, w, y0, y1, col, dep) {
   const fx = Math.cos(a), fz = Math.sin(a), rx = -fz, rz = fx;
@@ -2243,8 +2265,63 @@ export function drawChase3D(ctx, state) {
     for (let d0 = 540; d0 < 780; d0 += 40) flatQuad(2258, d0, 2262, d0 + 20, 0.09, '#e8d44d'); // centreline
     flatQuad(2224, 524, 2296, 532, 0.09, '#e8e4d8'); // threshold N
     flatQuad(2224, 768, 2296, 776, 0.09, '#e8e4d8'); // threshold S
-    flatQuad(2312, 532, 2344, 564, 0.05, sh(hx3('#7d838c'), shadeK, sdt)); // rocket pad
-    flatQuad(2320, 540, 2336, 556, 0.07, '#c98a3d');
+    // SPACEPORT-A: launch pad 1DesignTool (rebuild prosedural — file GLB
+    // tidak masuk repo). Pad r=32 di (2328,548) space.js: hardstand +
+    // flame trench + mount oranye + tangga + water tower biru +
+    // flood-light + crawlerway ramp. Semua muat di dalam lingkaran pad
+    // (sudut terjauh 26.9u < 32) dan di dalam apron; landasan (x<=2300)
+    // dan parkir HA-1 (2204,680) tidak tersentuh.
+    const pdep = Math.hypot(2328 * CS - ccX, 548 * CS - ccZ);
+    const pt = hz(pdep);
+    flatQuad(2310, 528, 2346, 568, 0.05, sh(hx3('#7d838c'), shadeK, sdt)); // hardstand
+    // Tepi oranye hardstand (referensi: garis oranye di tepi slab).
+    flatQuad(2310, 528, 2346, 529, 0.06, sh(hx3('#ff9d4d'), shadeK, sdt));
+    flatQuad(2310, 567, 2346, 568, 0.06, sh(hx3('#ff9d4d'), shadeK, sdt));
+    flatQuad(2310, 528, 2311, 568, 0.06, sh(hx3('#ff9d4d'), shadeK, sdt));
+    flatQuad(2345, 528, 2346, 568, 0.06, sh(hx3('#ff9d4d'), shadeK, sdt));
+    flatQuad(2318, 545, 2338, 551, 0.06, '#14161a'); // flame trench
+    // Launch mount: 4 kaki + meja oranye + lubang + 4 hold-down clamp.
+    // Meja di 4.2u — tepat di bawah mata chase-cam (4.4u) supaya permukaan
+    // meja + lubang terbaca dari selatan; di 5.7u hanya sisi bawah yang
+    // terlihat dan mount terbaca gapura, bukan meja luncur.
+    for (const [lx, lz] of [[2321.5, 543.5], [2334.5, 543.5], [2321.5, 552.5], [2334.5, 552.5]])
+      box3(lx * CS, 0.02, lz * CS, 2, 3, 2, 0, '#e86a1f', pdep);
+    box3(2328 * CS, 3, 548 * CS, 16, 1.2, 12, 0, '#e86a1f', pdep);
+    // Lubang mount: dep eksplisit di depan muka atas mount (pola yang
+    // sama dengan pintu hangar di atas) — kalau tidak, muka atas mount
+    // (dep = sudut terdekatnya) melukis menutupi quad ini.
+    const mountTopDep = Math.min(fwdD(2320 * CS, 542 * CS), fwdD(2336 * CS, 542 * CS), fwdD(2320 * CS, 554 * CS), fwdD(2336 * CS, 554 * CS));
+    QW([[2324.5 * CS, 4.22, 544.5 * CS], [2331.5 * CS, 4.22, 544.5 * CS], [2331.5 * CS, 4.22, 551.5 * CS], [2324.5 * CS, 4.22, 551.5 * CS]], '#14161a', mountTopDep - 0.5);
+    for (const [cx2, cz2] of [[2328, 543.5], [2334, 548], [2328, 552.5], [2322, 548]])
+      box3(cx2 * CS, 4.2, cz2 * CS, 1.6, 1, 1.6, 0, '#8a8f98', pdep);
+    // Tangga akses: 4 anak tangga naik ke sisi selatan mount (3u lebar —
+    // celah di kedua sisinya membiarkan flame trench terbaca).
+    const stepH = [1.1, 2.1, 3.1, 4.1];
+    for (let i = 0; i < 4; i += 1) box3(2328 * CS, 0.02, (564.5 - 3 * i) * CS, 3, stepH[i], 3, 0, '#8a8f98', pdep);
+    // Deluge water tower: 4 kaki + brace + tangki biru segi-8 + pita putih.
+    // Total 15.2u — elemen tertinggi pad (seperti referensi) supaya tangki
+    // biru terbaca dari selatan di atas mount, bukan mengintip di tepinya.
+    for (const [tx2, tz2] of [[2338, 537], [2344, 537], [2338, 543], [2344, 543]])
+      box3(tx2 * CS, 0.02, tz2 * CS, 0.6, 10, 0.6, 0, '#7d838c', pdep);
+    box3(2341 * CS, 5, 540 * CS, 6.6, 0.4, 0.4, 0, '#7d838c', pdep);
+    box3(2341 * CS, 5, 540 * CS, 0.4, 0.4, 6.6, 0, '#7d838c', pdep);
+    octPrism(2341 * CS, 10, 540 * CS, 3.5, 5, '#2f6fd0', pdep);
+    octPrism(2341 * CS, 12.2, 540 * CS, 3.6, 0.8, '#e8e4d8', pdep);
+    // Flood-light: 2 tiang + kepala lampu di sudut slab.
+    for (const [mx2, mz2] of [[2312, 530], [2344, 566]]) {
+      box3(mx2 * CS, 0.02, mz2 * CS, 0.4, 9, 0.4, 0, '#3a3f47', pdep);
+      box3(mx2 * CS, 9, mz2 * CS, 1.6, 0.8, 0.8, 0, '#22262c', pdep);
+    }
+    // Service tower footing (alas kecil di barat mount).
+    box3(2314 * CS, 0.02, 548 * CS, 4, 0.6, 4, 0, '#6b7280', pdep);
+    // Crawlerway ramp: bidang miring ke selatan + curb oranye.
+    // RAMP-FIX (SPACEPORT-A finisher): tinggi 0.3u, bukan 1.2u — deck
+    // pad cuma 0.05u, jadi step 1.15u di ujung utara bikin kaki pejalan
+    // kaki masuk ke lereng (game tidak mengikuti ketinggian tanah).
+    // 0.3u = step 0.25u, landai, kaki tidak tenggelam.
+    QW([[2321 * CS, 0.05, 568 * CS], [2335 * CS, 0.05, 568 * CS], [2335 * CS, 0.3, 596 * CS], [2321 * CS, 0.3, 596 * CS]], sh(hx3('#9aa0a8'), shadeK, pt), 'far');
+    QW([[2320 * CS, 0.06, 568 * CS], [2321 * CS, 0.06, 568 * CS], [2321 * CS, 0.36, 596 * CS], [2320 * CS, 0.36, 596 * CS]], sh(hx3('#ff9d4d'), shadeK, pt), 'far');
+    QW([[2335 * CS, 0.06, 568 * CS], [2336 * CS, 0.06, 568 * CS], [2336 * CS, 0.36, 596 * CS], [2335 * CS, 0.36, 596 * CS]], sh(hx3('#ff9d4d'), shadeK, pt), 'far');
     const hdep = Math.hypot(2166 * CS - ccX, 680 * CS - ccZ);
     box3(2166 * CS, 0.02, 680 * CS, 10, 6, 8, 0, '#7d838c', hdep); // hangar
     // WIN-FIX (VB-14): the south door glow was at fOff 4.1 — INSIDE the box
