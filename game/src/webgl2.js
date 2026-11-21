@@ -291,6 +291,16 @@ void main(){
     gl_FragColor = vec4(base * 1.8, a * 0.55);
     return;
   }
+  if (vM > 16.5 && vM < 17.5) { // PARTICLES: asap abu-abu (mirror city3d rgba(140,140,150))
+    float al = smoothstep(0.5, 0.05, length(vU - 0.5)) * vC.r; // radial x life-fade
+    gl_FragColor = vec4(vec3(0.55, 0.55, 0.59), al * 0.5);
+    return;
+  }
+  if (vM > 17.5 && vM < 18.5) { // PARTICLES: api oranye (mirror city3d rgba(255,140,40)) — blend NORMAL, bukan aditif: 14 flame aditif yang tumpang tindih menembus putih (G1: api harus ORANYE, bukan putih); normal-blend menumpuk ke arah oranye. vC.r = carrier alpha (life-fade).
+    float al = smoothstep(0.5, 0.05, length(vU - 0.5)) * vC.r; // radial x life-fade
+    gl_FragColor = vec4(vec3(1.0, 0.55, 0.16), al * 0.85);
+    return;
+  }
   if (vM > 7.5 && vM < 8.5) { // smear: memudar sepanjang v
     gl_FragColor = vec4(base * 1.5, (1.0 - vU.y) * 0.4);
     return;
@@ -2129,6 +2139,60 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     }
   }
   // R35-F9: bullets + muzzle flash — END.
+
+  // PARTICLES-WEBGL2: ledakan kendaraan terlihat — flame/spark/smoke/jet/flash
+  // sebagai quad camera-facing (mirror city3d.js:2779-2794). Dua pass WAJIB:
+  // pass 1 kind ledakan (flame/spark/smoke, cap 70), pass 2 jet/flash (cap 8)
+  // — satu pass urutan-spawn kalah oleh jet hydrant (~144 hidup). Cap pass 1
+  // 70 (bukan 40): TERUKUR, smoke besar (life 7-10 dtk, kolom asap) pertama
+  // ada di indeks array 49 — cap 40 mengeluarkannya, jadi kolom asap tidak
+  // pernah tampil. 70 = satu ledakan besar utuh (26+22+20=68) + 2. Biaya
+  // 78 quad = 156 tris (+0,2% trisPeak, negligible). Smoke DAN flame ke
+  // bucket SH (blend NORMAL — asap harus mengokulasi, api harus ORANYE solid
+  // seperti city3d; 14 flame aditif yang tumpang tindih terukur menembus
+  // putih, gagal G1); spark/jet/flash ke GL mat 7 (aditif, via split ke GL2;
+  // fade via pergelapan vC). Urutan draw: opaque -> SH smoke+api -> SP -> GL2 percik.
+  {
+    const pts = state.particles || [];
+    if (pts.length) {
+      const pn = norm([-cam.fwd[0], 0, -cam.fwd[1]]);
+      const emitPt = (pt) => {
+        const a = Math.max(0, Math.min(1, pt.life / (pt.maxLife || 1)));
+        const sz = pt.size * S * (1.6 - a * 0.6) * 2.2;
+        const y0 = Math.max(0.1, pt.size * S * 0.4);
+        const cy = y0 + sz / 2;
+        if (pt.kind === 'smoke') {
+          // vC.r = a (bukan a*0.5): alpha akhir = radial x a x 0.5 (maks 0.5)
+          // = mirror city3d a*0.5. (Draf awal [a*0.5,0,0] menggandakan
+          // 0.5 -> maks 0.25, asap terlalu tipis.)
+          billDir(SH, pt.x * S, cy, pt.y * S, sz, sz, pn, [a, 0, 0], 17);
+        } else if (pt.kind === 'flame') {
+          // Api ke SH mat 18 (blend NORMAL, oranye city3d) — BUKAN GL mat 7:
+          // 14 flame aditif yang tumpang tindih menembus putih (terukur:
+          // 60% area fireball >250 di staged sore). Normal-blend menumpuk
+          // ke arah oranye. vC.r = carrier alpha (life-fade).
+          billDir(SH, pt.x * S, cy, pt.y * S, sz, sz, pn, [a, 0, 0], 18);
+        } else {
+          const c = hx(pt.color);
+          billDir(GL, pt.x * S, cy, pt.y * S, sz, sz, pn, [c[0] * a, c[1] * a, c[2] * a], 7);
+        }
+      };
+      let n1 = 0;
+      for (const pt of pts) {
+        if (n1 >= 70) break;
+        if (pt.kind !== 'flame' && pt.kind !== 'spark' && pt.kind !== 'smoke') continue;
+        if (!vis(pt.x, pt.y, 60)) continue;
+        emitPt(pt); n1 += 1;
+      }
+      let n2 = 0;
+      for (const pt of pts) {
+        if (n2 >= 8) break;
+        if (pt.kind !== 'jet' && pt.kind !== 'flash') continue;
+        if (!vis(pt.x, pt.y, 60)) continue;
+        emitPt(pt); n2 += 1;
+      }
+    }
+  }
 
   // Traffic + parkir — cars3d v14 (INTEGRATION.md §6 OPSI A) + LOD WAJIB:
   // hero + mobil <250 px game dari hero = high, sisanya 'low' (hemat ~43%).
