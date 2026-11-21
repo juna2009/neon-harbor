@@ -225,7 +225,18 @@ void main(){
     base += mix(uSunCol, vec3(1.0, 0.95, 0.85), 0.5) * streak * 0.55;
     base = mix(base, vec3(0.02), pow(1.0 - abs(dot(N, V)), 2.0) * 0.3);
   } else if (vM < 3.5 || (vM > 12.5 && vM < 13.5)) { // jalan: marka (dari UV: u=sepanjang jalan, v=melintang) + streak matahari
-    float dash = step(0.45, fract(vU.x * 0.06)) * step(abs(vU.y - 0.5), 0.03);
+    // ZEBRA-STRIPES: mat 13 (aspal roadSeg, UV absolut-dunia) — dash periode
+    // 32u (320px), OFF di jendela ±80px sekitar tiap persimpangan (pusat di
+    // vU.x ≡ 16 mod 32, karena jalan di 160+320k px = 16+32k u; OFF bila
+    // fract(vU.x/32) ∈ [0.25, 0.75)). Mat 3 (dek jembatan, UV 0..1)
+    // PERTAHANKAN rumus lama — tanpanya dek kena garis kuning.
+    float dash;
+    if (vM > 12.5) {
+      float f = fract(vU.x / 32.0);
+      dash = (1.0 - step(0.25, f) * step(f, 0.75)) * step(abs(vU.y - 0.5), 0.03);
+    } else {
+      dash = step(0.45, fract(vU.x * 0.06)) * step(abs(vU.y - 0.5), 0.03);
+    }
     base = mix(base, vec3(0.85, 0.7, 0.25), dash);
     float asp = h21(floor(vW.xz * vec2(2.5, 2.5))); // SIANG v2: tekstur aspal (variasi butir)
     base *= 1.0 + (asp - 0.5) * 0.16 * uRoadTex;
@@ -1513,7 +1524,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     return spans;
   };
   const roadSeg = (x0, y0, x1, y1, vertical) => {
-    const len = Math.hypot(x1 - x0, y1 - y0) * S;
+    const len = Math.hypot(x1 - x0, y1 - y0) * S; // (ZEBRA-STRIPES: tidak lagi dipakai UV — UV aspal kini absolut-dunia; dipertahankan supaya diff minimal)
     // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44;
     // A-LITE (wave 2): ROAD_W 72->80, asphalt half-width 44->48 (same as
     // the Canvas fallback in city3d.js). VISUAL ONLY: this is paint
@@ -1523,8 +1534,11 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     const hw = 48 * S;
     if (vertical) {
       const X = x0 * S, z0 = y0 * S, z1 = y1 * S;
+      // ZEBRA-STRIPES: UV aspal ABSOLUT-DUNIA (u = koordinat dunia sepanjang
+      // jalan, dalam unit) supaya fase dash terikat grid persimpangan, bukan
+      // awal segmen (yang tergantung kamera). Vertikal: u = z; horizontal: u = x.
       quad(OP, [X - hw, -0.05, z0], [X + hw, -0.05, z0], [X + hw, -0.05, z1], [X - hw, -0.05, z1],
-        [0, 1, 0], [[0, 0], [0, 1], [len, 1], [len, 0]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
+        [0, 1, 0], [[z0, 0], [z0, 1], [z1, 1], [z1, 0]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
       for (const [s0, s1] of clipWalkSpans(z0, z1, city.roadsH)) {
         flat(OP, X - (hw + 1.6), 0.02, (s0 + s1) / 2, 3.2, (s1 - s0), walkCol, 14, // TROTOAR: pita hw..hw+3.2u (48..80px) + UV dunia (u = lebar 3.2, v = panjang, offset s0-z0)
           [[0, s0 - z0], [3.2, s0 - z0], [3.2, s1 - z0], [0, s1 - z0]]);
@@ -1536,7 +1550,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     } else {
       const Z = y0 * S, x0u = x0 * S, x1u = x1 * S;
       quad(OP, [x0u, -0.05, Z - hw], [x1u, -0.05, Z - hw], [x1u, -0.05, Z + hw], [x0u, -0.05, Z + hw],
-        [0, 1, 0], [[0, 0], [len, 0], [len, 1], [0, 1]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
+        [0, 1, 0], [[x0u, 0], [x1u, 0], [x1u, 1], [x0u, 1]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
       for (const [s0, s1] of clipWalkSpans(x0u, x1u, city.roadsV)) {
         flat(OP, (s0 + s1) / 2, 0.02, Z - (hw + 1.6), (s1 - s0), 3.2, walkCol, 14, // TROTOAR: pita hw..hw+3.2u (48..80px) + UV dunia (u = panjang, offset s0-x0u, v = lebar 3.2)
           [[s0 - x0u, 0], [s1 - x0u, 0], [s1 - x0u, 3.2], [s0 - x0u, 3.2]]);
@@ -1559,18 +1573,18 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // R36-ROADS (Juna 17:18: "tambahin zebracross dan detail lainnya") — VISUAL ONLY:
   // lebar jalan, lajur dan collision TIDAK berubah. Marka di y 0.01 (di atas aspal
   // -0.05) supaya tidak z-fight; prop di trotoar saja, tidak pernah menutupi koin.
-  const MARK_W = [0.88, 0.88, 0.86]; // putih marka (sedikit redup biar tidak blown)
+  const MARK_W = [0.90, 0.99, 1.10]; // ZEBRA-STRIPES iterasi 2: putih dingin + lebih terang — kalibrasi frame after iterasi 1: sore strip L 163 (target ≥175), R-B +11 (target ≤+10); siang R-B +11 (target ±8); malam tidak biru-hantu (cek visual)
   // Zebra + garis stop di tiap persimpangan yang terlihat (4 lengan penuh).
   // Strip membujur (sejajar lalu lintas, standar zebra): 9 strip per lengan.
   const zebraV = (rx, ry, side) => {
     const cz = (ry + side * 56) * S;
     for (let k = -5; k <= 5; k += 1) flat(OP, (rx + k * 9) * S, 0.01, cz, 0.45, 3.5, MARK_W, 5);
-    flat(OP, rx * S, 0.01, (ry + side * 61) * S, 9.6, 0.5, MARK_W, 5); // garis stop
+    flat(OP, rx * S, 0.01, (ry + side * 78) * S, 9.6, 0.5, MARK_W, 5); // garis stop (di luar pita zebra: tepi jauh 73.5 + celah 2 + setengah lebar 2.5)
   };
   const zebraH = (rx, ry, side) => {
     const cx = (rx + side * 56) * S;
     for (let k = -5; k <= 5; k += 1) flat(OP, cx, 0.01, (ry + k * 9) * S, 3.5, 0.45, MARK_W, 5);
-    flat(OP, (rx + side * 61) * S, 0.01, ry * S, 0.5, 9.6, MARK_W, 5); // garis stop
+    flat(OP, (rx + side * 78) * S, 0.01, ry * S, 0.5, 9.6, MARK_W, 5); // garis stop (di luar pita zebra)
   };
   for (const rx of city.roadsV) {
     for (const ry of city.roadsH) {

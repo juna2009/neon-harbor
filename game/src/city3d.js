@@ -2360,6 +2360,25 @@ export function drawChase3D(ctx, state) {
     }
     return spans;
   };
+  // ZEBRA-STRIPES: dash tengah diputus di persimpangan — potong span dash
+  // [d0, d0+64] dengan jendela [c-80, c+80] di sekitar tiap pusat jalan
+  // melintang c (80px = pita 73.5 + garis stop baru 80.5, dibulatkan).
+  // Pola sama seperti clipWalk di atas; warna '#e8d44d' TIDAK diubah.
+  const clipDash = (d0, cross) => {
+    let spans = [[d0, d0 + 64]];
+    for (const c of cross) {
+      const w0 = c - 80, w1 = c + 80;
+      const next = [];
+      for (const [lo, hi] of spans) {
+        if (w1 <= lo || w0 >= hi) { next.push([lo, hi]); continue; }
+        if (w0 > lo) next.push([lo, w0]);
+        if (w1 < hi) next.push([w1, hi]);
+      }
+      spans = next;
+      if (!spans.length) break;
+    }
+    return spans;
+  };
   for (const rx of city.roadsV) {
     for (let gy = -320; gy < WORLD_H + 320; gy += 320) {
       if (!inRange(rx, gy + 160, 175, 135)) continue;
@@ -2370,8 +2389,11 @@ export function drawChase3D(ctx, state) {
       }
       flatQuad(rx - 48, gy, rx + 48, gy + 320, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
       for (let d0 = gy + 24; d0 < gy + 320; d0 += 128) {
-        if (!inRange(rx, d0 + 16, 115, 75)) continue;
-        flatQuad(rx - 2.5, d0, rx + 2.5, d0 + 64, 0.09, '#e8d44d');
+        for (const [s0, s1] of clipDash(d0, city.roadsH)) {
+          if (s1 - s0 < 1) continue;
+          if (!inRange(rx, (s0 + s1) / 2, 115, 75)) continue;
+          flatQuad(rx - 2.5, s0, rx + 2.5, s1, 0.09, '#e8d44d');
+        }
       }
     }
   }
@@ -2393,8 +2415,12 @@ export function drawChase3D(ctx, state) {
       }
       flatQuad(gx, ry - 48, x1, ry + 48, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
       for (let d0 = gx + 24; d0 < gx + 320 && (!clip || d0 < WATER_X); d0 += 128) {
-        if (!inRange(d0 + 16, ry, 115, 75)) continue;
-        flatQuad(d0, ry - 2.5, clip ? Math.min(d0 + 64, WATER_X) : d0 + 64, ry + 2.5, 0.09, '#e8d44d');
+        for (const [s0, s1] of clipDash(d0, city.roadsV)) {
+          const e1 = clip ? Math.min(s1, WATER_X) : s1;
+          if (e1 - s0 < 1) continue;
+          if (!inRange((s0 + e1) / 2, ry, 115, 75)) continue;
+          flatQuad(s0, ry - 2.5, e1, ry + 2.5, 0.09, '#e8d44d');
+        }
       }
     }
   }
@@ -2406,10 +2432,10 @@ export function drawChase3D(ctx, state) {
     if (!inRange(rx, ry, 175, 135)) continue;
     const rd = Math.hypot(rx * CS - ccX, ry * CS - ccZ), zw = sh(hx3('#e8e8e6'), shadeK, hz(rd));
     for (const sd of [1, -1]) {
-      for (let k = 0; k < 11; k += 1) flatQuad(rx - 45 + k * 9, ry + sd * 56 - 14, rx - 45 + k * 9 + 4, ry + sd * 56 + 14, 0.11, zw);
-      flatQuad(rx - 48, ry + sd * 61 - 2, rx + 48, ry + sd * 61 + 2, 0.11, zw);
-      for (let k = 0; k < 11; k += 1) flatQuad(rx + sd * 56 - 14, ry - 45 + k * 9, rx + sd * 56 + 14, ry - 45 + k * 9 + 4, 0.11, zw);
-      flatQuad(rx + sd * 61 - 2, ry - 48, rx + sd * 61 + 2, ry + 48, 0.11, zw);
+      for (let k = 0; k < 11; k += 1) flatQuad(rx - 46 + k * 9, ry + sd * 56 - 14, rx - 46 + k * 9 + 4, ry + sd * 56 + 14, 0.11, zw); // strip -46..48: strip terakhir tidak overhang keluar aspal (±48)
+      flatQuad(rx - 48, ry + sd * 78 - 2, rx + 48, ry + sd * 78 + 2, 0.11, zw); // garis stop di luar pita
+      for (let k = 0; k < 11; k += 1) flatQuad(rx + sd * 56 - 14, ry - 46 + k * 9, rx + sd * 56 + 14, ry - 46 + k * 9 + 4, 0.11, zw); // strip -46..48 (tanpa overhang)
+      flatQuad(rx + sd * 78 - 2, ry - 48, rx + sd * 78 + 2, ry + 48, 0.11, zw); // garis stop di luar pita
     }
   }
   // warm sun glow on the asphalt ahead (low sun, straight ahead)
