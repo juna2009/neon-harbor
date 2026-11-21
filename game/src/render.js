@@ -276,27 +276,36 @@ export function createRenderer(canvas) {
     ctx.fillStyle = '#7d8183'; ctx.fillRect(gas.x, gas.y, gas.w, gas.h);
     ctx.strokeStyle = '#f2db96'; ctx.lineWidth = 3;
     ctx.strokeRect(gas.x + 8, gas.y + 8, gas.w - 16, gas.h - 16);
-    ctx.fillStyle = '#292f3c'; ctx.fillRect(gas.x + 14, gas.y + 41, gas.w - 28, 55);
-    ctx.fillStyle = '#ee594d'; ctx.fillRect(gas.x + 14, gas.y + 41, gas.w - 28, 7);
+    // SPBU-ENLARGE: kanopi (864,1526) 192x70, stripe 9 px; tiang 10x45, timur 1032->1044
+    ctx.fillStyle = '#292f3c'; ctx.fillRect(gas.x + 4, gas.y + 26, gas.w - 8, 70);
+    ctx.fillStyle = '#ee594d'; ctx.fillRect(gas.x + 4, gas.y + 26, gas.w - 8, 9);
     ctx.fillStyle = '#c6cbd0';
-    for (const dx of [20, gas.w - 28]) for (const dy of [40, 100]) ctx.fillRect(gas.x + dx, gas.y + dy, 7, 30);
-    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('HARBOR GAS', gas.x + gas.w / 2, gas.y + 60);
+    for (const dx of [20, gas.w - 16]) for (const dy of [40, 100]) ctx.fillRect(gas.x + dx, gas.y + dy, 10, 45);
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('HARBOR GAS', gas.x + gas.w / 2, gas.y + 61);
+    // SPBU-ENLARGE: pylon tanda di (1030,1530) — kotak gelap 10x10 + strip oranye 30x6
+    ctx.fillStyle = '#263948'; ctx.fillRect(1025, 1525, 10, 10);
+    ctx.fillStyle = '#ff9d4d'; ctx.fillRect(1015, 1527, 30, 6);
+    // SPBU-ENLARGE: price sign digambar SEBELUM pompa — kotak baru 50x64 di (862,1620)
+    // menutup sudut kanan-bawah pompa0 (885-912 x 1620-1631) bila digambar sesudahnya;
+    // pompa di depan tanda, jadi pompa yang menimpa kotak, bukan sebaliknya.
+    // Tiang 6x80 jangkar atas = kotak (1620) supaya tetap di dalam lot (bawah pas 1700);
+    // jangkar lama (1630) akan menjulur 10 px ke luar lot.
+    ctx.fillStyle = '#a9afb4'; ctx.fillRect(gas.x + 24, gas.y + gas.h - 80, 6, 80);
+    ctx.fillStyle = '#263948'; ctx.fillRect(gas.x + 2, gas.y + gas.h - 80, 50, 64);
+    ctx.fillStyle = '#a6ffb6'; ctx.font = 'bold 32px sans-serif'; ctx.fillText('$', gas.x + 27, gas.y + gas.h - 37);
     for (const pump of gas.pumps) {
       if (!pump.alive) {
-        ctx.fillStyle = '#25232a'; ctx.fillRect(pump.x - 10, pump.y - 4, 20, 10);
-        ctx.fillStyle = '#474047'; ctx.fillRect(pump.x - 7, pump.y - 11, 14, 9);
+        ctx.fillStyle = '#25232a'; ctx.fillRect(pump.x - 15, pump.y - 6, 30, 15);
+        ctx.fillStyle = '#474047'; ctx.fillRect(pump.x - 10.5, pump.y - 16.5, 21, 13);
         continue;
       }
-      ctx.fillStyle = '#cc3e45'; ctx.fillRect(pump.x - 10, pump.y - 24, 20, 28);
-      ctx.fillStyle = '#e8e8df'; ctx.fillRect(pump.x - 10, pump.y - 24, 20, 15);
-      ctx.fillStyle = '#182c36'; ctx.fillRect(pump.x - 6, pump.y - 20, 12, 7);
+      ctx.fillStyle = '#cc3e45'; ctx.fillRect(pump.x - 15, pump.y - 21, 30, 42);
+      ctx.fillStyle = '#e8e8df'; ctx.fillRect(pump.x - 15, pump.y - 21, 30, 22);
+      ctx.fillStyle = '#182c36'; ctx.fillRect(pump.x - 9, pump.y - 17, 18, 10);
       ctx.strokeStyle = '#20232b'; ctx.lineWidth = 3; ctx.beginPath();
-      ctx.moveTo(pump.x + 11, pump.y - 16); ctx.lineTo(pump.x + 16, pump.y - 9); ctx.lineTo(pump.x + 13, pump.y + 1); ctx.stroke();
+      ctx.moveTo(pump.x + 16.5, pump.y - 24); ctx.lineTo(pump.x + 24, pump.y - 13.5); ctx.lineTo(pump.x + 19.5, pump.y + 1.5); ctx.stroke();
     }
-    ctx.fillStyle = '#a9afb4'; ctx.fillRect(gas.x + 12, gas.y + gas.h - 70, 5, 62);
-    ctx.fillStyle = '#263948'; ctx.fillRect(gas.x - 2, gas.y + gas.h - 80, 34, 44);
-    ctx.fillStyle = '#a6ffb6'; ctx.font = 'bold 24px sans-serif'; ctx.fillText('$', gas.x + 15, gas.y + gas.h - 49);
     for (const h of state.hydrants) {
       if (h.burst) ctx.globalAlpha = 0.55;
       drawHydrant(ctx, h.x, h.y);

@@ -2603,10 +2603,56 @@ export function drawChase3D(ctx, state) {
   if (gas && inRange(gas.x + gas.w / 2, gas.y + gas.h / 2, 120, 100)) {
     const dep = Math.hypot((gas.x + gas.w / 2) * CS - ccX, (gas.y + gas.h / 2) * CS - ccZ);
     flatQuad(gas.x, gas.y, gas.x + gas.w, gas.y + gas.h, 0.07, '#7d8183');
-    box3((gas.x + gas.w / 2) * CS, 3.6, (gas.y + 100) * CS, gas.w * CS, 0.5, 8, 0, '#292f3c', dep);
-    for (const px of [870, 1032]) for (const pz of [1570, 1610]) box3(px * CS, 1.65, pz * CS, 0.7, 3.3, 0.7, 0, '#c6cbd0', dep); // tiang kanopi
+    // SPBU-ENLARGE: kanopi naik 3,6->4,6u, lebar 8->10u (box3: w->sumbu z/map-y, d->sumbu x/map-x)
+    box3((gas.x + gas.w / 2) * CS, 4.6, (gas.y + 100) * CS, gas.w * CS, 0.5, 10, 0, '#292f3c', dep);
+    // SPBU-ENLARGE: tiang 1,0x4,6u y0=0 (B1: alas menapak tanah, puncak temu bawah kanopi); timur 1032->1044 (B3)
+    for (const px of [870, 1044]) for (const pz of [1570, 1610]) box3(px * CS, 0, pz * CS, 1.0, 4.6, 1.0, 0, '#c6cbd0', dep); // tiang kanopi
     for (const pump of gas.pumps) {
-      if (pump.alive) box3(pump.x * CS, 0.07, pump.y * CS, 1.6, 2.2, 0.8, 0, '#cc3e45', dep);
+      if (pump.alive) {
+        box3(pump.x * CS, 0.07, pump.y * CS, 2.4, 3.0, 1.2, 0, '#cc3e45', dep); // SPBU-ENLARGE: pompa 1,5x
+        box3(pump.x * CS, 2.82, pump.y * CS, 2.4, 0.25, 1.2, 0, '#e8e8df', dep); // tutup putih
+        // layar gelap + selang di muka utara (z-): muka utara di z=pump.y*CS-1,2 (w pompa 2,4/2);
+        // box3 w->z, d->x, jadi layar 0,9 lebar (x) = d 0,9, tebal (z) = w 0,1; selang di x+0,4
+        // (masih di atas muka pompa, setengah lebar x pompa cuma 0,6u — +0,85 desain melayang)
+        // KOREKSI PAINTER (verifikasi frame G1): box3 sortir muka by dep = sudut
+        // TERDEKAT (min fwdD). Muka pompa lebih lebar (x±0,6) dari layar (x±0,45)/
+        // selang, jadi sudut barat-laut muka pompa MENANG (lebih dekat kamera)
+        // dan muka pompa dicat SETELAH layar/selang -> layar+selang tertutup
+        // dari kamera barat-laut (bukti: crop 4x G1 muka pompa merah polos,
+        // padahal dari hadapan utara layar+selang terbaca jelas). depOff -0,8
+        // (pola sunroof :1155 -0,6 / bollard :2592 -1) memaksa layar+selang
+        // dicat setelah muka pompa. Kerugian di sudut G1: layar +0,063u,
+        // selang +0,561u (sudut barat-laut pompa lebih dekat) — -0,8 menutup
+        // keduanya dengan margin 0,24u untuk selang.
+        box3(pump.x * CS, 1.7, pump.y * CS - 1.2, 0.1, 0.5, 0.9, 0, '#182c36', dep, -0.8); // layar 0,9x0,5u
+        box3(pump.x * CS + 0.4, 0.07, pump.y * CS - 1.2, 0.15, 1.5, 0.15, 0, '#20232b', dep, -0.8); // selang
+      }
+    }
+    // SPBU-ENLARGE: pylon tanda di (1030,1530) — tiang 1,0x5,0u + panel oranye
+    // (muka lebar menghadap barat: panel tipis di x, panjang di z -> w 3,0, d 0,3)
+    // + 2 pita hijau; puncak 7,0u
+    box3(103, 0, 153, 1.0, 5.0, 1.0, 0, '#263948', dep);
+    box3(103, 5.0, 153, 3.0, 2.0, 0.3, 0, '#ff9d4d', dep);
+    box3(103, 5.4, 153, 3.2, 0.35, 0.5, 0, '#a6ffb6', dep);
+    box3(103, 6.3, 153, 3.2, 0.35, 0.5, 0, '#a6ffb6', dep);
+    // SPBU-ENLARGE: teks 'HARBOR GAS' di fascia kanopi.
+    // KOREKSI SUMBU (bukan fascia utara): kanopi box3 w=20 -> sumbu z/map-y,
+    // d=10 -> sumbu x/map-x — kanopi adalah strip utara-selatan, jadi muka
+    // PANJANG yang dilihat kamera G1 (barat-laut) adalah muka BARAT (x=91,
+    // 20u), bukan muka utara (z=150, cuma 10u, proyeksinya jatuh di balik
+    // panel HUD kiri). Teks di tengah muka barat (90,9, 4,85u, 160).
+    // Via ops (pola label beacon/misi), BUKAN fillText langsung ala kasino
+    // :2637: teks langsung dicat sebelum flush ops dan akan tertutup fascia.
+    // Depth = sudut terdekat muka barat - 0,1 (dihitung per frame dari kamera
+    // aktif, jadi dari timur teks tersembunyi benar di balik kanopi).
+    const gp = cP(90.9, 4.85, 160);
+    if (gp) {
+      const gd = Math.min(fwdD(91, 150), fwdD(91, 170)) - 0.1;
+      ops.push({ d: gd, f() {
+        x.save(); x.font = 'bold ' + Math.round(cl(1500 / gp[2], 10, 42)) + 'px sans-serif'; x.textAlign = 'center';
+        x.globalAlpha = NEON; x.shadowColor = '#ffffff'; x.shadowBlur = 14 * NEON; x.fillStyle = '#ffffff';
+        x.fillText('HARBOR GAS', gp[0], gp[1]); x.restore();
+      } });
     }
   }
   // drawbridge
