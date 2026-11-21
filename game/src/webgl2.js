@@ -1678,23 +1678,18 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // -0.05) supaya tidak z-fight; prop di trotoar saja, tidak pernah menutupi koin.
   const MARK_W = [0.90, 0.99, 1.10]; // ZEBRA-STRIPES iterasi 2: putih dingin + lebih terang — kalibrasi frame after iterasi 1: sore strip L 163 (target ≥175), R-B +11 (target ≤+10); siang R-B +11 (target ±8); malam tidak biru-hantu (cek visual)
   // Zebra + garis stop di tiap persimpangan yang terlihat (4 lengan penuh).
-  // Strip membujur (sejajar lalu lintas, standar zebra): 11 strip per lengan.
+  // Strip membujur (sejajar lalu lintas, standar zebra): 9 strip per lengan.
   const zebraV = (rx, ry, side) => {
     const cz = (ry + side * 56) * S;
-    for (let k = -5; k <= 5; k += 1) flat(OP, (rx + k * 9) * S, 0.01, cz, 0.45, 3.5, MARK_W, 5);
-    flat(OP, rx * S, 0.01, (ry + side * 78) * S, 9.6, 0.5, MARK_W, 5); // garis stop (di luar pita zebra: tepi jauh 73.5 + celah 2 + setengah lebar 2.5)
+    for (let k = -4; k <= 4; k += 1) flat(OP, (rx + k * 9) * S, 0.01, cz, 0.45, 3.2, MARK_W, 5);
+    flat(OP, rx * S, 0.01, (ry + side * 78) * S, 9.6, 0.5, MARK_W, 5); // garis stop (di luar pita zebra: tepi jauh 72 + celah 3.5 + setengah lebar 2.5)
   };
   const zebraH = (rx, ry, side) => {
     const cx = (rx + side * 56) * S;
     // ZEBRA-ORIENT: REVERT ke continental (strip panjang sumbu-x, sejajar
     // lalu lintas E-W — UK TSM Ch.5 §15.5). 48273d1 memutar lengan ini 90°
     // (transverse) dan Juna benar: tidak ada zebracross menghadap situ.
-    for (let k = -5; k <= 5; k += 1) flat(OP, cx, 0.01, (ry + k * 9) * S, 3.5, 0.45, MARK_W, 5);
-    // Tambal notch sudut (4,25x4,25px): kotak di sudut lengan yang tak
-    // tertutup strip mana pun — penyebab step 11:09. Pusat (rx ± 40,625,
-    // ry ± 40,625) px; w=d=0,425u. 2 tambalan per lengan, 4 per persimpangan.
-    flat(OP, (rx + side * 40.625) * S, 0.01, (ry - 40.625) * S, 0.425, 0.425, MARK_W, 5);
-    flat(OP, (rx + side * 40.625) * S, 0.01, (ry + 40.625) * S, 0.425, 0.425, MARK_W, 5);
+    for (let k = -4; k <= 4; k += 1) flat(OP, cx, 0.01, (ry + k * 9) * S, 3.2, 0.45, MARK_W, 5);
     flat(OP, (rx + side * 78) * S, 0.01, ry * S, 0.5, 9.6, MARK_W, 5); // garis stop — TIDAK BERUBAH
   };
   for (const rx of city.roadsV) {

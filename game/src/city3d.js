@@ -2509,9 +2509,9 @@ export function drawChase3D(ctx, state) {
     if (!inRange(rx, ry, 175, 135)) continue;
     const rd = Math.hypot(rx * CS - ccX, ry * CS - ccZ), zw = sh(hx3('#e8e8e6'), shadeK, hz(rd));
     for (const sd of [1, -1]) {
-      for (let k = 0; k < 11; k += 1) flatQuad(rx - 46 + k * 9, ry + sd * 56 - 14, rx - 46 + k * 9 + 4, ry + sd * 56 + 14, 0.11, zw); // strip -46..48: strip terakhir tidak overhang keluar aspal (±48)
+      for (let k = 0; k < 9; k += 1) flatQuad(rx - 38 + k * 9, ry + sd * 56 - 14, rx - 38 + k * 9 + 4, ry + sd * 56 + 14, 0.11, zw); // strip -38..38: pita 76px muat di jalan 80px (ZEBRA-OVERLAP: buang strip paling luar tiap ujung)
       flatQuad(rx - 48, ry + sd * 78 - 2, rx + 48, ry + sd * 78 + 2, 0.11, zw); // garis stop di luar pita
-      for (let k = 0; k < 11; k += 1) flatQuad(rx + sd * 56 - 14, ry - 46 + k * 9, rx + sd * 56 + 14, ry - 46 + k * 9 + 4, 0.11, zw); // REVERT continental — strip 28x4 sejajar lalu lintas (48273d1 memutarnya; lihat webgl2.js)
+      for (let k = 0; k < 9; k += 1) flatQuad(rx + sd * 56 - 14, ry - 38 + k * 9, rx + sd * 56 + 14, ry - 38 + k * 9 + 4, 0.11, zw); // REVERT continental — strip 28x4 sejajar lalu lintas (48273d1 memutarnya; lihat webgl2.js)
       flatQuad(rx + sd * 78 - 2, ry - 48, rx + sd * 78 + 2, ry + 48, 0.11, zw); // garis stop di luar pita
     }
   }
