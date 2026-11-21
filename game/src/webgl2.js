@@ -2089,11 +2089,22 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     box(OP, (mr.x + mr.w / 2) * S, 0.25, (mr.y + mr.h / 2) * S, mr.w * S, 0.5, mr.h * S, [0.35, 0.30, 0.22], 5);
     if (vis(2480, 680, 160) || vis(2530, 1750, 90)) drawCruiseShips(OP, GL); // R27b: kapal pesiar + yacht (statis, visual saja)
   }
-  // Pom bensin (kalau dekat).
+  // Pom bensin (kalau dekat). SPBU-ENLARGE-WEBGL2: pompa 1.5x + kanopi 2.9u + pylon.
   if (near(955, 1595, R) && vis(955, 1595, 150)) {
-    box(OP, 955 * S, 2.5, 1590 * S, 210 * S, 0.4, 60 * S, [0.7, 0.7, 0.72], 5); // kanopi
-    for (const px of [870, 1032]) for (const pz of [1570, 1610]) box(OP, px * S, 1.15, pz * S, 0.7, 2.3, 0.7, [0.78, 0.8, 0.82], 5); // tiang kanopi
-    for (const px of [900, 960, 1020]) box(OP, px * S, 0.6, 1610 * S, 1.2, 1.2, 0.8, [0.9, 0.2, 0.2], 5);
+    box(OP, 955 * S, 3.1, 1590 * S, 210 * S, 0.4, 60 * S, [0.7, 0.7, 0.72], 5); // kanopi 2.9-3.3u
+    box(OP, 955 * S, 3.1, 155.95, 210 * S, 0.4, 0.15, [1, 0.62, 0.3], 5); // pita fascia oranye, tepi utara kanopi
+    for (const px of [870, 1044]) for (const pz of [1570, 1610]) box(OP, px * S, 1.45, pz * S, 0.7, 2.9, 0.7, [0.78, 0.8, 0.82], 5); // tiang 0-2.9u; timur 1032->1044 (B3)
+    for (const px of [900, 960, 1020]) {
+      box(OP, px * S, 0.9, 1610 * S, 1.8, 1.8, 1.2, [0.9, 0.2, 0.2], 5); // pompa 1.8x1.8x1.2u
+      box(OP, px * S, 1.9, 1610 * S, 1.8, 0.2, 1.2, [0.91, 0.91, 0.87], 5); // tutup putih 1.8-2.0u
+      box(OP, px * S, 1.1, 160.34, 0.9, 0.5, 0.1, [0.09, 0.17, 0.21], 5); // layar gelap, muka utara
+      box(OP, (px + 5.5) * S, 0.75, 160.32, 0.15, 1.5, 0.15, [0.13, 0.14, 0.17], 5); // selang, muka utara
+    }
+    // Pylon (1030,1530): tiang + panel oranye + 2 pita hijau, puncak 4.5u.
+    box(OP, 1030 * S, 1.25, 1530 * S, 1.0, 2.5, 1.0, [0.15, 0.22, 0.28], 5); // tiang pylon 0-2.5u
+    box(OP, 1030 * S, 3.5, 1530 * S, 0.3, 2.0, 3.0, [1, 0.62, 0.3], 5); // panel oranye 2.5-4.5u, muka lebar ke barat
+    box(OP, 1030 * S, 2.9, 1530 * S, 0.5, 0.35, 3.2, [0.65, 1, 0.71], 5); // pita hijau bawah
+    box(OP, 1030 * S, 4.1, 1530 * S, 0.5, 0.35, 3.2, [0.65, 1, 0.71], 5); // pita hijau atas
   }
   // #7: garage 3D box removed — it stood in the middle of the (480,1440)
   // intersection with no collision (cars drove through it). Flat 2D
