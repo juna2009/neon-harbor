@@ -1584,20 +1584,32 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     else flat(OP, j[0], 0.03, j[1], 0.7, 0.14, [0.16, 0.15, 0.17], 5);
   }
   // Halte bus (bangku + rambu) di trotoar kanan, tempat sampah di kiri.
-  if (propClear(16, 7.2)) {
-    const bn = atFU(16, 7.2), bb = atFU(16, 7.45), yaw = hEW ? 0 : Math.PI / 2;
+  // BENCH: bangku world-snap grid 128u (pola snapGrid Canvas: slot =
+  // floor((heroAlong+16)/128)*128) + hindari-zebra (slot <80px = 8u dari
+  // pusat persimpangan di jalan aktif -> lewati). Dulu camera-relative
+  // fwd 16 tetap -> lewat pojok zebra tiap hero ~20-23u dari persimpangan.
+  // Gambar hanya bila fwd slot 12..66 (jendela prop dekat WebGL2).
+  const heroAlongU = (hEW ? hx0 : hy0) * S;
+  const bnSlotU = Math.floor((heroAlongU + 16) / 128) * 128, bnFwdU = bnSlotU - heroAlongU;
+  const bnNearXing = (() => {
+    const cross = hEW ? city.roadsV : city.roadsH;
+    for (const c of cross) if (Math.abs(bnSlotU - c * S) < 8) return true;
+    return false;
+  })();
+  if (bnFwdU >= 12 && bnFwdU < 66 && !bnNearXing && propClear(bnFwdU, 7.5)) {
+    const bn = atFU(bnFwdU, 7.5), bb = atFU(bnFwdU, 7.75), yaw = hEW ? 0 : Math.PI / 2;
     boxR(OP, bn[0], 0.55, bn[1], 1.9, 0.14, 0.55, yaw, 0, [0.45, 0.32, 0.20], 5); // bangku: dudukan kayu
     boxR(OP, bb[0], 0.95, bb[1], 1.9, 0.6, 0.1, yaw, 0, [0.40, 0.28, 0.18], 5); // sandaran
     boxR(OP, bn[0], 0.25, bn[1], 0.12, 0.5, 0.5, yaw, 0, [0.15, 0.15, 0.16], 5); // kaki
   }
-  if (propClear(19, 7.2)) {
-    const sg = atFU(19, 7.2);
+  if (bnFwdU >= 12 && bnFwdU < 66 && !bnNearXing && propClear(bnFwdU + 3, 7.5)) {
+    const sg = atFU(bnFwdU + 3, 7.5);
     box(OP, sg[0], 1.4, sg[1], 0.12, 2.8, 0.12, LAMP_STEEL, 5); // tiang rambu halte
     if (hEW) box(OP, sg[0], 2.5, sg[1], 0.95, 0.65, 0.08, [0.12, 0.35, 0.85], 5);
     else box(OP, sg[0], 2.5, sg[1], 0.08, 0.65, 0.95, [0.12, 0.35, 0.85], 5); // panel biru halte
   }
-  if (propClear(24, -7.2)) {
-    const tb = atFU(24, -7.2);
+  if (propClear(24, -7.5)) {
+    const tb = atFU(24, -7.5);
     box(OP, tb[0], 0.48, tb[1], 0.55, 0.95, 0.55, [0.10, 0.28, 0.14], 5); // tempat sampah hijau
     box(OP, tb[0], 1.0, tb[1], 0.6, 0.1, 0.6, [0.08, 0.22, 0.11], 5); // tutup
   }
@@ -1729,7 +1741,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       return false;
     };
     const spot = (a, side) => { // posisi dunia (unit) utk along a & sisi side
-      const la = roadLat + side * 7.2;
+      const la = roadLat + side * 7.5;
       return [(cam.eye[0] + fx2 * (a - camAlong) + rx2 * la) / S,
               (cam.eye[2] + fz2 * (a - camAlong) + rz2 * la) / S];
     };
@@ -1750,8 +1762,8 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
           if (clash(wx, wy)) continue; // dua sisi bentrok -> lewati slot
         }
       }
-      const wxu = cam.eye[0] + fx2 * (along - camAlong) + rx2 * (roadLat + side * 7.2);
-      const wyu = cam.eye[2] + fz2 * (along - camAlong) + rz2 * (roadLat + side * 7.2);
+      const wxu = cam.eye[0] + fx2 * (along - camAlong) + rx2 * (roadLat + side * 7.5);
+      const wyu = cam.eye[2] + fz2 * (along - camAlong) + rz2 * (roadLat + side * 7.5);
       if (Math.hypot(wxu - cam.eye[0], wyu - cam.eye[2]) < 12) continue;
       const scK = k === 2 ? 1.0 : 1 + k * 0.12; // 1A-TREES: slot k=2 (shade tree) tanpa skala (dulu 1.24); R36 v4: jauh = lebih tinggi
       if (k === 2) shadeTree(OP, wxu, wyu, sunA, scK);

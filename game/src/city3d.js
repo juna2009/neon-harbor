@@ -2691,8 +2691,8 @@ export function drawChase3D(ctx, state) {
     return (roadX * CS - ccX) * -cfZ;
   })();
   // POLEFIX2: lamps + palms sit HARD on the sidewalk, flush with the
-  // building line — walkLat 7.2 (72px from the road centreline: 24px
-  // past the 48px asphalt edge, 8px off the 80px facade). JF4's 4.3
+  // building line — walkLat 7.5 (75px from the road centreline: 27px
+  // past the 48px asphalt edge, 5px off the 80px facade). JF4's 4.3
   // (mid-sidewalk, 7px past the edge) FAILED on screen: at the
   // chase-cam's grazing angle the 7px strip projects to a sliver, so
   // the trunk base still read as standing on the asphalt edge and the
@@ -2701,7 +2701,7 @@ export function drawChase3D(ctx, state) {
   // Palms use EXACTLY walkLat now (JF4's +h2*0.3 drifted them to 5.1,
   // inside the wall). Fronds shortened 3.4 -> 2.0 so the canopy's inner
   // tip (42px) clears the 40px road edge instead of overhanging it.
-  const walkLat = 7.2; // sidewalk outer edge, in 3D units (72px from road centre)
+  const walkLat = 7.5; // sidewalk outer edge, in 3D units (75px from road centre)
   // R36-ROADS (fallback Canvas): tekstur jalan dekat kamera + prop trotoar.
   // VISUAL ONLY — padanan versi WebGL2 di webgl2.js (roadSeg/atFU).
   const fwdU = (f, lat) => [ccX + cfX * f + (-cfZ) * lat, ccZ + cfZ * f + cfX * lat]; // (maju, lateral) unit -> [x, z] 3D
@@ -2740,20 +2740,25 @@ export function drawChase3D(ctx, state) {
     if (ewRoad) flatQuad(j[0] - 0.7, j[1] - 3.5, j[0] + 0.7, j[1] + 3.5, 0.08, 'rgba(20,20,24,0.5)');
     else flatQuad(j[0] - 3.5, j[1] - 0.7, j[0] + 3.5, j[1] + 0.7, 0.08, 'rgba(20,20,24,0.5)');
   }
-  { const bnAlong = snapGrid(camAlong + 16, 128, 0), bnFwd = bnAlong - camAlong; // halte: bangku kayu + rambu biru (trotoar kanan) — grid 128 unit; lateral +7.2 Street 2
-  if (bnFwd >= 12 && bnFwd < 175 && fwdClear(bnFwd, roadLat + 7.2)) {
-    const bn = fwdU(bnFwd, roadLat + 7.2), bb = fwdU(bnFwd, roadLat + 7.45), lg1 = fwdU(bnFwd - 0.8, roadLat + 7.2), lg2 = fwdU(bnFwd + 0.8, roadLat + 7.2), yaw = ewRoad ? Math.PI / 2 : 0; // box3: w ikut "right" — jalan E-W (sumbu x) butuh yaw pi/2 supaya panjang bangku sejajar jalan
+  const bnNearXing = (along) => { // BENCH: slot <80px dari pusat persimpangan di jalan aktif -> jangan taruh bangku (pita zebra 42-70px + garis stop 61px + margin); grid 128u normalnya sudah mid-block (160px dari persimpangan), ini safety net saat kamera belok
+    const sp = slotWorldP(along, roadLat), ax = ewRoad ? sp[0] : sp[1];
+    for (const c of (ewRoad ? city.roadsV : city.roadsH)) if (Math.abs(ax - c) < 80) return true;
+    return false;
+  };
+  { const bnAlong = snapGrid(camAlong + 16, 128, 0), bnFwd = bnAlong - camAlong; // halte: bangku kayu + rambu biru (trotoar kanan) — grid 128 unit; lateral +7.5 Street 2
+  if (bnFwd >= 12 && bnFwd < 175 && !bnNearXing(bnAlong) && fwdClear(bnFwd, roadLat + 7.5)) {
+    const bn = fwdU(bnFwd, roadLat + 7.5), bb = fwdU(bnFwd, roadLat + 7.75), lg1 = fwdU(bnFwd - 0.8, roadLat + 7.5), lg2 = fwdU(bnFwd + 0.8, roadLat + 7.5), yaw = ewRoad ? Math.PI / 2 : 0; // box3: w ikut "right" — jalan E-W (sumbu x) butuh yaw pi/2 supaya panjang bangku sejajar jalan
     box3(lg1[0], 0, lg1[1], 0.12, 0.55, 0.12, 0, '#3a2c1c', bnFwd); // kaki bangku (alas 0 -> dudukan)
     box3(lg2[0], 0, lg2[1], 0.12, 0.55, 0.12, 0, '#3a2c1c', bnFwd);
     box3(bn[0], 0.55, bn[1], 1.9, 0.14, 0.55, yaw, '#6b4a2f', bnFwd);
     box3(bb[0], 0.6, bb[1], 1.9, 0.6, 0.1, yaw, '#5d3f28', bnFwd); // sandaran naik dari dudukan (alas 0.6, bukan 0.95 — dulu melayang)
-    const sg = fwdU(bnFwd + 3, roadLat + 7.2);
+    const sg = fwdU(bnFwd + 3, roadLat + 7.5);
     box3(sg[0], 0, sg[1], 0.14, 2.6, 0.14, 0, '#3a3340', bnFwd + 3);
     box3(sg[0], 2.3, sg[1], 0.95, 0.65, 0.1, yaw, '#2456c8', bnFwd + 3); // panel menimpa ujung tiang
   } }
-  { const tbAlong = snapGrid(camAlong + 24, 128, 0), tbFwd = tbAlong - camAlong; // tempat sampah hijau (trotoar kiri) — grid 128 unit; lateral −7.2 Street 2
-  if (tbFwd >= 12 && tbFwd < 175 && fwdClear(tbFwd, roadLat - 7.2)) {
-    const tb = fwdU(tbFwd, roadLat - 7.2);
+  { const tbAlong = snapGrid(camAlong + 24, 128, 0), tbFwd = tbAlong - camAlong; // tempat sampah hijau (trotoar kiri) — grid 128 unit; lateral −7.5 Street 2
+  if (tbFwd >= 12 && tbFwd < 175 && fwdClear(tbFwd, roadLat - 7.5)) {
+    const tb = fwdU(tbFwd, roadLat - 7.5);
     box3(tb[0], 0, tb[1], 0.55, 0.95, 0.55, 0, '#2a6b45', tbFwd);
     box3(tb[0], 0.95, tb[1], 0.6, 0.12, 0.6, 0, '#1d4e33', tbFwd);
   } }
