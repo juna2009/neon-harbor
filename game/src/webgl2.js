@@ -1665,8 +1665,12 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   };
   const zebraH = (rx, ry, side) => {
     const cx = (rx + side * 56) * S;
-    for (let k = -5; k <= 5; k += 1) flat(OP, cx, 0.01, (ry + k * 9) * S, 3.5, 0.45, MARK_W, 5);
-    flat(OP, (rx + side * 78) * S, 0.01, ry * S, 0.5, 9.6, MARK_W, 5); // garis stop (di luar pita zebra)
+    // ZEBRA-ARMS: strip panjang sumbu-z (transverse), fase selaras grid
+    // zebraV (x ≡ rx mod 9) supaya bar x=rx∓45 menyambung dengan strip
+    // pertama/terakhir zebraV melewati celah tengah. 4 strip/lengan.
+    const ks = side < 0 ? [-8, -7, -6, -5] : [5, 6, 7, 8];
+    for (const k of ks) flat(OP, (rx + k * 9) * S, 0.01, ry * S, 0.45, 9.4, MARK_W, 5);
+    flat(OP, (rx + side * 78) * S, 0.01, ry * S, 0.5, 9.6, MARK_W, 5); // garis stop — TIDAK BERUBAH
   };
   for (const rx of city.roadsV) {
     for (const ry of city.roadsH) {

@@ -2511,7 +2511,8 @@ export function drawChase3D(ctx, state) {
     for (const sd of [1, -1]) {
       for (let k = 0; k < 11; k += 1) flatQuad(rx - 46 + k * 9, ry + sd * 56 - 14, rx - 46 + k * 9 + 4, ry + sd * 56 + 14, 0.11, zw); // strip -46..48: strip terakhir tidak overhang keluar aspal (±48)
       flatQuad(rx - 48, ry + sd * 78 - 2, rx + 48, ry + sd * 78 + 2, 0.11, zw); // garis stop di luar pita
-      for (let k = 0; k < 11; k += 1) flatQuad(rx + sd * 56 - 14, ry - 46 + k * 9, rx + sd * 56 + 14, ry - 46 + k * 9 + 4, 0.11, zw); // strip -46..48 (tanpa overhang)
+      for (const k of (sd < 0 ? [-2, -1, 0] : [10, 11, 12]))
+        flatQuad(rx - 46 + k * 9, ry - 47, rx - 46 + k * 9 + 4, ry + 47, 0.11, zw); // ZEBRA-ARMS: strip transverse (sumbu-y), fase selaras grid zebraV :2513 — 3 strip/lengan; rx-46/rx+44 berbagi dgn strip pertama/terakhir zebraV
       flatQuad(rx + sd * 78 - 2, ry - 48, rx + sd * 78 + 2, ry + 48, 0.11, zw); // garis stop di luar pita
     }
   }
