@@ -2789,9 +2789,78 @@ export function drawChase3D(ctx, state) {
     if (!inRange(pt.x, pt.y, 120, 100)) continue;
     const a = Math.max(0, pt.life / pt.maxLife);
     const sz = pt.size * CS * (1.6 - a * 0.6) * 2.2;
-    const col = pt.kind === 'flame' ? 'rgba(255,140,40,' + (a * 0.85).toFixed(3) + ')' : 'rgba(140,140,150,' + (a * 0.5).toFixed(3) + ')';
+    const col = pt.kind === 'flame' ? 'rgba(255,140,40,' + (a * 0.85).toFixed(3) + ')' : 'rgba(140,140,150,' + (a * 0.35).toFixed(3) + ')'; // EXPLOSION-VFX S1 v2: asap 0.35 (paritas mat 17 WebGL2 — 0.5 + tepi keras menumpuk jadi gelembung solid)
     vQuad(pt.x * CS, pt.y * CS, ccYaw, 0, 0, sz, Math.max(0.1, pt.size * CS * 0.4), Math.max(0.1, pt.size * CS * 0.4) + sz, col);
     drawn += 1;
+  }
+  // EXPLOSION-VFX S1 parity (mirror webgl2.js derivation: rumus ukuran SAMA).
+  // Flame dikelompokkan per bucket age 0.05 dtk; ledakan biasa (tanpa flame)
+  // dari spark termuda. Ring = 16 segmen flat (arc stroke), debu = vQuad tan,
+  // flash = vQuad putih, beads = vQuad kecil di keliling ring.
+  {
+    const groups = new Map();
+    const sparkAge = [];
+    for (const pt of state.particles) {
+      if (pt.kind !== 'flame' && pt.kind !== 'spark') continue;
+      const age = (pt.maxLife || 1) - pt.life;
+      if (age < 0 || age > 1.0) continue;
+      if (pt.kind === 'flame') {
+        const key = Math.round(age * 20);
+        let g = groups.get(key);
+        if (!g) { g = { age, sx: 0, sy: 0, n: 0, maxSz: 0, big: true }; groups.set(key, g); }
+        g.sx += pt.x - pt.vx * age; g.sy += pt.y - pt.vy * age; g.n += 1;
+        const a = Math.max(0, Math.min(1, pt.life / (pt.maxLife || 1)));
+        g.maxSz = Math.max(g.maxSz, pt.size * CS * (1.6 - a * 0.6) * 2.2);
+      } else if (sparkAge.length < 40) sparkAge.push([age, pt.x, pt.y, pt.vx, pt.vy]);
+    }
+    sparkAge.sort((p, q) => p[0] - q[0]);
+    if (sparkAge.length) {
+      const yAge = sparkAge[0][0];
+      let hasFlame = false;
+      for (const g of groups.values()) if (g.age <= yAge && yAge - g.age < 0.75) { hasFlame = true; break; }
+      if (!hasFlame) {
+        const f = (1 / 60) * (1 - Math.pow(0.94, yAge * 60)) / 0.06;
+        let sx = 0, sy = 0, n = 0;
+        for (const sp of sparkAge.slice(0, 5)) { sx += sp[1] - sp[3] * f; sy += sp[2] - sp[4] * f; n += 1; }
+        groups.set(Math.round(yAge * 20) + 1000, { age: yAge, sx, sy, n, maxSz: 6, big: false });
+      }
+    }
+    const list = [...groups.values()].sort((a, b) => a.age - b.age).slice(0, 3);
+    let gi = 0;
+    for (const g of list) {
+      const cx = g.sx / g.n, cy = g.sy / g.n;
+      if (!inRange(cx, cy, 120, 100)) { gi += 1; continue; }
+      const age = g.age, ringK = gi === 0 ? 1 : 0.6;
+      if (age < 0.2) {
+        const fd = g.big ? Math.min(20, 1.3 * g.maxSz) : 12; // v2: 1.3x cap 20u (v1 2x/30u = wash langit)
+        vQuad(cx * CS, cy * CS, ccYaw, 0, 0, fd, 0.1, 0.1 + fd, 'rgba(255,240,200,' + (0.9 * (1 - age / 0.2)).toFixed(3) + ')');
+      }
+      if (g.big && age >= 0.05 && age < 0.6) {
+        const R = 30 * (age / 0.6), ra = (0.8 * (1 - age / 0.6) * ringK).toFixed(3);
+        const hc = R * Math.sin(Math.PI / 16) * 1.15, hb = 1.0;
+        for (let k = 0; k < 16; k += 1) {
+          const an = (k * Math.PI) / 8, co = Math.cos(an), si = Math.sin(an);
+          const px = cx * CS + co * R, pz = cy * CS + si * R;
+          QW([[px + si * hc - co * hb, 0.15, pz - co * hc - si * hb], [px - si * hc - co * hb, 0.15, pz + co * hc - si * hb],
+            [px - si * hc + co * hb, 0.15, pz + co * hc + si * hb], [px + si * hc + co * hb, 0.15, pz - co * hc + si * hb]],
+            'rgba(255,230,150,' + ra + ')', 'far');
+        }
+        const beadA = (0.9 * (1 - age / 0.6)).toFixed(3);
+        for (let k = 0; k < 12; k += 1) {
+          const an = (k * Math.PI) / 6;
+          vQuad((cx + Math.cos(an) * R * 10) * CS, (cy + Math.sin(an) * R * 10) * CS, ccYaw, 0, 0, 2.0, 0.1, 2.1, 'rgba(255,220,150,' + beadA + ')');
+        }
+      }
+      if (age >= 0.3 && age <= 1.0) {
+        const nD = g.big ? 10 : 5, fade = (0.3 * (1 - (age - 0.3) / 0.7)).toFixed(3);
+        for (let i = 0; i < nD; i += 1) {
+          const an = (i * Math.PI * 2) / nD + 0.31;
+          const dist = (3 + age * 6) * 10, ds = g.maxSz * 0.7 * (1 + (age - 0.3) / 0.7);
+          vQuad((cx + Math.cos(an) * dist) * CS, (cy + Math.sin(an) * dist) * CS, ccYaw, 0, 0, ds, 0.1, 0.1 + ds, 'rgba(201,177,138,' + fade + ')');
+        }
+      }
+      gi += 1;
+    }
   }
   // bullets
   drawn = 0;

@@ -291,14 +291,35 @@ void main(){
     gl_FragColor = vec4(base * 1.8, a * 0.55);
     return;
   }
-  if (vM > 16.5 && vM < 17.5) { // PARTICLES: asap abu-abu (mirror city3d rgba(140,140,150))
-    float al = smoothstep(0.5, 0.05, length(vU - 0.5)) * vC.r; // radial x life-fade
-    gl_FragColor = vec4(vec3(0.55, 0.55, 0.59), al * 0.5);
+  if (vM > 16.5 && vM < 17.5) { // PARTICLES: asap abu-abu (mirror city3d rgba(140,140,150)) — EXPLOSION-VFX S1 CEL-SHADED v2: tepi tegas tapi TIDAK keras (0.5->0.38) + rim tipis x0.75 di band 0.40<r<0.5; alpha maks 0.35 (BUKAN 0.5: frame G1 v1 membuktikan 0.5 + tepi keras + 40 quad menumpuk = gelembung solid tak tembus; langit >180 naik 4.8%->69.5%)
+    float r = length(vU - 0.5);
+    float al = smoothstep(0.5, 0.38, r) * vC.r; // tepi tegas x life-fade
+    float rimK = mix(1.0, 0.75, smoothstep(0.40, 0.44, r) * (1.0 - smoothstep(0.46, 0.5, r)));
+    gl_FragColor = vec4(vec3(0.55, 0.55, 0.59) * rimK, al * 0.35);
     return;
   }
   if (vM > 17.5 && vM < 18.5) { // PARTICLES: api oranye (mirror city3d rgba(255,140,40)) — blend NORMAL, bukan aditif: 14 flame aditif yang tumpang tindih menembus putih (G1: api harus ORANYE, bukan putih); normal-blend menumpuk ke arah oranye. vC.r = carrier alpha (life-fade).
     float al = smoothstep(0.5, 0.05, length(vU - 0.5)) * vC.r; // radial x life-fade
     gl_FragColor = vec4(vec3(1.0, 0.55, 0.16), al * 0.85);
+    return;
+  }
+  if (vM > 18.5 && vM < 19.5) { // EXPLOSION-VFX S1: shockwave ring — annulus SDF dari length(vU-0.5) (first principles, bukan salinan shader mana pun); band 0.42-0.5, warna [1.0,0.9,0.6], alpha via vC.r (0.8->0)
+    float r = length(vU - 0.5);
+    float band = smoothstep(0.42, 0.46, r) * (1.0 - smoothstep(0.46, 0.5, r));
+    gl_FragColor = vec4(vec3(1.0, 0.9, 0.6), band * vC.r);
+    return;
+  }
+  if (vM > 19.5 && vM < 20.5) { // EXPLOSION-VFX S1: flash disc — inti putih -> tepi emas, tepi TEGAS via smoothstep (bukan radial lembut); NORMAL blend (bucket SH, BUKAN aditif — pelajaran G1); alpha via vC.r (0.9->0)
+    float r = length(vU - 0.5);
+    float edge = smoothstep(0.5, 0.44, r);
+    float core = smoothstep(0.30, 0.05, r);
+    vec3 col = mix(vec3(1.0, 0.75, 0.25), vec3(1.0), core);
+    gl_FragColor = vec4(col, edge * vC.r);
+    return;
+  }
+  if (vM > 20.5 && vM < 21.5) { // EXPLOSION-VFX S1: debu tan #c9b18a, ground-hugging; alpha = radial x vC.r x 0.3 (maks 0.3)
+    float al = smoothstep(0.5, 0.08, length(vU - 0.5)) * vC.r;
+    gl_FragColor = vec4(vec3(0.788, 0.694, 0.541), al * 0.3);
     return;
   }
   if (vM > 7.5 && vM < 8.5) { // smear: memudar sepanjang v
@@ -2194,6 +2215,83 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
         if (pt.kind !== 'jet' && pt.kind !== 'flash') continue;
         if (!vis(pt.x, pt.y, 60)) continue;
         emitPt(pt); n2 += 1;
+      }
+      // EXPLOSION-VFX S1 (derived, 0 kind baru, 0 world.js): flash/ring/beads/
+      // debu dihitung dari state.particles LANGSUNG (B11: bukan dari quad yang
+      // ter-emit). Flame satu ledakan berbagi age persis (lahir age 0, dt sama)
+      // -> kelompokkan per bucket age 0.05 dtk; ledakan mobil biasa TIDAK punya
+      // flame (world.js spawnExplosion: non-big = spark+smoke saja) -> derive
+      // flash/debu dari spark termuda (tanpa ring). Back-track ke titik spawn:
+      // flame tanpa damping (pos - v*age = spawn persis); spark damping 0.94/
+      // step (STEP 1/60). Cap derived TERPISAH dari cap partikel 70+8: <=24/
+      // ledakan besar (flash 1 + ring 1 + beads 12 + debu 10), <=3 ledakan.
+      {
+        const groups = new Map(); // ageKey -> {age, sx, sy, n, maxSz, big}
+        const sparkAge = []; // [age, x, y, vx, vy] spark, untuk ledakan biasa
+        for (const pt of pts) {
+          if (pt.kind !== 'flame' && pt.kind !== 'spark') continue;
+          const age = (pt.maxLife || 1) - pt.life;
+          if (age < 0 || age > 1.0) continue;
+          if (pt.kind === 'flame') {
+            const key = Math.round(age * 20);
+            let g = groups.get(key);
+            if (!g) { g = { age, sx: 0, sy: 0, n: 0, maxSz: 0, big: true }; groups.set(key, g); }
+            g.sx += pt.x - pt.vx * age; g.sy += pt.y - pt.vy * age; g.n += 1;
+            const a = Math.max(0, Math.min(1, pt.life / (pt.maxLife || 1)));
+            g.maxSz = Math.max(g.maxSz, pt.size * S * (1.6 - a * 0.6) * 2.2);
+          } else if (sparkAge.length < 40) {
+            sparkAge.push([age, pt.x, pt.y, pt.vx, pt.vy]);
+          }
+        }
+        // Ledakan biasa (tanpa flame): spark termuda, bila bucket age-nya
+        // tidak beririsan dengan grup flame mana pun (spark ledakan besar
+        // ikut bucket flame-nya sendiri). Spark lahir dgn age 0-0,7 (life
+        // acak 0,4-1,1, maxLife 1,1) -> spark termuda ledakan besar = age
+        // flame-nya; jendela satu-sisi 0,75 dtk (bukan |d|<0,15).
+        sparkAge.sort((p, q) => p[0] - q[0]);
+        if (sparkAge.length) {
+          const yAge = sparkAge[0][0];
+          let hasFlame = false;
+          for (const g of groups.values()) if (g.age <= yAge && yAge - g.age < 0.75) { hasFlame = true; break; }
+          if (!hasFlame) {
+            const f = (1 / 60) * (1 - Math.pow(0.94, yAge * 60)) / 0.06; // back-track damping spark
+            let sx = 0, sy = 0, n = 0;
+            for (const sp of sparkAge.slice(0, 5)) { sx += sp[1] - sp[3] * f; sy += sp[2] - sp[4] * f; n += 1; }
+            groups.set(Math.round(yAge * 20) + 1000, { age: yAge, sx, sy, n, maxSz: 6, big: false });
+          }
+        }
+        const list = [...groups.values()].sort((a, b) => a.age - b.age).slice(0, 3);
+        let gi = 0;
+        for (const g of list) {
+          const cx = g.sx / g.n, cy = g.sy / g.n;
+          if (!vis(cx, cy, 80)) { gi += 1; continue; }
+          const age = g.age;
+          const ringK = gi === 0 ? 1 : 0.6; // B14: ring ke-2/ke-3 alpha x0.6
+          if (age < 0.2) { // flash disc: ~1.3x lebar fireball maks (cap 20u) — v1 2x (24-30u) TERBUKTI jadi wash langit dari chase cam rendah (langit >180: 4.8%->69.5%); 16u = bola terang di pompa, bukan menara cahaya
+            const fd = g.big ? Math.min(20, 1.3 * g.maxSz) : 12;
+            billDir(SH, cx * S, 0.1 + g.maxSz * 0.4, cy * S, fd, fd, pn, [0.9 * (1 - age / 0.2), 0, 0], 20);
+          }
+          if (g.big && age >= 0.05 && age < 0.6) { // shockwave ring: radius 0->30u / 0.6 dtk, y=0.15
+            const R = 30 * (age / 0.6);
+            flat(SH, cx * S, 0.15, cy * S, 2 * R, 2 * R, [0.8 * (1 - age / 0.6) * ringK, 0, 0], 19);
+            const beadA = 0.9 * (1 - age / 0.6); // beads: 12 dot mat 7 di keliling ring (v2: 2.0u, biar terbaca dari chase cam rendah)
+            for (let k = 0; k < 12; k += 1) {
+              const an = (k * Math.PI) / 6;
+              billDir(GL, (cx + Math.cos(an) * R * 10) * S, 0.6, (cy + Math.sin(an) * R * 10) * S, 2.0, 2.0, pn, [beadA, beadA * 0.85, beadA * 0.5], 7);
+            }
+          }
+          if (age >= 0.3 && age <= 1.0) { // debu tan ground-hugging: 10 besar / 5 biasa, membesar 1.5-2x
+            const nD = g.big ? 10 : 5;
+            const fade = 1 - (age - 0.3) / 0.7;
+            for (let i = 0; i < nD; i += 1) {
+              const an = (i * Math.PI * 2) / nD + 0.31;
+              const dist = (3 + age * 6) * 10; // px game: radius 3u -> 9u
+              const ds = g.maxSz * 0.7 * (1 + (age - 0.3) / 0.7);
+              billDir(SH, (cx + Math.cos(an) * dist) * S, 0.1 + ds / 2, (cy + Math.sin(an) * dist) * S, ds, ds, pn, [fade, 0, 0], 21);
+            }
+          }
+          gi += 1;
+        }
       }
     }
   }
