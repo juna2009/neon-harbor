@@ -1492,6 +1492,26 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
 
   // Jalan: segmen di sekitar hero (u = sepanjang jalan, v = melintang, untuk marka).
   const roadCol = [0.10, 0.09, 0.11], walkCol = [0.32, 0.32, 0.32];
+  // ZEBRA: trotoar/curb tidak boleh menyeberang persimpangan — pita
+  // dibelah di sekitar tiap jalan melintang (|along| < 4.8u = 48px dari
+  // pusatnya). Corner pad (|along| 48..80px) TETAP: potongan di kedua
+  // sisi jendela. Aspal TIDAK dibelah. UV trotoar pakai offset dunia
+  // (s - a0) supaya tekstur ubin tidak bergeser di tiap potongan.
+  const clipWalkSpans = (a0, a1, crossPx) => {
+    let spans = [[a0, a1]];
+    for (const c of crossPx) {
+      const w0 = c * S - 4.8, w1 = c * S + 4.8;
+      const next = [];
+      for (const [lo, hi] of spans) {
+        if (w1 <= lo || w0 >= hi) { next.push([lo, hi]); continue; }
+        if (w0 > lo) next.push([lo, w0]);
+        if (w1 < hi) next.push([w1, hi]);
+      }
+      spans = next;
+      if (!spans.length) break;
+    }
+    return spans;
+  };
   const roadSeg = (x0, y0, x1, y1, vertical) => {
     const len = Math.hypot(x1 - x0, y1 - y0) * S;
     // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44;
@@ -1505,22 +1525,26 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       const X = x0 * S, z0 = y0 * S, z1 = y1 * S;
       quad(OP, [X - hw, -0.05, z0], [X + hw, -0.05, z0], [X + hw, -0.05, z1], [X - hw, -0.05, z1],
         [0, 1, 0], [[0, 0], [0, 1], [len, 1], [len, 0]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
-      flat(OP, X - (hw + 1.6), 0.02, (z0 + z1) / 2, 3.2, (z1 - z0), walkCol, 14, // TROTOAR: pita penuh hw..hw+3.2u (48..80px) + UV dunia (u = lebar 3.2, v = panjang)
-        [[0, 0], [3.2, 0], [3.2, (z1 - z0)], [0, (z1 - z0)]]);
-      flat(OP, X - (hw + 0.15), 0.03, (z0 + z1) / 2, 0.3, (z1 - z0), [0.07, 0.07, 0.08], 5); // TROTOAR: curb — garis gelap tepi jalan (48..51px); quad, bukan tekstur (u tercermin antar sisi, tepi-tekstur tak simetris)
-      flat(OP, X + (hw + 1.6), 0.02, (z0 + z1) / 2, 3.2, (z1 - z0), walkCol, 14,
-        [[0, 0], [3.2, 0], [3.2, (z1 - z0)], [0, (z1 - z0)]]);
-      flat(OP, X + (hw + 0.15), 0.03, (z0 + z1) / 2, 0.3, (z1 - z0), [0.07, 0.07, 0.08], 5);
+      for (const [s0, s1] of clipWalkSpans(z0, z1, city.roadsH)) {
+        flat(OP, X - (hw + 1.6), 0.02, (s0 + s1) / 2, 3.2, (s1 - s0), walkCol, 14, // TROTOAR: pita hw..hw+3.2u (48..80px) + UV dunia (u = lebar 3.2, v = panjang, offset s0-z0)
+          [[0, s0 - z0], [3.2, s0 - z0], [3.2, s1 - z0], [0, s1 - z0]]);
+        flat(OP, X - (hw + 0.15), 0.03, (s0 + s1) / 2, 0.3, (s1 - s0), [0.07, 0.07, 0.08], 5); // TROTOAR: curb — garis gelap tepi jalan (48..51px); quad, bukan tekstur (u tercermin antar sisi, tepi-tekstur tak simetris)
+        flat(OP, X + (hw + 1.6), 0.02, (s0 + s1) / 2, 3.2, (s1 - s0), walkCol, 14,
+          [[0, s0 - z0], [3.2, s0 - z0], [3.2, s1 - z0], [0, s1 - z0]]);
+        flat(OP, X + (hw + 0.15), 0.03, (s0 + s1) / 2, 0.3, (s1 - s0), [0.07, 0.07, 0.08], 5);
+      }
     } else {
       const Z = y0 * S, x0u = x0 * S, x1u = x1 * S;
       quad(OP, [x0u, -0.05, Z - hw], [x1u, -0.05, Z - hw], [x1u, -0.05, Z + hw], [x0u, -0.05, Z + hw],
         [0, 1, 0], [[0, 0], [len, 0], [len, 1], [0, 1]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
-      flat(OP, (x0u + x1u) / 2, 0.02, Z - (hw + 1.6), (x1u - x0u), 3.2, walkCol, 14, // TROTOAR: pita penuh hw..hw+3.2u (48..80px) + UV dunia (u = panjang, v = lebar 3.2)
-        [[0, 0], [(x1u - x0u), 0], [(x1u - x0u), 3.2], [0, 3.2]]);
-      flat(OP, (x0u + x1u) / 2, 0.03, Z - (hw + 0.15), (x1u - x0u), 0.3, [0.07, 0.07, 0.08], 5);
-      flat(OP, (x0u + x1u) / 2, 0.02, Z + (hw + 1.6), (x1u - x0u), 3.2, walkCol, 14,
-        [[0, 0], [(x1u - x0u), 0], [(x1u - x0u), 3.2], [0, 3.2]]);
-      flat(OP, (x0u + x1u) / 2, 0.03, Z + (hw + 0.15), (x1u - x0u), 0.3, [0.07, 0.07, 0.08], 5);
+      for (const [s0, s1] of clipWalkSpans(x0u, x1u, city.roadsV)) {
+        flat(OP, (s0 + s1) / 2, 0.02, Z - (hw + 1.6), (s1 - s0), 3.2, walkCol, 14, // TROTOAR: pita hw..hw+3.2u (48..80px) + UV dunia (u = panjang, offset s0-x0u, v = lebar 3.2)
+          [[s0 - x0u, 0], [s1 - x0u, 0], [s1 - x0u, 3.2], [s0 - x0u, 3.2]]);
+        flat(OP, (s0 + s1) / 2, 0.03, Z - (hw + 0.15), (s1 - s0), 0.3, [0.07, 0.07, 0.08], 5);
+        flat(OP, (s0 + s1) / 2, 0.02, Z + (hw + 1.6), (s1 - s0), 3.2, walkCol, 14,
+          [[s0 - x0u, 0], [s1 - x0u, 0], [s1 - x0u, 3.2], [s0 - x0u, 3.2]]);
+        flat(OP, (s0 + s1) / 2, 0.03, Z + (hw + 0.15), (s1 - s0), 0.3, [0.07, 0.07, 0.08], 5);
+      }
     }
   };
   for (const rx of city.roadsV) {
@@ -1578,8 +1602,14 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   }
   // Ubin trotoar: sambungan melintang tiap ~12 unit di kedua trotoar.
   // R36-ROADS item 17: dari fwd -6 (dasar layar, di belakang hero).
+  // ZEBRA: joint yang jatuh di kotak aspal persimpangan (|along| < 48px
+  // dari pusat jalan melintang) dilewati — kalau tidak, garis joint
+  // gelap melayang di atas aspal (trotoar di sana sudah di-clip).
+  const jCross = hEW ? city.roadsV : city.roadsH;
   for (let f = -6; f <= 66; f += 12) for (const lat of [-6.4, 6.4]) {
     const j = atFU(f, lat);
+    const jAlongPx = (hEW ? j[0] : j[1]) / S;
+    if (jCross.some((c) => Math.abs(jAlongPx - c) < 48)) continue;
     if (hEW) flat(OP, j[0], 0.03, j[1], 0.14, 0.7, [0.16, 0.15, 0.17], 5);
     else flat(OP, j[0], 0.03, j[1], 0.7, 0.14, [0.16, 0.15, 0.17], 5);
   }

@@ -2337,11 +2337,37 @@ export function drawChase3D(ctx, state) {
   // faces stay at 80 (city.js), so a 32 px sidewalk strip remains;
   // parked cars (+16, traffic.js) sit well inside the asphalt, as
   // parallel-parked cars do.
+  // ZEBRA: koridor trotoar tidak boleh menyeberang persimpangan — belah
+  // per segmen di sekitar tiap jalan melintang (|along| < 48px dari
+  // pusatnya). Corner pad (|along| 48..80px) TETAP. Aspal + zebra +
+  // garis stop TIDAK dibelah. Koridor digambar sebagai DUA strip lateral
+  // (48..80px), BUKAN satu rect ±80px: rect penuh menumpang aspal di
+  // tengah, dan potongan yang terbelah mengubah urutan sort painter
+  // (sudut terjauh) sehingga koridor bisa menang atas aspal — strip
+  // lateral tidak pernah menumpang aspal, jadi soal sort hilang.
+  const clipWalk = (a0, a1, cross) => {
+    let spans = [[a0, a1]];
+    for (const c of cross) {
+      const w0 = c - 48, w1 = c + 48;
+      const next = [];
+      for (const [lo, hi] of spans) {
+        if (w1 <= lo || w0 >= hi) { next.push([lo, hi]); continue; }
+        if (w0 > lo) next.push([lo, w0]);
+        if (w1 < hi) next.push([w1, hi]);
+      }
+      spans = next;
+      if (!spans.length) break;
+    }
+    return spans;
+  };
   for (const rx of city.roadsV) {
     for (let gy = -320; gy < WORLD_H + 320; gy += 320) {
       if (!inRange(rx, gy + 160, 175, 135)) continue;
       const rd = Math.hypot(rx * CS - ccX, (gy + 160) * CS - ccZ);
-      flatQuad(rx - 80, gy, rx + 80, gy + 320, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
+      for (const [s0, s1] of clipWalk(gy, gy + 320, city.roadsH)) {
+        flatQuad(rx - 80, s0, rx - 48, s1, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
+        flatQuad(rx + 48, s0, rx + 80, s1, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
+      }
       flatQuad(rx - 48, gy, rx + 48, gy + 320, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
       for (let d0 = gy + 24; d0 < gy + 320; d0 += 128) {
         if (!inRange(rx, d0 + 16, 115, 75)) continue;
@@ -2361,7 +2387,10 @@ export function drawChase3D(ctx, state) {
       const clip = rd < 80;
       const x1 = clip ? Math.min(gx + 320, WATER_X) : gx + 320;
       if (x1 <= gx) continue;
-      flatQuad(gx, ry - 80, x1, ry + 80, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
+      for (const [s0, s1] of clipWalk(gx, x1, city.roadsV)) {
+        flatQuad(s0, ry - 80, s1, ry - 48, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
+        flatQuad(s0, ry + 48, s1, ry + 80, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
+      }
       flatQuad(gx, ry - 48, x1, ry + 48, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
       for (let d0 = gx + 24; d0 < gx + 320 && (!clip || d0 < WATER_X); d0 += 128) {
         if (!inRange(d0 + 16, ry, 115, 75)) continue;
