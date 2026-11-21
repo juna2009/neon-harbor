@@ -1,12 +1,8 @@
 export const ACTION_CONFIRM = 'confirm';
 export const ACTION_PAUSE = 'pause';
-export const ACTION_INTERACT = 'interact';
-export const ACTION_RELOAD = 'reload';
 export const ACTION_MUTE = 'mute';
-export const ACTION_WEAPON = 'weapon';
 export const ACTION_RADIO = 'radio';
 export const ACTION_SETTINGS = 'settings';
-export const ACTION_REPAIR = 'repair';
 export const ACTION_SHOP = 'shop';
 export const DEFAULT_BINDINGS = {
   confirm: ['Enter', 'Space'],
@@ -20,21 +16,6 @@ export const DEFAULT_BINDINGS = {
   repair: ['KeyG'],
   shop: ['KeyU'],
 };
-const ACTION_LABELS = {
-  confirm: 'Confirm',
-  pause: 'Pause',
-  interact: 'Interact',
-  reload: 'Reload',
-  mute: 'Mute',
-  weapon: 'Weapon',
-  radio: 'Radio',
-  settings: 'Settings',
-  repair: 'Repair',
-  shop: 'Shop',
-};
-export function actionLabel(action) {
-  return ACTION_LABELS[action] || action;
-}
 export function keyLabel(code) {
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);

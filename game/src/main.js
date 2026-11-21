@@ -55,9 +55,6 @@ function runShot(name) {
     renderer.draw(world.state, scene.screen, scene.best, scene.ui || { stationName: RADIO_STATIONS[settings.station].name });
     painted += 1;
     // R39 SHOT-MODE: atlas ped siap ~7,02 dtk vs paint ke-2 ~7,01 dtk —
-    // paint 2x saja = sprite kalah race, shot juri menampilkan ped box.
-    // Tunggu flag settle atlas (window.__pa, diset loadAtlas + early-fetch,
-    // sukses MAUPUN gagal) sebelum __shotReady; cap 12 paint anti-hang.
     if (painted < 2 || (!window.__pa && painted < 12)) requestAnimationFrame(paint);
     else window.__shotReady = true;
   }
@@ -66,9 +63,6 @@ function runShot(name) {
 function runGame() {
   const input = createInput(canvas);
   // R41 on-foot: modul dimuat via dynamic import (pola post-cut seperti
-  // touch.js di ui2.js) — static-import walk dossier tidak mengikutinya,
-  // jadi 0 byte dossier. Gagal dimuat = game tetap jalan, mode jalan kaki
-  // nonaktif (chase-cam biasa).
   let onfoot = null;
   import('./onfoot.js').then((m) => { onfoot = m; }).catch(() => { onfoot = null; });
   if (settings.bindings) input.setBindings(settings.bindings);

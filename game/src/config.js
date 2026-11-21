@@ -19,10 +19,6 @@ export const PLAYER = {
 };
 // R41: radian fase jalan per px jarak tempuh (Jax + semua NPC).
 // 1 langkah = π rad → ~39 px/langkah: jalan Jax 80 px/dtk ≈ 2,04 langkah/dtk
-// (gait manusia santai), lari 130 ≈ 3,31, NPC 28–52 ≈ 0,7–1,3 (stroll pelan),
-// lari ketakutan 150 ≈ 3,8. Fase maju dari JARAK, bukan waktu — kalau diam,
-// kaki diam (anti-meluncur). Kalibrasi visual: stride geometris (~14 px)
-// menuntut 12 langkah/dtk — itu yang terbaca robotik. R39: frame = floor(walkPhase/(π/2))%4.
 export const WALK_PHASE_PER_PX = 0.08;
 export const WEAPONS = {
   pistol: {

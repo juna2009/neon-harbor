@@ -1,28 +1,5 @@
 // Neon Harbor — 4 palet suasana waktu (pagi / siang / sore / malam).
 // ES module, post-cut, tanpa library. Dibaca dari game state, BUKAN dari
-// file lain: `state.timeOfDay` adalah satu-satunya jembatan ke renderer.
-//
-// KENAPA PERLU: game selama ini hampir selalu sunset — shader langit WebGL2
-// (SKYF) dan langit Canvas (city3d SKY) meng-hardcode gradient oranye-ungu,
-// warna fog HZ oranye, dan warna matahari oranye. `state.daylight` (0..1)
-// hanya menggelapkan/mencerahkan palet sunset itu, bukan menggantinya.
-// Modul ini mengganti paletnya per suasana, dengan SORE = nilai yang sudah
-// ada persis (baseline, jangan diubah).
-//
-// DASAR RISET (bukan riset baru — pakai yang sudah ada):
-//  - graphics-bible/art-direction.md §2.1 palet sunset (SORE = tabel itu),
-//    §2.2 color script ("tiap shot punya suhu berbeda TAPI satu keluarga
-//    palet", "parameterisasi gradient langit + HZ per scene, bukan satu
-//    palet global"), §2.3 blue hour (#0B1E3A -> #274B7A + horizon oranye
-//    #FF8C42 + jendela hangat — dipakai untuk MALAM).
-//  - graphics-bible/webgl-techniques.md §4 sky (6-stop gradient, Mie glow,
-//    anamorphic streak, smog band) + §1 lighting (Half-Lambert, rim, Fresnel).
-//  - city3d.js SKY yang sudah ada: [0]=malam, [1]=sunset, [2]=siang —
-//    sky4 tiap preset di bawah MENGAMBIL anchor yang sama persis.
-//
-// SATUAN: warna [r,g,b] 0..1 untuk WebGL, 0..255 untuk Canvas (sky4).
-// `daylight` = skalar lama yang sudah dimengerti semua renderer (0..1).
-// `nightF` = turunan yang dipakai city3d/render.js (0 siang — 1 malam).
 
 export const PRESETS = {
   // PAGI — fajar biru-pink dingin, 07:00. Matahari rendah di timur, cahaya
@@ -48,12 +25,6 @@ export const PRESETS = {
   },
   // SIANG — tengah hari biru cerah, 12:00. Matahari tinggi, bayangan keras /
   // pendek, warna vivid, neon hampir tak terlihat, jalan kering.
-  // SIANG v2 (2026-11-18, agen SIANG-FIX — Juna: shot siang v1 "jelek banget"):
-  // langit zenith LEBIH TUA, matahari LEBIH TINGGI (elevasi ~57°, bayangan
-  // pendek), ambient LEBIH RENDAH + kontras terarah (bayangan tidak lagi
-  // abu-abu terang), fog LEBIH TIPIS (udara jernih), jendela kecil+rapat
-  // + kaca gelap pantul langit, jalan bertekstur. Field baru di bawah
-  // (facK..bldShadow) = 0/netral di preset lain — sore/pagi/malam TIDAK berubah.
   siang: {
     name: 'siang', label: 'Siang — tengah hari', hour: 12, daylight: 1.00, nightF: 0.00,
     sky5: [[0.82, 0.90, 0.97], [0.62, 0.80, 0.94], [0.38, 0.62, 0.88], [0.20, 0.45, 0.80], [0.08, 0.28, 0.65]],
@@ -72,10 +43,6 @@ export const PRESETS = {
     bldShadow: true, heroReal: true,
   },
   // SORE — sunset yang sudah ada, 18:30. BASELINE — semua nilai di bawah
-  // adalah nilai hardcode yang SUDAH ADA di webgl2.js / city3d.js hari ini.
-  // FIX1 (20 Nov, Juna: gedung sore coklat-oranye seragam): preset sore
-  // DIUBAH seperlunya supaya fasad tetap bervariasi — lihat tag FIX1 di
-  // bawah; langit/matahari/neon TIDAK diubah, sunset tetap sunset.
   sore: {
     name: 'sore', label: 'Sore — sunset (baseline)', hour: 18.5, daylight: 0.45, nightF: 0.43,
     sky5: [[1.00, 0.77, 0.52], [1.00, 0.60, 0.34], [0.85, 0.28, 0.38], [0.45, 0.14, 0.42], [0.12, 0.05, 0.28]], // = stop SKYF
@@ -146,11 +113,6 @@ export function lerpPreset(a, b, t) {
 }
 
 // ---- API utama ----
-// Terapkan satu suasana ke game state. Satu-satunya penulis state.timeOfDay.
-// Mengatur JUGA state.daylight (skalar lama, supaya renderer yang belum
-// di-patch tetap berubah) + state.clock.total (jam) + daylightManual=true
-// (mematikan siklus sinus otomatis di world.js:571 — suasana pilihan user
-// tidak ditimpa tiap frame).
 export function applyTimeOfDay(state, name) {
   const p = PRESETS[name];
   if (!p) throw new Error('suasana tidak dikenal: ' + name);
@@ -160,7 +122,6 @@ export function applyTimeOfDay(state, name) {
   state.timeOfDay = p;
   return p;
 }
-export const setTimeOfDay = applyTimeOfDay;
 
 // Transisi halus antar dua suasana: t 0..1. Dipakai untuk crossfade
 // (misal cutscene pagi -> siang, atau siklus jam yang berjalan).
@@ -175,8 +136,6 @@ export function timeOfDayBlend(state, aName, bName, t) {
 }
 
 // Siklus jam -> preset (untuk game live, fase 2 — lihat PATCH-SPEC §5).
-// Keyframe: 0 malam, 5 malam, 6.5 pagi, 9.5 pagi, 11 siang, 15.5 siang,
-// 17.5 sore, 19.5 sore, 21 malam, 24 malam. Di antara keyframe: lerp.
 const KEYS = [
   [0, 'malam'], [5, 'malam'], [6.5, 'pagi'], [9.5, 'pagi'], [11, 'siang'],
   [15.5, 'siang'], [17.5, 'sore'], [19.5, 'sore'], [21, 'malam'], [24, 'malam'],
@@ -194,12 +153,6 @@ export function presetForHour(hour) {
 }
 
 // ---- adaptor renderer ----
-// WebGL2 (webgl2.js yang di-patch, PATCH-SPEC §2): satu objek, semua uniform.
-// `sunCol` dipakai ulang untuk SEMUA tint hangat (cat Fresnel, streak kaca,
-// streak jalan, air, ambient sun, spec, rim) — satu warna matahari menggeser
-// seluruh suhu frame, sesuai bible §2.1 (satu pasangan komplementer dominan).
-// R36 POSTFX: color grade per TOD (lift/gamma/gain) — palet sudah ada di
-// PRESETS; grade diturunkan dari nama preset (blend -> netral, jangan tebak).
 const GRADE = {
   pagi: { lift: [0.01, 0.01, 0.02], gain: [1.02, 1.00, 1.04], gamma: 1.05 },
   siang: { lift: [0.00, 0.00, 0.00], gain: [1.04, 1.03, 1.00], gamma: 0.98 },
@@ -228,16 +181,6 @@ export function webglUniforms(p) {
   };
 }
 
-// Canvas fallback (city3d.js yang di-patch, PATCH-SPEC §3): skyFor() cukup
-// diberi sky4 + nightF + sunH/moonH dari preset, sisanya mengikuti mesin
-// nightF yang sudah ada (lampu, neon, bintang, jendela).
-export function canvasPalette(p) {
-  return {
-    sky4: p.sky4, nightF: p.nightF,
-    sunH: p.name === 'siang' ? 42 : p.name === 'pagi' ? 16 : 10,
-    moonH: 26, moon: p.moon,
-  };
-}
 
 // T1: jam live -> preset TOD. Dipanggil tiap frame dari world.step:
 // preset + daylight mengikuti jam HUD (presetForHour), sinus mati.

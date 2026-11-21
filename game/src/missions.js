@@ -150,9 +150,6 @@ function marinaTarget(city) {
 function marinaWaterTarget(city) {
   return { x: WATER_X + 40, y: city.marina.y + 80, label: 'Marina' };
 }
-function casinoTarget(city) {
-  return { x: city.casino.x, y: city.casino.y, label: 'Casino' };
-}
 function vaultTarget(city) {
   return { x: city.casino.x, y: city.casino.y, label: 'Evidence Vault' };
 }
@@ -758,8 +755,6 @@ export function updatePickups(world) {
       if (!pk.taken && Math.hypot(p.x - pk.x, p.y - pk.y) < 30) {
         pk.taken = true;
         // R35-F4: grant here, NOT via events.weaponPickup — updatePickups runs
-        // AFTER world.js consumes that event, so it was always wiped (R34: pistol
-        // pickup left ammo at 24/120). [mag,reserve] mirrors WEAPONS in config.js.
         const g = { smg: [32, 160], shotgun: [6, 30], pistol: [24, 120], rifle: [30, 90] }[pk.weapon]; const w = world.player.weapons[pk.weapon] || (world.player.weapons[pk.weapon] = { ammo: 0, reserve: 0 }); if (w.ammo + w.reserve === 0) { w.ammo = g[0]; w.reserve = g[1]; world.player.weapon = pk.weapon; world.player.ammo = g[0]; world.player.reserve = g[1]; } else w.reserve += g[1];
         world.events.pickup = true;
       }

@@ -238,8 +238,6 @@ export function createPedestrians(city, rng) {
     });
   }
   // R27c: hero peds on the NORTH sidewalk (y=431), not the road (before: both
-  // stood on y=480, run over ~5s into every drive). South lane y=504 is 16u
-  // from the south sidewalk — inside the 26u run-over radius; north is 73u away.
   peds.push({
     x: 540, y: 431, angle: 0, speed: 40,
     color: '#6b4423', skin: '#d8a077', pants: '#1c1f24', hat: 0, build: 'wide',
@@ -357,7 +355,3 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
   return flashes;
 }
 
-export function randomRoadPoint(city, rng) {
-  if (rng.chance(0.5)) return { x: rng.pick(city.roadsV), y: rng.range(120, WORLD_H - 120) };
-  return { x: rng.range(120, WATER_X - 120), y: rng.pick(city.roadsH) };
-}
