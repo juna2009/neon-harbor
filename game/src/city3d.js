@@ -2833,9 +2833,15 @@ export function drawChase3D(ctx, state) {
     if (pt.kind !== 'flame' && pt.kind !== 'smoke') continue;
     if (!inRange(pt.x, pt.y, 120, 100)) continue;
     const a = Math.max(0, pt.life / pt.maxLife);
-    const sz = pt.size * CS * (1.6 - a * 0.6) * 2.2;
-    const col = pt.kind === 'flame' ? 'rgba(255,140,40,' + (a * 0.85).toFixed(3) + ')' : 'rgba(140,140,150,' + (a * 0.35).toFixed(3) + ')'; // EXPLOSION-VFX S1 v2: asap 0.35 (paritas mat 17 WebGL2 — 0.5 + tepi keras menumpuk jadi gelembung solid)
-    vQuad(pt.x * CS, pt.y * CS, ccYaw, 0, 0, sz, Math.max(0.1, pt.size * CS * 0.4), Math.max(0.1, pt.size * CS * 0.4) + sz, col);
+    // EXPLOSION-VFX S2 parity (mirror webgl2.js emitPt): asap besar tumbuh +
+    // naik seiring umur, carrier ditekan saat lahir; warna gelap + alpha 0.45
+    const age = (pt.maxLife || 1) - pt.life;
+    const isBigSmoke = pt.kind === 'smoke' && pt.size >= 20;
+    const sz = isBigSmoke ? pt.size * CS * (1.1 + (1 - a) * 1.3) * 2.2 : pt.size * CS * (1.6 - a * 0.6) * 2.2;
+    const carrier = isBigSmoke ? a * (1.35 - 0.5 * a) : a;
+    const y0 = Math.max(0.1, pt.size * CS * 0.4) + (isBigSmoke ? age * 0.8 : 0);
+    const col = pt.kind === 'flame' ? 'rgba(255,140,40,' + (a * 0.85).toFixed(3) + ')' : 'rgba(107,107,117,' + (carrier * 0.42).toFixed(3) + ')';
+    vQuad(pt.x * CS, pt.y * CS, ccYaw, 0, 0, sz, y0, y0 + sz, col);
     drawn += 1;
   }
   // EXPLOSION-VFX S1 parity (mirror webgl2.js derivation: rumus ukuran SAMA).
@@ -2848,7 +2854,7 @@ export function drawChase3D(ctx, state) {
     for (const pt of state.particles) {
       if (pt.kind !== 'flame' && pt.kind !== 'spark') continue;
       const age = (pt.maxLife || 1) - pt.life;
-      if (age < 0 || age > 1.0) continue;
+      if (age < 0 || age > 1.5) continue; // S2: 1.5 (bukan 1.0) — jendela debu diperpanjang ke 1.5 dtk
       if (pt.kind === 'flame') {
         const key = Math.round(age * 20);
         let g = groups.get(key);
@@ -2881,8 +2887,8 @@ export function drawChase3D(ctx, state) {
         vQuad(cx * CS, cy * CS, ccYaw, 0, 0, fd, 0.1, 0.1 + fd, 'rgba(255,240,200,' + (0.9 * (1 - age / 0.2)).toFixed(3) + ')');
       }
       if (g.big && age >= 0.05 && age < 0.6) {
-        const R = 30 * (age / 0.6), ra = (0.8 * (1 - age / 0.6) * ringK).toFixed(3);
-        const hc = R * Math.sin(Math.PI / 16) * 1.15, hb = 1.0;
+        const R = 30 * (age / 0.6), ra = (0.9 * (1 - age / 0.6) * ringK).toFixed(3);
+        const hc = R * Math.sin(Math.PI / 16) * 1.15, hb = 2.0; // S2: band ditebalkan 2u->4u (paritas FS mat 19 WebGL2)
         for (let k = 0; k < 16; k += 1) {
           const an = (k * Math.PI) / 8, co = Math.cos(an), si = Math.sin(an);
           const px = cx * CS + co * R, pz = cy * CS + si * R;
@@ -2891,20 +2897,46 @@ export function drawChase3D(ctx, state) {
             'rgba(255,230,150,' + ra + ')', 'far');
         }
         const beadA = (0.9 * (1 - age / 0.6)).toFixed(3);
-        for (let k = 0; k < 12; k += 1) {
-          const an = (k * Math.PI) / 6;
+        for (let k = 0; k < 5; k += 1) { // S2 v3: 12->5 (slot untuk kolom asap; total derived tetap <=24)
+          const an = (k * Math.PI * 2) / 5;
           vQuad((cx + Math.cos(an) * R * 10) * CS, (cy + Math.sin(an) * R * 10) * CS, ccYaw, 0, 0, 2.0, 0.1, 2.1, 'rgba(255,220,150,' + beadA + ')');
         }
       }
-      if (age >= 0.3 && age <= 1.0) {
-        const nD = g.big ? 10 : 5, fade = (0.3 * (1 - (age - 0.3) / 0.7)).toFixed(3);
+      if (age >= 0.3 && age <= 1.5) { // S2: jendela 0.3-1.5 dtk, ds 0.9x, alpha 0.45 (paritas webgl2.js)
+        const nD = g.big ? 10 : 5, fade = (0.45 * (1 - (age - 0.3) / 1.2)).toFixed(3);
         for (let i = 0; i < nD; i += 1) {
           const an = (i * Math.PI * 2) / nD + 0.31;
-          const dist = (3 + age * 6) * 10, ds = g.maxSz * 0.7 * (1 + (age - 0.3) / 0.7);
-          vQuad((cx + Math.cos(an) * dist) * CS, (cy + Math.sin(an) * dist) * CS, ccYaw, 0, 0, ds, 0.1, 0.1 + ds, 'rgba(201,177,138,' + fade + ')');
+          const dist = (3 + age * 6) * 10, ds = g.maxSz * 0.9 * (1 + (age - 0.3) / 1.2);
+          vQuad((cx + Math.cos(an) * dist) * CS, (cy + Math.sin(an) * dist) * CS, ccYaw, 0, 0, ds, 0.1, 0.1 + ds, 'rgba(201,177,138,' + fade + ')'); // tan terang dipertahankan (tan gelap dicoba + dibatalkan)
         }
       }
       gi += 1;
+    }
+    // EXPLOSION-VFX S2 parity: KOLOM ASAP derived (mirror webgl2.js) — 7 puff
+    // tegak di atas POMPA (jangkar = spawn-y terselatan), umur asap 1.0-7.5 dtk,
+    // tumpang-tindih rapat supaya menyatu jadi satu plume.
+    {
+      const sGroups = new Map();
+      for (const pt of state.particles) {
+        if (pt.kind !== 'smoke' || (pt.maxLife || 0) <= 5) continue;
+        const age = (pt.maxLife || 1) - pt.life;
+        if (age < 1.0 || age > 7.5) continue;
+        const key = Math.round(age * 5);
+        let sg = sGroups.get(key);
+        if (!sg) { sg = { age, sx: 0, n: 0, syMax: -1e9 }; sGroups.set(key, sg); }
+        sg.sx += pt.x - pt.vx * age; sg.syMax = Math.max(sg.syMax, pt.y - pt.vy * age); sg.n += 1;
+      }
+      const sList = [...sGroups.values()].sort((a, b) => a.age - b.age).slice(0, 3);
+      for (const sg of sList) {
+        const scx = sg.sx / sg.n, scy = sg.syMax;
+        if (!inRange(scx, scy, 120, 100)) continue;
+        const sFade = 0.95 * (1 - (sg.age - 1.0) / 7.0);
+        for (let k = 0; k < 7; k += 1) {
+          const hgt = 2.0 + k * 2.0, w = 3.0 + k * 0.7; // FINAL v3 (paritas webgl2.js)
+          const ca = (sFade * (1 - k * 0.05) * 0.42).toFixed(3);
+          vQuad(scx * CS, scy * CS, ccYaw, 0, 0, w, hgt - w / 2, hgt + w / 2, 'rgba(107,107,117,' + ca + ')');
+        }
+      }
     }
   }
   // bullets

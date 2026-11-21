@@ -291,11 +291,11 @@ void main(){
     gl_FragColor = vec4(base * 1.8, a * 0.55);
     return;
   }
-  if (vM > 16.5 && vM < 17.5) { // PARTICLES: asap abu-abu (mirror city3d rgba(140,140,150)) — EXPLOSION-VFX S1 CEL-SHADED v2: tepi tegas tapi TIDAK keras (0.5->0.38) + rim tipis x0.75 di band 0.40<r<0.5; alpha maks 0.35 (BUKAN 0.5: frame G1 v1 membuktikan 0.5 + tepi keras + 40 quad menumpuk = gelembung solid tak tembus; langit >180 naik 4.8%->69.5%)
+  if (vM > 16.5 && vM < 17.5) { // PARTICLES: asap abu-abu (mirror city3d rgba(107,107,117)) — EXPLOSION-VFX S2 v3: tepi DILEMBUTKAN (0.5->0.30) + rim x0.85 — v2 TERBUKTI: tepi tegas + rim kuat + alpha naik = tiap puff terbaca sbg gelembung/balon di langit sore; asap harus menyatu jadi plume, bukan disc terpisah. Warna 0.42, alpha maks 0.42.
     float r = length(vU - 0.5);
-    float al = smoothstep(0.5, 0.38, r) * vC.r; // tepi tegas x life-fade
-    float rimK = mix(1.0, 0.75, smoothstep(0.40, 0.44, r) * (1.0 - smoothstep(0.46, 0.5, r)));
-    gl_FragColor = vec4(vec3(0.55, 0.55, 0.59) * rimK, al * 0.35);
+    float al = smoothstep(0.5, 0.30, r) * vC.r; // tepi lembut x life-fade
+    float rimK = mix(1.0, 0.85, smoothstep(0.40, 0.44, r) * (1.0 - smoothstep(0.46, 0.5, r)));
+    gl_FragColor = vec4(vec3(0.42, 0.42, 0.46) * rimK, al * 0.42);
     return;
   }
   if (vM > 17.5 && vM < 18.5) { // PARTICLES: api oranye (mirror city3d rgba(255,140,40)) — blend NORMAL, bukan aditif: 14 flame aditif yang tumpang tindih menembus putih (G1: api harus ORANYE, bukan putih); normal-blend menumpuk ke arah oranye. vC.r = carrier alpha (life-fade).
@@ -303,9 +303,9 @@ void main(){
     gl_FragColor = vec4(vec3(1.0, 0.55, 0.16), al * 0.85);
     return;
   }
-  if (vM > 18.5 && vM < 19.5) { // EXPLOSION-VFX S1: shockwave ring — annulus SDF dari length(vU-0.5) (first principles, bukan salinan shader mana pun); band 0.42-0.5, warna [1.0,0.9,0.6], alpha via vC.r (0.8->0)
+  if (vM > 18.5 && vM < 19.5) { // EXPLOSION-VFX S2: shockwave ring — annulus SDF; band DITEBALKAN 0.42-0.5 -> 0.34-0.5 (Stage 1: arc tipis, samar di 768px), warna [1.0,0.9,0.6], alpha via vC.r (0.9->0)
     float r = length(vU - 0.5);
-    float band = smoothstep(0.42, 0.46, r) * (1.0 - smoothstep(0.46, 0.5, r));
+    float band = smoothstep(0.34, 0.40, r) * (1.0 - smoothstep(0.44, 0.5, r));
     gl_FragColor = vec4(vec3(1.0, 0.9, 0.6), band * vC.r);
     return;
   }
@@ -317,9 +317,9 @@ void main(){
     gl_FragColor = vec4(col, edge * vC.r);
     return;
   }
-  if (vM > 20.5 && vM < 21.5) { // EXPLOSION-VFX S1: debu tan #c9b18a, ground-hugging; alpha = radial x vC.r x 0.3 (maks 0.3)
+  if (vM > 20.5 && vM < 21.5) { // EXPLOSION-VFX S2: debu tan #c9b18a, ground-hugging; alpha = radial x vC.r x 0.45 (Stage 1: 0.3) — TAN GELAP DICOBA + DIBATALKAN: ROI debu 15.3% (vs 16.6% tan terang) + billboard tinggi mengotori langit; tan terang dipertahankan, perbaikan debu = ukuran/jendela/alpha
     float al = smoothstep(0.5, 0.08, length(vU - 0.5)) * vC.r;
-    gl_FragColor = vec4(vec3(0.788, 0.694, 0.541), al * 0.3);
+    gl_FragColor = vec4(vec3(0.788, 0.694, 0.541), al * 0.45);
     return;
   }
   if (vM > 7.5 && vM < 8.5) { // smear: memudar sepanjang v
@@ -2193,14 +2193,23 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       const pn = norm([-cam.fwd[0], 0, -cam.fwd[1]]);
       const emitPt = (pt) => {
         const a = Math.max(0, Math.min(1, pt.life / (pt.maxLife || 1)));
-        const sz = pt.size * S * (1.6 - a * 0.6) * 2.2;
+        const age = (pt.maxLife || 1) - pt.life;
+        // EXPLOSION-VFX S2: asap BESAR (size>=20, kolom ledakan big) tumbuh
+        // + naik seiring umur — rumus lama (1.6-a*0.6) cuma tumbuh 1.0->1.6x
+        // selama 7-10 dtk dan cy tetap ~4u, jadi kolomnya rebah di bidang
+        // tanah (terukur: veil lebar x300-650 tanpa bentuk di +2s sore).
+        const isBigSmoke = pt.kind === 'smoke' && pt.size >= 20;
+        const sz = isBigSmoke
+          ? pt.size * S * (1.1 + (1 - a) * 1.3) * 2.2
+          : pt.size * S * (1.6 - a * 0.6) * 2.2;
         const y0 = Math.max(0.1, pt.size * S * 0.4);
-        const cy = y0 + sz / 2;
+        const cy = y0 + sz / 2 + (isBigSmoke ? age * 0.8 : 0);
         if (pt.kind === 'smoke') {
-          // vC.r = a (bukan a*0.5): alpha akhir = radial x a x 0.5 (maks 0.5)
-          // = mirror city3d a*0.5. (Draf awal [a*0.5,0,0] menggandakan
-          // 0.5 -> maks 0.25, asap terlalu tipis.)
-          billDir(SH, pt.x * S, cy, pt.y * S, sz, sz, pn, [a, 0, 0], 17);
+          // vC.r = carrier: asap besar ditekan saat lahir (a=1 -> 0.85, api
+          // menutupi) lalu relatif naik di tengah umur (a=0.75 -> 0.73,
+          // a=0.5 -> 0.55) — alpha akhir = radial x carrier x 0.45 (FS mat 17)
+          const carrier = isBigSmoke ? a * (1.35 - 0.5 * a) : a;
+          billDir(SH, pt.x * S, cy, pt.y * S, sz, sz, pn, [carrier, 0, 0], 17);
         } else if (pt.kind === 'flame') {
           // Api ke SH mat 18 (blend NORMAL, oranye city3d) — BUKAN GL mat 7:
           // 14 flame aditif yang tumpang tindih menembus putih (terukur:
@@ -2241,7 +2250,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
         for (const pt of pts) {
           if (pt.kind !== 'flame' && pt.kind !== 'spark') continue;
           const age = (pt.maxLife || 1) - pt.life;
-          if (age < 0 || age > 1.0) continue;
+          if (age < 0 || age > 1.5) continue; // S2: 1.5 (bukan 1.0) — jendela debu diperpanjang ke 1.5 dtk; flash/ring tak terpengaruh (jendelanya sendiri <0.6)
           if (pt.kind === 'flame') {
             const key = Math.round(age * 20);
             let g = groups.get(key);
@@ -2281,26 +2290,60 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
             const fd = g.big ? Math.min(20, 1.3 * g.maxSz) : 12;
             billDir(SH, cx * S, 0.1 + g.maxSz * 0.4, cy * S, fd, fd, pn, [0.9 * (1 - age / 0.2), 0, 0], 20);
           }
-          if (g.big && age >= 0.05 && age < 0.6) { // shockwave ring: radius 0->30u / 0.6 dtk, y=0.15
+          if (g.big && age >= 0.05 && age < 0.6) { // shockwave ring: radius 0->30u / 0.6 dtk, y=0.15 — S2: alpha 0.9 (FS band ditebalkan 2x)
             const R = 30 * (age / 0.6);
-            flat(SH, cx * S, 0.15, cy * S, 2 * R, 2 * R, [0.8 * (1 - age / 0.6) * ringK, 0, 0], 19);
-            const beadA = 0.9 * (1 - age / 0.6); // beads: 12 dot mat 7 di keliling ring (v2: 2.0u, biar terbaca dari chase cam rendah)
-            for (let k = 0; k < 12; k += 1) {
-              const an = (k * Math.PI) / 6;
+            flat(SH, cx * S, 0.15, cy * S, 2 * R, 2 * R, [0.9 * (1 - age / 0.6) * ringK, 0, 0], 19);
+            const beadA = 0.9 * (1 - age / 0.6); // beads: 5 dot mat 7 di keliling ring (S2 v3: 6->5, slotnya untuk kolom asap; total derived tetap <=24/ledakan besar: 1+1+5+10+7)
+            for (let k = 0; k < 5; k += 1) {
+              const an = (k * Math.PI * 2) / 5;
               billDir(GL, (cx + Math.cos(an) * R * 10) * S, 0.6, (cy + Math.sin(an) * R * 10) * S, 2.0, 2.0, pn, [beadA, beadA * 0.85, beadA * 0.5], 7);
             }
           }
-          if (age >= 0.3 && age <= 1.0) { // debu tan ground-hugging: 10 besar / 5 biasa, membesar 1.5-2x
+          if (age >= 0.3 && age <= 1.5) { // debu tan ground-hugging: 10 besar / 5 biasa, membesar — S2: ds 0.7->0.9x maxSz, jendela 0.3-1.5 dtk (fade /(1.2)), FS alpha 0.3->0.45
             const nD = g.big ? 10 : 5;
-            const fade = 1 - (age - 0.3) / 0.7;
+            const fade = 1 - (age - 0.3) / 1.2;
             for (let i = 0; i < nD; i += 1) {
               const an = (i * Math.PI * 2) / nD + 0.31;
               const dist = (3 + age * 6) * 10; // px game: radius 3u -> 9u
-              const ds = g.maxSz * 0.7 * (1 + (age - 0.3) / 0.7);
+              const ds = g.maxSz * 0.9 * (1 + (age - 0.3) / 1.2);
               billDir(SH, (cx + Math.cos(an) * dist) * S, 0.1 + ds / 2, (cy + Math.sin(an) * dist) * S, ds, ds, pn, [fade, 0, 0], 21);
             }
           }
           gi += 1;
+        }
+        // EXPLOSION-VFX S2: KOLOM ASAP derived — asap big spawn-nya segaris di
+        // bidang tanah (y - i*13) sehingga dari chase cam rendah kolomnya
+        // rebah jadi veil lebar tanpa bentuk (Stage 1 +2s sore). Kolom ini
+        // digambar TEGAK di atas POMPA (bukan centroid spawn: centroid = pompa
+        // - 123px ke utara, v1 TERBUKTI menyatu dgn veil; jangkar = spawn-y
+        // TERSELATAN = posisi pompa, i=0) dari umur asap 1.0-7.5 dtk — setelah
+        // api mati, saat Juna menilai "ledakan HILANG TOTAL". 7 puff mat 17
+        // per ledakan, tumpang-tindih rapat (jarak 2u, lebar 3->7.2u) supaya
+        // menyatu jadi SATU plume tegak — v2 (6 puff lebar 6.5->16.5u, jarak
+        // 3.8u) TERBUKTI terbaca sbg balon/gelembung terpisah di langit sore.
+        // Cap 3 ledakan; asap kecil (maxLife<=5) tidak ikut -> 0 di luar ledakan.
+        {
+          const sGroups = new Map(); // ageBucket(0.2 dtk) -> {age,sx,n,syMax}
+          for (const pt of pts) {
+            if (pt.kind !== 'smoke' || (pt.maxLife || 0) <= 5) continue;
+            const age = (pt.maxLife || 1) - pt.life;
+            if (age < 1.0 || age > 7.5) continue;
+            const key = Math.round(age * 5);
+            let sg = sGroups.get(key);
+            if (!sg) { sg = { age, sx: 0, n: 0, syMax: -1e9 }; sGroups.set(key, sg); }
+            sg.sx += pt.x - pt.vx * age; sg.syMax = Math.max(sg.syMax, pt.y - pt.vy * age); sg.n += 1;
+          }
+          const sList = [...sGroups.values()].sort((a, b) => a.age - b.age).slice(0, 3);
+          for (const sg of sList) {
+            const scx = sg.sx / sg.n, scy = sg.syMax;
+            if (!vis(scx, scy, 80)) continue;
+            const sFade = 0.95 * (1 - (sg.age - 1.0) / 7.0);
+            for (let k = 0; k < 7; k += 1) {
+              const hgt = 2.0 + k * 2.0, w = 3.0 + k * 0.7; // FINAL (v3 terukur terbaik: +2s 52.5% vs v4 47.0%, +3s 36.1% vs 27.0% — kolom sempit v4 kalah padat, celah antar-kolom tak terbaca karena veil mendominasi)
+              const carrier = sFade * (1 - k * 0.05);
+              billDir(SH, scx * S, hgt, scy * S, w, w, pn, [carrier, 0, 0], 17);
+            }
+          }
         }
       }
     }
