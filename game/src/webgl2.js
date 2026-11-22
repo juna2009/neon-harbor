@@ -339,14 +339,14 @@ void main(){
     return;
   }
   if (vM > 8.5 && vM < 9.5) { // contact shadow: elips gelap
-    float a = smoothstep(0.5, 0.12, length((vU - 0.5) * vec2(1.0, 2.4))) * uShadowK; // SIANG v2: bayangan kontak lebih gelap di siang (0.75; sore 0.5 = lama)
+    float a = smoothstep(0.5, 0.12, length((vU - 0.5) * vec2(1.0, 2.4))) * uShadowK * vC.r; // SIANG v2: bayangan kontak lebih gelap di siang (0.75; sore 0.5 = lama); CAR-SHADOW: alpha via vC.r (elips mobil 0.6, lain 1)
     gl_FragColor = vec4(0.0, 0.0, 0.0, a);
     return;
   }
   if (vM > 10.5 && vM < 11.5) { // R36 POSTFX: bayangan tanah lunak berarah (groundShadow) — alpha bergradasi: penuh di pangkal (dinding), 0 di ujung; tepi samping lembut
     float along = clamp((vU.y - 0.5) / 0.35, 0.0, 1.0); // 0 pangkal (dinding) -> 1 ujung jauh
     float side = 1.0 - smoothstep(0.08, 0.5, abs(vU.x - 0.5));
-    float a = (1.0 - smoothstep(0.75, 1.0, along)) * side * uShadowK * 0.85; // penuh di sepanjang bayangan, baru memudar di 25% ujung (fade kuadrat ke nol membuat bayangan panjang hilang sebelum sampai kamera)
+    float a = (1.0 - smoothstep(0.5, 1.0, along)) * side * uShadowK * 0.85 * vC.r; // penuh di sepanjang bayangan, baru memudar di 50% ujung (CAR-SHADOW: dulu 25% — terlalu pendek untuk dibaca); alpha gedung/palem via vC.r
     gl_FragColor = vec4(0.0, 0.0, 0.0, a);
     return;
   }
@@ -729,7 +729,7 @@ function car(B, G, cx, cz, yaw, len, wid, paint, police, SHB) { // SIANG v2: SHB
     billDir(B, p2[0], p2[1], p2[2], 0.5, 0.18, nb, [0.15, 0.3, 1.0], 4);
     billDir(G, p3[0], p3[1], p3[2], 1.6, 0.6, nb, [0.7, 0.2, 0.6], 7);
   }
-  flat(SHB || G, cx, 0.06, cz, wid + 0.7, len + 0.9, [0, 0, 0], 9); // contact shadow (bucket SH = blending normal; di G aditif hitam = 0 — lihat INTEGRATION.md §6)
+  flat(SHB || G, cx, 0.06, cz, wid + 0.7, len + 0.9, [1, 0, 0], 9); // contact shadow (bucket SH = blending normal; di G aditif hitam = 0 — lihat INTEGRATION.md §6); CAR-SHADOW: vC.r=1 = alpha utuh (mat 9 kini dikali vC.r)
 }
 // VIPER R36: hero boat = NH-90 VIPER (target Juna 18:00 WIB) — lambung hitam
 // + trim neon cyan, kokpit terbuka 2 kursi, twin hydrojet (bukan outboard).
@@ -1269,7 +1269,7 @@ function plane(B,G,x,z,yaw,altU,thr,t,o){
  // Bayangan kontak (mat 9 -> bucket SH via splitBucketInto), alt rendah saja.
  if(altU<5){
   const sh=(a,c)=>[x+R[0]*a+F[0]*c,0.06,z+R[1]*a+F[1]*c];
-  q4(G,[sh(-2.4,-3.6),sh(2.4,-3.6),sh(2.4,3.6),sh(-2.4,3.6)],[0,1,0],[0,0,0],9);
+  q4(G,[sh(-2.4,-3.6),sh(2.4,-3.6),sh(2.4,3.6),sh(-2.4,3.6)],[0,1,0],[1,0,0],9); // CAR-SHADOW: vC.r=1 = alpha utuh (mat 9 kini dikali vC.r)
  }
 }
 // Orang jalan kaki: kaki melangkah + badan + lengan + kepala + rambut/topi.
@@ -1497,22 +1497,38 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   const shDir = { dx: -_saz[0], dz: -_saz[1], len: 1 / tod.sun.y };
   const sunA = { x: -shDir.dx, z: -shDir.dz, w: 1 - tod.sun.y / 1.5 }; // R27c PALM: azimuth + bobot matahari
   const DIRSH = tod.bldShadow || tod.sun.y < 0.6; // R36 POSTFX: bayangan tanah berarah juga saat matahari rendah (sore 0.30, pagi 0.18) — bukan cuma siang
-  const groundShadow = (cx, cz, w, d, h) => {
-    // Quad gelap di tanah dari DINDING gedung ke arah bayangan (pangkal di
-    // dinding, bukan di tengah — setengah dalam gedung tersembunyi + fade
+  const groundShadow = (cx, cz, w, d, h, yaw, aMul = 1, lenCap = 60) => {
+    // Quad gelap di tanah dari DINDING objek ke arah bayangan (pangkal di
+    // dinding, bukan di tengah — setengah dalam objek tersembunyi + fade
     // UV mulai dari 0 tepat di dinding; kalau pangkal di tengah, bayangan
     // yang kelihatan sudah mulai di tengah fade = nyaris tak terlihat).
-    const len = Math.min(h * shDir.len, 60); // R36 POSTFX: panjang bayangan (dibatasi 60u)
-    const edge = (Math.abs(shDir.dx) * w * 0.5 + Math.abs(shDir.dz) * d * 0.5) * 0.9; // pusat->dinding searah bayangan (kotak axis-aligned; 0.9 = pangkal sedikit di dalam dinding)
+    // CAR-SHADOW: yaw = sudut hadap game mobil (0=timur; L sepanjang
+    // hadap, W tegak lurus) — hx/hz dari yaw, bukan w/d tertukar (dulu
+    // celah siang / buntung sore); tanpa yaw (gedung/palem/pohon,
+    // axis-aligned) rumus lama. aMul = pengali alpha (gedung/palem/pohon
+    // 0.55, mobil 1 — anti tumpukan); lenCap = cap panjang (gedung 14u).
+    const len = Math.min(h * shDir.len, lenCap); // R36 POSTFX: panjang bayangan (dibatasi 60u)
     const px2 = -shDir.dz, pz2 = shDir.dx;
-    const hw2 = Math.max(w, d) * 0.45;
+    let edge, hw2;
+    if (yaw === undefined) {
+      edge = (Math.abs(shDir.dx) * w * 0.5 + Math.abs(shDir.dz) * d * 0.5) * 0.9; // pusat->dinding searah bayangan (kotak axis-aligned; 0.9 = pangkal sedikit di dalam dinding)
+      hw2 = Math.max(w, d) * 0.45;
+    } else {
+      const L = d, W = w; // pemanggil mobil: w=width, d=length
+      const ca = Math.abs(Math.cos(yaw)), sa = Math.abs(Math.sin(yaw));
+      const hx = (ca * L + sa * W) / 2, hz = (sa * L + ca * W) / 2;
+      edge = (Math.abs(shDir.dx) * hx + Math.abs(shDir.dz) * hz) * 0.9;
+      const pf = px2 * Math.cos(yaw) + pz2 * Math.sin(yaw); // bentang tegak lurus shDir
+      const pr = px2 * Math.sin(yaw) - pz2 * Math.cos(yaw);
+      hw2 = (Math.abs(pf) * L + Math.abs(pr) * W) * 0.55 + 0.15;
+    }
     const nx = cx + shDir.dx * edge, nz = cz + shDir.dz * edge;
     const fx = cx + shDir.dx * (edge + len), fz = cz + shDir.dz * (edge + len);
-    quad(SH, [nx - px2 * hw2, 0.03, nz - pz2 * hw2],
-      [nx + px2 * hw2, 0.03, nz + pz2 * hw2],
-      [fx + px2 * hw2, 0.03, fz + pz2 * hw2],
-      [fx - px2 * hw2, 0.03, fz - pz2 * hw2],
-      [0, 1, 0], [[0, 0.5], [1, 0.5], [1, 0.85], [0, 0.85]], [0, 0, 0], 11); // R36 POSTFX: material 11 = bayangan lunak berarah (bukan 9 elips)
+    quad(SH, [nx - px2 * hw2, 0.045, nz - pz2 * hw2],
+      [nx + px2 * hw2, 0.045, nz + pz2 * hw2],
+      [fx + px2 * hw2, 0.045, fz + pz2 * hw2],
+      [fx - px2 * hw2, 0.045, fz - pz2 * hw2],
+      [0, 1, 0], [[0, 0.5], [1, 0.5], [1, 0.85], [0, 0.85]], [aMul, 0, 0], 11); // R36 POSTFX: material 11 = bayangan lunak berarah (bukan 9 elips); alpha via vC.r
   };
   const city = state.city;
   const hero = heroOf(state);
@@ -1892,7 +1908,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       for (const s of ['W', 'N', 'E']) if (gaps[s] < gaps[bFace]) bFace = s;
     }
     bld(OP, GL, b, bi, tod.facK, bFace);
-    if (DIRSH) groundShadow(cx * S, cy * S, b.w * S, b.h * S, (b.height || 2) * 6.5); // R36 POSTFX: bayangan gedung sore/pagi juga (dulu cuma siang)
+    if (DIRSH) groundShadow(cx * S, cy * S, b.w * S, b.h * S, (b.height || 2) * 6.5, undefined, 0.55, 14); // R36 POSTFX: bayangan gedung sore/pagi juga (dulu cuma siang); CAR-SHADOW: alpha x0.55 + cap 14u
     bi++;
   }
   if(INT)INT.draw(state,OP,GL,t,{boxR,box,flat}); // R41: pintu + interior
@@ -1904,7 +1920,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     if (!near(tr.x, tr.y, 1200) || !vis(tr.x, tr.y, DIRSH ? 130 : 40)) continue;
     const scT = 0.9 + hash2(Math.round(tr.x), Math.round(tr.y)) * 0.35; // R36 v3: tinggi palem taman bervariasi (alami)
     palm(OP, tr.x * S, tr.y * S, sunA, scT);
-    if (DIRSH) groundShadow(tr.x * S, tr.y * S, 1.2, 1.2, 5.1 * scT); // SIANG v2: bayangan palem (R36: mahkota naik 4.4->5.1)
+    if (DIRSH) groundShadow(tr.x * S, tr.y * S, 1.2, 1.2, 5.1 * scT, undefined, 0.55); // SIANG v2: bayangan palem (R36: mahkota naik 4.4->5.1); CAR-SHADOW: alpha x0.55
   }
   // R36 POHON TEPI JALAN — WORLD-SNAP (port pola Canvas DIAG-A):
   // city.trees HANYA ada di dalam taman (16% blok) — dari chase-cam
@@ -1986,7 +2002,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       const scK = shade ? 1.0 : 1 + (((wi % 3) + 3) % 3) * 0.12; // skala dari indeks dunia (1.0/1.12/1.24)
       if (shade) shadeTree(OP, wxu, wyu, sunA, scK);
       else palm(OP, wxu, wyu, sunA, scK, eRoad ? [0, -side] : [-side, 0]); // 1A-TREES: arah dr batang ke sumbu jalan, utk clamp pelepah (POLEFIX2)
-      if (DIRSH) groundShadow(wxu, wyu, 1.2, 1.2, (shade ? 4.8 : 5.1) * scK);
+      if (DIRSH) groundShadow(wxu, wyu, 1.2, 1.2, (shade ? 4.8 : 5.1) * scK, undefined, 0.55); // CAR-SHADOW: alpha pohon x0.55
     }
   }
 
@@ -2202,7 +2218,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     const c = p.car;
     const hSt = carDmgStage(c); // VEHICLE-DAMAGE-P1: visual di-derive dari hp tiap frame
     drawCarRealistic(OP, GL, 'hero', c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#e33e5f'), { t, tl: tlGain, door: c.doorAngle || 0, doorSide: c.doorSide || -1, damage: hSt >= 1, heavy: hSt >= 2, charred: hSt === 2 ? 0.55 : 0, steer: c.steerS || 0, lean: c.lean || 0 }); // R26: hero selalu realistis v15d (gate heroReal dihapus)
-    groundShadow(c.x * S, c.y * S, (c.width || 22) * S, (c.length || 46) * S, 1.4); // SUN-TREE: bayangan mobil berarah ikut matahari (dulu cuma contact shadow statis)
+    groundShadow(c.x * S, c.y * S, (c.width || 22) * S, (c.length || 46) * S, 1.4, c.angle || 0); // SUN-TREE: bayangan mobil berarah ikut matahari (dulu cuma contact shadow statis); CAR-SHADOW: edge dari yaw
     if (tod.headlight > 0.02) { // TOD: kerucut lampu depan (malam) — trapesium mat 8,
       // v=0 di bemper (terang) -> v=1 jauh (memudar, ikut shader smear).
       const yaw = yawOf(c), fw = [Math.sin(yaw), Math.cos(yaw)], rg = [Math.cos(yaw), -Math.sin(yaw)];
@@ -2457,7 +2473,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     // health/2, bangkai = stage 3 (damage + heavy + charred 0.35, pintu 0).
     const st = c.wreck ? 3 : (police && unit ? dmgStage(unit.health, 3) : carDmgStage(c));
     drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, taxi: c.body === 'taxi', tl: tlGain, door: c.wreck ? 0 : (c.doorAngle || 0), doorSide: c.doorSide || -1, damage: st >= 1, heavy: st >= 2, charred: st === 3 ? 0.35 : st === 2 ? 0.55 : 0, wreck: !!c.wreck, steer: c.steerS || 0, lean: c.lean || 0 }); // R36V2-TAXI: papan TAXI + strip kotak (cars3d.js) — digabung R38 tlGain
-    groundShadow(c.x * S, c.y * S, (c.width || 22) * S, (c.length || 46) * S, 1.4); // SUN-TREE: bayangan mobil berarah ikut matahari (traffic/parkir/polisi/bangkai)
+    groundShadow(c.x * S, c.y * S, (c.width || 22) * S, (c.length || 46) * S, 1.4, c.angle || 0); // SUN-TREE: bayangan mobil berarah ikut matahari (traffic/parkir/polisi/bangkai); CAR-SHADOW: edge dari yaw
   };
   for (const c of state.traffic.cars || []) drawCar(c, false);
   for (const c of state.traffic.parked || []) drawCar(c, false);
@@ -2469,7 +2485,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       if (!near(u.car.x, u.car.y, R) || !vis(u.car.x, u.car.y, 100)) continue; // R27c-TUNE: 60->100
       if (u.military) {
         if (u.car.body === 'apc') drawCar(u.car, false); // APC v14 (turret + 6 roda); mtruck tetap car() lama (tak ada spec truk v14)
-        else { car(OP, GL, u.car.x * S, u.car.y * S, yawOf(u.car), (u.car.length || 54) * S, (u.car.width || 24) * S, [0.35, 0.38, 0.20], false, SHB); groundShadow(u.car.x * S, u.car.y * S, (u.car.width || 24) * S, (u.car.length || 54) * S, 2.0); } // SUN-TREE: bayangan mtruck berarah ikut matahari
+        else { car(OP, GL, u.car.x * S, u.car.y * S, yawOf(u.car), (u.car.length || 54) * S, (u.car.width || 24) * S, [0.35, 0.38, 0.20], false, SHB); groundShadow(u.car.x * S, u.car.y * S, (u.car.width || 24) * S, (u.car.length || 54) * S, 2.0, u.car.angle || 0); } // SUN-TREE: bayangan mtruck berarah ikut matahari; CAR-SHADOW: edge dari yaw
       } else {
         drawCar(u.car, true, u);
       }
@@ -2492,7 +2508,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     // VEHICLE-DAMAGE-P1: stage dari at.hp/20 (maxHp di-set saat spawn).
     const tSt = carDmgStage(at);
     drawCarRealistic(OP, GL, 'armored', at.x * S, at.y * S, yawOf(at), (at.length || 54) * S, (at.width || 24) * S, hx(at.color || '#4a5240'), { t, tl: tlGain, damage: tSt >= 1, heavy: tSt >= 2, charred: tSt === 2 ? 0.55 : 0 });
-    groundShadow(at.x * S, at.y * S, (at.width || 24) * S, (at.length || 54) * S, 1.8); // SUN-TREE: bayangan armored berarah ikut matahari
+    groundShadow(at.x * S, at.y * S, (at.width || 24) * S, (at.length || 54) * S, 1.8, at.angle || 0); // SUN-TREE: bayangan armored berarah ikut matahari; CAR-SHADOW: edge dari yaw
   }
 
   // Helikopter polisi + kolam cahaya searchlight di hero.
@@ -2863,7 +2879,7 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo (HUD asli ui2.
     // SUN-TREE-WORLDSNAP: matahari/bulan TETAP per TOD (sunAzOf) —
     // elevasi ikut preset (U.sunY); dulu mengikuti kamera (fx*0.85+rx*0.18).
     const fx = cam.fwd[0], fz = cam.fwd[1];
-    const rx = fz, rz = -fx; // right = up x fwd
+    const rx = -fz, rz = fx; // right = fwd x up (CAR-SHADOW: dulu fz,-fx = up x fwd = KIRI — piringan tercermin horizontal)
     const _az = sunAzOf(tod);
     const SUN = norm([_az[0], U.sunY, _az[1]]);
     // Piringan langit (uSunPos) ikut azimuth tetap: x bergeser dari anchor

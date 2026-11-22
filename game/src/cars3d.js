@@ -163,12 +163,13 @@ function flat(B, x, y, z, w, d, col, m, uvs) {
 // dari persegi panjang (STATUS-V2.md: bayangan v2 masih slab hitam keras).
 function flatOct(B, x, y, z, w, d, col, m) {
   const hw = w / 2, hd = d / 2, c = [x, y, z];
-  const vs = [];
+  const vs = [], us = [];
   for (let k = 0; k < 8; k += 1) {
     const a = (k / 8) * Math.PI * 2 + Math.PI / 8;
     vs.push([x + hw * Math.cos(a), y, z + hd * Math.sin(a)]);
+    us.push([0.5 + 0.5 * Math.cos(a), 0.5 + 0.5 * Math.sin(a)]); // CAR-SHADOW: UV radial sejati (dulu (0,0)/(1,0) bergantian -> falloff mat 9 flat-top)
   }
-  for (let k = 0; k < 8; k += 1) tri(B, c, vs[k], vs[(k + 1) % 8], [0, 1, 0], [[0.5, 0.5], [0, 0], [1, 0]], col, m);
+  for (let k = 0; k < 8; k += 1) tri(B, c, vs[k], vs[(k + 1) % 8], [0, 1, 0], [[0.5, 0.5], us[k], us[(k + 1) % 8]], col, m);
 }
 // Quad vertikal dengan normal bebas (kaca, lampu, panel, plat nomor).
 function billDir(B, cx, cy, cz, w, h, nrm, col, m) {
@@ -464,16 +465,15 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   const axleZ = spec.wheels === 6 ? [-L * 0.29, 0, L * 0.29] : [-L * wbFrac / 2, L * wbFrac / 2];
 
   // Bayangan kontak v3 — oktagon (bukan persegi panjang): tepi lebih lembut.
-  // DUA lapis (alasan di STATUS-V2.md): (a) elips lembut material 9 di G
-  // (terlihat SETELAH T4 membelah bucket G); (b) 3 lapis nested di B
-  // (material 5, terlihat SEKARANG tanpa perubahan renderer).
+  // CAR-SHADOW: SATU elips material 9 di G (dulu dua lapis = genangan) +
+  // 6 lapis nested di B (material 5, terlihat SEKARANG tanpa perubahan
+  // renderer).
   // v5 — 6 lapis fade di B (bukan 5): inti 0,04 (di bawah 0,06 — batch 8)
   // + langkah warna lebih kecil supaya tidak ada cincin terlihat.
   // v5b: ukuran diperkecil (terluar W+2,2, bukan W+3,0) + opasitas diturunkan
   // — v5a bayangan masih karpet gelap 1,8× lebar mobil di shot hero.
   // y 0.02–0.08: memotong tipis bagian bawah ban, tidak terlihat dari chase-cam.
-  flatOct(G, cx, 0.05, cz, W + 0.7, L + 0.9, [0, 0, 0], 9);
-  flatOct(G, cx, 0.07, cz, W + 0.9, L + 1.1, [0, 0, 0], 9); // SUN-TREE: lapis luar W+1.6/L+1.8 -> W+0.9/L+1.1 — dulu meluber jadi genangan hitam di luar jejak mobil (Juna 11:48); bayangan berarah kini dari groundShadow (webgl2.js)
+  flatOct(G, cx, 0.05, cz, W + 0.3, L + 0.5, [0.6, 0, 0], 9); // CAR-SHADOW: SATU lapis saja (dulu dua = genangan hitam 0.75/0.94), lebih kecil (W+0.3/L+0.5), alpha x0.6 via vC.r; lapis luar DIHAPUS
   flatOct(B, cx, 0.02, cz, W + 1.2, L + 1.5, [0.16, 0.15, 0.16], 5); // v10: halo lebih lembut (batch 13 #3 — tepi oktagon jangan terlalu tegas; ukuran tetap seperti v9c2)
   flatOct(B, cx, 0.03, cz, W + 0.95, L + 1.2, [0.14, 0.135, 0.14], 5); // v10: halo lebih lembut
   flatOct(B, cx, 0.04, cz, W + 0.7, L + 0.95, [0.095, 0.09, 0.095], 5);
