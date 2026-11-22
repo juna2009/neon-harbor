@@ -123,17 +123,20 @@ function cross(a, b) {
 // (Rx sesudah Ry) memutar rx mengelilingi sumbu-X DUNIA: untuk yaw PI/2
 // itu ROLL 30° mengelilingi sumbu-maju, bukan pitch — kaca belakang jadi
 // slab miring-menyamping, hanya baji segitiga yang menyembul di atas atap.
-function boxR(B, cx, cy, cz, w, h, d, ry, rx, col, m) {
+function boxR(B, cx, cy, cz, w, h, d, ry, rx, col, m, rz) {
   const hx = w / 2, hy = h / 2, hz = d / 2;
   const cy2 = Math.cos(ry), sy2 = Math.sin(ry), cx2 = Math.cos(rx), sx2 = Math.sin(rx);
+  const cz3 = Math.cos(rz || 0), sz3 = Math.sin(rz || 0); // S3: roll lokal-Z dulu, baru pitch, baru yaw
   const rot = (x, y, z) => {
-    const y1 = y * cx2 - z * sx2, z1 = y * sx2 + z * cx2;
-    const x2 = x * cy2 + z1 * sy2, z2 = -x * sy2 + z1 * cy2;
+    const x0 = x * cz3 - y * sz3, y0 = x * sz3 + y * cz3;
+    const y1 = y0 * cx2 - z * sx2, z1 = y0 * sx2 + z * cx2;
+    const x2 = x0 * cy2 + z1 * sy2, z2 = -x0 * sy2 + z1 * cy2;
     return [cx + x2, cy + y1, cz + z2];
   };
   const nrm = (x, y, z) => {
-    const y1 = y * cx2 - z * sx2, z1 = y * sx2 + z * cx2;
-    const x2 = x * cy2 + z1 * sy2, z2 = -x * sy2 + z1 * cy2;
+    const x0 = x * cz3 - y * sz3, y0 = x * sz3 + y * cz3;
+    const y1 = y0 * cx2 - z * sx2, z1 = y0 * sx2 + z * cx2;
+    const x2 = x0 * cy2 + z1 * sy2, z2 = -x0 * sy2 + z1 * cy2;
     const l = Math.hypot(x2, y1, z2) || 1;
     return [x2 / l, y1 / l, z2 / l];
   };
@@ -267,13 +270,22 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   const blink = Math.floor((o.t || 0) * 6) % 2 === 0;
   const fwd = [Math.sin(yaw), Math.cos(yaw)];
   const rgt = [Math.cos(yaw), -Math.sin(yaw)];
-  const at = (lx, ly, lz) => [cx + rgt[0] * lx + fwd[0] * lz, ly, cz + rgt[1] * lx + fwd[1] * lz];
+  // S2/S3: steer = sudut roda depan (rad, opts.steer = car.steerS, maks
+  // ~0,45 rad = 26 derajat); lean = roll bodi (rad, opts.lean = car.lean,
+  // maks 0,14 rad = 8 derajat). Roll ke arah LUAR belokan (fisika: bodi
+  // miring keluar) -> tanda lean dibalik di leanA. at/dir ikut roll
+  // (pivot tanah); roda pakai at0 (tetap napak, tidak ikut miring).
+  const leanA = Math.max(-0.2, Math.min(0.2, -(o.lean || 0)));
+  const steerA = Math.max(-0.45, Math.min(0.45, o.steer || 0));
+  const lc = Math.cos(leanA), ls = Math.sin(leanA);
+  const at0 = (lx, ly, lz) => [cx + rgt[0] * lx + fwd[0] * lz, ly, cz + rgt[1] * lx + fwd[1] * lz];
+  const at = (lx, ly, lz) => { const rx = lx * lc - ly * ls, ry = lx * ls + ly * lc; return [cx + rgt[0] * rx + fwd[0] * lz, ry, cz + rgt[1] * rx + fwd[1] * lz]; };
   // Arah lokal (dx,dy,dz) diputar yaw → dunia (untuk normal diagonal/bevel).
-  const dir = (dx, dy, dz) => [rgt[0] * dx + fwd[0] * dz, dy, rgt[1] * dx + fwd[1] * dz];
+  const dir = (dx, dy, dz) => { const rx = dx * lc - dy * ls, ry = dx * ls + dy * lc; return [rgt[0] * rx + fwd[0] * dz, ry, rgt[1] * rx + fwd[1] * dz]; };
   // p = box yawed (+pitch rx opsional) di koordinat lokal mobil.
   const p = (lx, ly, lz, w, h, d, c, m, rx) => {
     const q = at(lx, ly, lz);
-    boxR(B, q[0], q[1], q[2], w, h, d, yaw, rx || 0, c, m);
+    boxR(B, q[0], q[1], q[2], w, h, d, yaw, rx || 0, c, m, leanA);
   };
   // Quad di muka belakang (-Z lokal), depan (+Z), atau flank (±X).
   const qB = (lx, ly, lz, w, h, c, m) => {
@@ -386,8 +398,9 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     // baru yaw. Urutan lama = roll (lihat boxR); quad langit/border harus
     // sebidang dengan muka kaca boxR yang sudah diperbaiki.
     const rot = (x, y, z) => {
-      const y1 = y * cx2 - z * sx2, z1 = y * sx2 + z * cx2;
-      const a = x * cy2 + z1 * sy2, b = -x * sy2 + z1 * cy2;
+      const x0 = x * lc - y * ls, y0 = x * ls + y * lc; // S3: roll dulu (sama seperti boxR)
+      const y1 = y0 * cx2 - z * sx2, z1 = y0 * sx2 + z * cx2;
+      const a = x0 * cy2 + z1 * sy2, b = -x0 * sy2 + z1 * cy2;
       return [q[0] + a, q[1] + y1, q[2] + b];
     };
     // Normal muka belakang (0,0,-1) sesudah rot (arah ke kamera).
@@ -477,21 +490,22 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   // tapak/kaliper (hi-only). Low tetap 8-sisi, tanpa detail.
   const hi = o.detail !== 'low' && o.detail !== 'mid';
   const mid = o.detail === 'mid';
-  const wheelCyl = (C, r, len, seg, colM, m, capCol) => {
-    const pt = (a, dx) => [C[0] + rgt[0] * dx + fwd[0] * r * Math.sin(a), C[1] + r * Math.cos(a), C[2] + rgt[1] * dx + fwd[1] * r * Math.sin(a)];
+  const wheelCyl = (C, r, len, seg, colM, m, capCol, R, F, D) => {
+    const RR = R || rgt, FF = F || fwd, DD = D || dir; // S2: sumbu roda boleh dibelokkan
+    const pt = (a, dx) => [C[0] + RR[0] * dx + FF[0] * r * Math.sin(a), C[1] + r * Math.cos(a), C[2] + RR[1] * dx + FF[1] * r * Math.sin(a)];
     for (let j = 0; j < seg; j += 1) {
       const a0 = (j / seg) * Math.PI * 2, a1 = ((j + 1) / seg) * Math.PI * 2;
       // R36V2-SMOOTH: tapak ban bulat — normal tiap sudut = arah radial
       // di sudut ITU (a0/a1), bukan mid-angle datar → ban terbaca
       // silinder halus, bukan prisma 14-sisi. 0 tris (quad yang sama).
       quadN(B, pt(a0, -len / 2), pt(a0, len / 2), pt(a1, len / 2), pt(a1, -len / 2),
-        dir(0, Math.cos(a0), Math.sin(a0)), dir(0, Math.cos(a0), Math.sin(a0)),
-        dir(0, Math.cos(a1), Math.sin(a1)), dir(0, Math.cos(a1), Math.sin(a1)),
+        DD(0, Math.cos(a0), Math.sin(a0)), DD(0, Math.cos(a0), Math.sin(a0)),
+        DD(0, Math.cos(a1), Math.sin(a1)), DD(0, Math.cos(a1), Math.sin(a1)),
         [[0, 0], [1, 0], [1, 1], [0, 1]], colM, m);
     }
     for (const s of [1, -1]) {
-      const nrm = [rgt[0] * s, 0, rgt[1] * s];
-      const cc = [C[0] + rgt[0] * s * len / 2, C[1], C[2] + rgt[1] * s * len / 2];
+      const nrm = [RR[0] * s, 0, RR[1] * s];
+      const cc = [C[0] + RR[0] * s * len / 2, C[1], C[2] + RR[1] * s * len / 2];
       const cCol = s > 0 && capCol ? capCol : colM;
       for (let j = 0; j < seg; j += 1) {
         const a0 = (j / seg) * Math.PI * 2, a1 = ((j + 1) / seg) * Math.PI * 2;
@@ -501,7 +515,17 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     }
   };
   const drawWheel = (lx, lz, s) => {
-    const C = at(lx, wheelY, lz);
+    // S2: as depan (lz > 0) ikut belok sebesar steerA; sumbu roda (wr/wf)
+    // = frame mobil diputar sa mengelilingi sumbu tegak lewat pusat roda.
+    // Roda pakai at0 (tanpa roll bodi) supaya tetap napak; fender di bawah
+    // tetap pakai at/dir (ikut bodi).
+    const sa = lz > 0 ? steerA : 0;
+    const cs = Math.cos(sa), sn = Math.sin(sa);
+    const wr = [rgt[0] * cs + fwd[0] * sn, rgt[1] * cs + fwd[1] * sn];
+    const wf = [-rgt[0] * sn + fwd[0] * cs, -rgt[1] * sn + fwd[1] * cs];
+    const C = at0(lx, wheelY, lz);
+    const wAt = (dx, dy, dz) => [C[0] + wr[0] * dx + wf[0] * dz, wheelY + dy, C[2] + wr[1] * dx + wf[1] * dz];
+    const wDir = (dx, dy, dz) => [wr[0] * dx + wf[0] * dz, dy, wr[1] * dx + wf[1] * dz];
     // R36V2-WHEEL: hero = velg hitam + kaliper merah (Huracan); polisi =
     // velg baja hitam + hub krom, tanpa kaliper merah (Charger steelies);
     // sisanya velg alloy perak. Hanya warna (+ skip kaliper polisi) — 0 tris.
@@ -509,21 +533,21 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     const spokeCol = wheelMode === 'alloy' ? [0.82, 0.82, 0.86] : wheelMode === 'black' ? [0.13, 0.13, 0.15] : [0.10, 0.10, 0.11];
     const spokeHi = wheelMode === 'alloy' ? [0.98, 0.98, 0.98] : [0.30, 0.30, 0.34];
     const r = wheelD / 2, seg = hi ? 14 : mid ? 12 : 8; // v12: hi 14 sisi (dari 16) — BAYAR stripe highlight spoke: -8 tris/ban x 4 = -32 tris. A/B macro v12b: siluet tepi bawah ban 14 vs 16 IDENTIK (12 lug tapak yang mendominasi outline); 12 sisi = stop sign (v10a) — 14 aman.
-    wheelCyl(C, r, 0.26, seg, TIRE, 5, [0.07, 0.07, 0.07]); // ban + dinding samping
+    wheelCyl(C, r, 0.26, seg, TIRE, 5, [0.07, 0.07, 0.07], wr, wf, wDir); // ban + dinding samping
     const rimR = wheelD * 0.34; // v16: pelek LEBIH BESAR (0,30->0,34) — velg terbaca sebagai velg, bukan bintik
     // v6 — cakram velg GELAP ([0.16]) supaya spoke TERANG terbaca di
     // atasnya (v3: cakram + spoke sama-sama RIM → spoke tak terlihat).
-    wheelCyl(C, rimR, 0.32, 8, [0.07, 0.07, 0.09], 1, [0.07, 0.07, 0.09]); // v11: cakram HAMPIR HITAM (0,16 render abu-abu pucat di macro — celah antar-spoke harus gelap supaya 5 spoke terbaca terpisah)
+    wheelCyl(C, rimR, 0.32, 8, [0.07, 0.07, 0.09], 1, [0.07, 0.07, 0.09], wr, wf, wDir); // v11: cakram HAMPIR HITAM (0,16 render abu-abu pucat di macro — celah antar-spoke harus gelap supaya 5 spoke terbaca terpisah)
     // (v16c: cakram rem DICABUT — lihat header. Velg 0,34×wheelD sudah membuat roda terbaca.)
     // v19-MULUS (kembali, hi-only): CAKRAM REM — quad baja di belakang
     // spoke (dx s*0,165, 0,005 di dalam bidang spoke 0,17), setengah
     // ukuran rimR*0,70 — terbaca lewat celah antar-spoke. 2 tris/roda.
     if (hi) {
       const discR = rimR * 0.70;
-      const up = dir(0, 1, 0), fw = dir(0, 0, 1);
-      const dc = [C[0] + rgt[0] * s * 0.165, C[1], C[2] + rgt[1] * s * 0.165];
+      const up = wDir(0, 1, 0), fw = wDir(0, 0, 1);
+      const dc = [C[0] + wr[0] * s * 0.165, C[1], C[2] + wr[1] * s * 0.165];
       const dp = (su, sv) => [dc[0] + up[0] * su * discR + fw[0] * sv * discR, dc[1] + up[1] * su * discR + fw[1] * sv * discR, dc[2] + up[2] * su * discR + fw[2] * sv * discR];
-      quad(B, dp(-1, -1), dp(1, -1), dp(1, 1), dp(-1, 1), [rgt[0] * s, 0, rgt[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], [0.55, 0.56, 0.58], 1);
+      quad(B, dp(-1, -1), dp(1, -1), dp(1, 1), dp(-1, 1), [wr[0] * s, 0, wr[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], [0.55, 0.56, 0.58], 1);
     }
     if (hi || mid) {
       // 5 spoke di muka luar velg (bidang x = +0.17 dari pusat roda)
@@ -536,17 +560,17 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       const dx = s * 0.17;
       for (let i = 0; i < 5; i += 1) {
         const th = Math.PI / 2 + (i * Math.PI * 2) / 5;
-        const d = dir(0, Math.cos(th), Math.sin(th));
-        const pp = dir(0, -Math.sin(th), Math.cos(th));
+        const d = wDir(0, Math.cos(th), Math.sin(th));
+        const pp = wDir(0, -Math.sin(th), Math.cos(th));
         const rc = rimR * 0.52, sl = rimR * 0.95, sw = 0.12; // v11: spoke LEBIH SEMPIT (0,12) + lebih panjang (0,95) — v10 0,20 LEBIH LEBAR dari jarak antar-spoke (0,20 > 2*0,093*sin36°=0,109 di dekat hub) sehingga 5 spoke menyatu jadi cakram pucat solid; 0,12 membuka celah gelap antar-spoke. Lebar 0,20 tetap PLAFON (jangan lebarkan lagi).
-        const base = [C[0] + rgt[0] * dx + d[0] * rc, C[1] + d[1] * rc, C[2] + rgt[1] * dx + d[2] * rc];
+        const base = [C[0] + wr[0] * dx + d[0] * rc, C[1] + d[1] * rc, C[2] + wr[1] * dx + d[2] * rc];
         const mk = (sd, sp) => [base[0] + d[0] * sd * sl / 2 + pp[0] * sp * sw / 2, base[1] + d[1] * sd * sl / 2 + pp[1] * sp * sw / 2, base[2] + d[2] * sd * sl / 2 + pp[2] * sp * sw / 2];
-        quad(B, mk(-1, -1), mk(1, -1), mk(1, 1), mk(-1, 1), [rgt[0] * s, 0, rgt[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], spokeCol, 1);
+        quad(B, mk(-1, -1), mk(1, -1), mk(1, 1), mk(-1, 1), [wr[0] * s, 0, wr[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], spokeCol, 1);
         // v12: STRIPE HIGHLIGHT tengah spoke [0,98] — garis terang tipis (22% lebar spoke, 85% panjang), 0,005 unit di depan bidang spoke (anti z-fight). Tiap spoke punya highlight spine = terbaca LOGAM; celah gelap antar-spoke tetap (TIDAK jadi bunga v6a). +2 tris/spoke x 5 x 4 roda = +40 tris, dibayar ban 14 sisi (-32) -> hero 1526 (<=1550).
-        const mkH = (sd, sp) => [base[0] + rgt[0] * s * 0.005 + d[0] * sd * sl * 0.85 / 2 + pp[0] * sp * sw * 0.22 / 2, base[1] + d[1] * sd * sl * 0.85 / 2 + pp[1] * sp * sw * 0.22 / 2, base[2] + rgt[1] * s * 0.005 + d[2] * sd * sl * 0.85 / 2 + pp[2] * sp * sw * 0.22 / 2];
-        quad(B, mkH(-1, -1), mkH(1, -1), mkH(1, 1), mkH(-1, 1), [rgt[0] * s, 0, rgt[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], spokeHi, 1);
+        const mkH = (sd, sp) => [base[0] + wr[0] * s * 0.005 + d[0] * sd * sl * 0.85 / 2 + pp[0] * sp * sw * 0.22 / 2, base[1] + d[1] * sd * sl * 0.85 / 2 + pp[1] * sp * sw * 0.22 / 2, base[2] + wr[1] * s * 0.005 + d[2] * sd * sl * 0.85 / 2 + pp[2] * sp * sw * 0.22 / 2];
+        quad(B, mkH(-1, -1), mkH(1, -1), mkH(1, 1), mkH(-1, 1), [wr[0] * s, 0, wr[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], spokeHi, 1);
       }
-      wheelCyl(C, 0.08, 0.34, 6, wheelMode === 'black' ? [0.15, 0.15, 0.17] : CHROME, 1); // hub tengah v6 (0,07→0,08 — lebih besar/terang, pusat velg; R36V2: hero hub gelap)
+      wheelCyl(C, 0.08, 0.34, 6, wheelMode === 'black' ? [0.15, 0.15, 0.17] : CHROME, 1, undefined, wr, wf, wDir); // hub tengah v6 (0,07→0,08 — lebih besar/terang, pusat velg; R36V2: hero hub gelap)
       // Kaliper rem v7: LEBIH BESAR (0,12×0,24×0,18 — dari 0,10×0,20×0,16)
       // + LEBIH TERANG [0,90, 0,14, 0,08] + digeser keluar (dx 0,08→0,09) —
       // batch 10: kaliper v6 cuma bintik merah kecil, hampir tak terbaca
@@ -554,8 +578,8 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       // yang menutupi velg; 0,12×0,24 jalan tengah. Hi-only, v4 LOD mid.
       if (hi && wheelMode !== 'steel') { // R36V2: polisi steelies tanpa kaliper merah
         const thc = -2.4;
-        const cq = at(lx + s * 0.09, wheelY + Math.cos(thc) * rimR * 0.7, lz + Math.sin(thc) * rimR * 0.7);
-        boxR(B, cq[0], cq[1], cq[2], 0.12, 0.24, 0.18, yaw, 0, [0.90, 0.14, 0.08], 5);
+        const cq = wAt(s * 0.09, Math.cos(thc) * rimR * 0.7, Math.sin(thc) * rimR * 0.7);
+        boxR(B, cq[0], cq[1], cq[2], 0.12, 0.24, 0.18, yaw - sa, 0, [0.90, 0.14, 0.08], 5);
       }
       // FENDER MEMBULAT v3 (bukan kotak): pita melengkung warna bodi di atas
       // roda (±75°, 6 segmen) + cincin gelap di dalamnya sebagai celah sumur
@@ -599,9 +623,9 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
         // (sin(am)<-0,7) digelapkan ke 0,22 — pola tapak tetap terbaca
         // dari samping/3-4, tapi muka belakang ban gelap, bukan lampu.
         const lug = j % 2 === 0 ? (Math.sin(am) < -0.7 ? [0.22, 0.22, 0.22] : [0.68, 0.68, 0.68]) : [0.04, 0.04, 0.04];
-        const lp = (a, dx) => at(lx + dx, wheelY + (r + 0.022) * Math.cos(a), lz + (r + 0.022) * Math.sin(a));
+        const lp = (a, dx) => wAt(dx, (r + 0.022) * Math.cos(a), (r + 0.022) * Math.sin(a));
         quad(B, lp(am - hw2, 0.15), lp(am - hw2, -0.15), lp(am + hw2, -0.15), lp(am + hw2, 0.15),
-          dir(0, Math.cos(am), Math.sin(am)), [[0, 0], [1, 0], [1, 1], [0, 1]], lug, 5);
+          wDir(0, Math.cos(am), Math.sin(am)), [[0, 0], [1, 0], [1, 1], [0, 1]], lug, 5);
       }
       // TAPAK SAMPING v6 (hi-only): 6 alur radial di DINDING SAMPING ban
       // (annulus di luar velg, di muka luar ban) — supaya tapak terbaca
@@ -619,9 +643,9 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
         const am = ((j * 60 + 30) * Math.PI) / 180, hw3 = 0.17;
         const gcol = j % 2 === 0 ? (wheelMode === 'alloy' ? [0.88, 0.88, 0.88] : [0.30, 0.30, 0.30]) : [0.02, 0.02, 0.02]; // R36V2: alur dinding ban ikut gelap di velg hitam/baja
         const r1 = rimR * 1.12, r2 = r * 0.97;
-        const gp = (a, rr) => at(lx + s * 0.20, wheelY + rr * Math.cos(a), lz + rr * Math.sin(a)); // v8: dx 0,20 — lebih menonjol dari dinding ban
+        const gp = (a, rr) => wAt(s * 0.20, rr * Math.cos(a), rr * Math.sin(a)); // v8: dx 0,20 — lebih menonjol dari dinding ban
         quad(B, gp(am - hw3, r1), gp(am - hw3, r2), gp(am + hw3, r2), gp(am + hw3, r1),
-          [rgt[0] * s, 0, rgt[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], gcol, 5);
+          [wr[0] * s, 0, wr[1] * s], [[0, 0], [1, 0], [1, 1], [0, 1]], gcol, 5);
       }
     }
   };
@@ -653,7 +677,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
     // Gagang: box kecil menembus panel dekat ujung bebas (0,35u dari ujung),
     // ikut berputar (ry = yaw + ayunan) — pola interiors.js:544-546.
     const gq = at(hx + dx * 1.35, 0, hz + dz * 1.35);
-    boxR(B, gq[0], 0.95, gq[2], 0.16, 0.14, 0.42, yaw + th, 0, DARK, 5);
+    boxR(B, gq[0], 0.95, gq[2], 0.16, 0.14, 0.42, yaw + th, 0, DARK, 5, leanA);
   }
 
   if (spec.kind === 'bus') return drawBus();

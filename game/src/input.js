@@ -99,10 +99,10 @@ export function createInput(canvas) {
       return capture !== null;
     },
     moveX() {
-      return axis('ArrowLeft', 'ArrowRight') || axis('KeyA', 'KeyD');
+      return window.nhAx || axis('ArrowLeft', 'ArrowRight') || axis('KeyA', 'KeyD');
     },
     moveY() {
-      return axis('ArrowUp', 'ArrowDown') || axis('KeyW', 'KeyS');
+      return window.nhAy || axis('ArrowUp', 'ArrowDown') || axis('KeyW', 'KeyS');
     },
     run() {
       return keys.has('ShiftLeft') || keys.has('ShiftRight');

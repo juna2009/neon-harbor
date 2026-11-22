@@ -28,6 +28,7 @@ function initTouch() {
   function releaseAll() {
     for (const code of [...held]) up(code);
     stickHeld.clear();
+    window.nhAx = 0; window.nhAy = 0;
     knob.style.transform = 'translate(0px, 0px)';
     document.querySelectorAll('.nh-btn.nh-on').forEach((b) => b.classList.remove('nh-on'));
   }
@@ -80,6 +81,11 @@ function initTouch() {
     const ex = ux * cl;
     const ey = uy * cl;
     knob.style.transform = 'translate(' + ex.toFixed(1) + 'px,' + ey.toFixed(1) + 'px)';
+    // S1: stick progresif — teruskan magnitude ke game via window.nhAx/nhAy
+    // (input.js moveX/moveY baca ini dulu; key event biner di bawah tetap
+    // dikirim sebagai fallback). ex/R, ey/R di [-1,1]; 0 di dalam dead zone.
+    window.nhAx = Math.abs(ex) / R > DEAD ? ex / R : 0;
+    window.nhAy = Math.abs(ey) / R > DEAD ? ey / R : 0;
     const want = new Set();
     if (cl / R > DEAD) {
       if (ey < -DEAD * R) want.add('KeyW');
@@ -97,6 +103,7 @@ function initTouch() {
   function endStick(e) {
     if (e.pointerId !== stickId) return;
     stickId = null;
+    window.nhAx = 0; window.nhAy = 0;
     knob.style.transform = 'translate(0px, 0px)';
     for (const code of [...stickHeld]) { up(code); stickHeld.delete(code); }
   }

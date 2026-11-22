@@ -506,12 +506,12 @@ export function createWorld(rng, savedMission, sp) {
       car.speed -= car.speed * 0.85 * dt;
     }
     car.speed = Math.max(-CAR.maxReverse, Math.min(topSpeed, car.speed));
-    // R34: steerS ramps to input (no snap); lean = body roll.
-    car.steerS = (car.steerS || 0) + (steer - (car.steerS || 0)) * Math.min(1, 7 * dt);
+    // R34: steerS ramps; lean roll
+    car.steerS = (car.steerS || 0) + (steer - (car.steerS || 0)) * Math.min(1, 4 * dt);
     const spd = Math.abs(car.speed);
     let turnScale = 1;
     if (spd < 60) turnScale = 0.35 + 0.65 * (spd / 60);
-    else if (spd > 240) turnScale = 1 - 0.45 * Math.min(1, (spd - 240) / 300);
+    else if (spd > 240) turnScale = 1 - 0.30 * Math.min(1, (spd - 240) / 300);
     if (spd > 5) {
       car.angle += car.steerS * CAR.turnRate * steerFactor * (car.tiresPopped ? 0.55 : 1) * dt * Math.sign(car.speed) * Math.min(1, spd / 120) * turnScale;
     }
@@ -933,7 +933,7 @@ export function createWorld(rng, savedMission, sp) {
     for (const car of traffic.cars) if (car.kind !== 'player') hitScenery(car);
     const danger = events.shot
       ? { x: p.x, y: p.y }
-      : (p.inCar && p.car && Math.abs(p.car.speed) > 250 ? { x: p.x, y: p.y } : null);
+      : (p.inCar && p.car && Math.abs(p.car.speed) > 300 ? { x: p.x, y: p.y } : null);
     const chase = state.wanted >= 3 ? { x: p.x, y: p.y } : null;
     const flashes = stepPedestrians(peds, dt, city, danger, chase);
     for (const f of flashes) {

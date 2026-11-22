@@ -2201,7 +2201,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   if (p.inCar && p.car) {
     const c = p.car;
     const hSt = carDmgStage(c); // VEHICLE-DAMAGE-P1: visual di-derive dari hp tiap frame
-    drawCarRealistic(OP, GL, 'hero', c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#e33e5f'), { t, tl: tlGain, door: c.doorAngle || 0, doorSide: c.doorSide || -1, damage: hSt >= 1, heavy: hSt >= 2, charred: hSt === 2 ? 0.55 : 0 }); // R26: hero selalu realistis v15d (gate heroReal dihapus)
+    drawCarRealistic(OP, GL, 'hero', c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#e33e5f'), { t, tl: tlGain, door: c.doorAngle || 0, doorSide: c.doorSide || -1, damage: hSt >= 1, heavy: hSt >= 2, charred: hSt === 2 ? 0.55 : 0, steer: c.steerS || 0, lean: c.lean || 0 }); // R26: hero selalu realistis v15d (gate heroReal dihapus)
     groundShadow(c.x * S, c.y * S, (c.width || 22) * S, (c.length || 46) * S, 1.4); // SUN-TREE: bayangan mobil berarah ikut matahari (dulu cuma contact shadow statis)
     if (tod.headlight > 0.02) { // TOD: kerucut lampu depan (malam) — trapesium mat 8,
       // v=0 di bemper (terang) -> v=1 jauh (memudar, ikut shader smear).
@@ -2456,7 +2456,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     // VEHICLE-DAMAGE-P1: polisi dari unit.health/3, traffic/parkir dari
     // health/2, bangkai = stage 3 (damage + heavy + charred 0.35, pintu 0).
     const st = c.wreck ? 3 : (police && unit ? dmgStage(unit.health, 3) : carDmgStage(c));
-    drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, taxi: c.body === 'taxi', tl: tlGain, door: c.wreck ? 0 : (c.doorAngle || 0), doorSide: c.doorSide || -1, damage: st >= 1, heavy: st >= 2, charred: st === 3 ? 0.35 : st === 2 ? 0.55 : 0, wreck: !!c.wreck }); // R36V2-TAXI: papan TAXI + strip kotak (cars3d.js) — digabung R38 tlGain
+    drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, taxi: c.body === 'taxi', tl: tlGain, door: c.wreck ? 0 : (c.doorAngle || 0), doorSide: c.doorSide || -1, damage: st >= 1, heavy: st >= 2, charred: st === 3 ? 0.35 : st === 2 ? 0.55 : 0, wreck: !!c.wreck, steer: c.steerS || 0, lean: c.lean || 0 }); // R36V2-TAXI: papan TAXI + strip kotak (cars3d.js) — digabung R38 tlGain
     groundShadow(c.x * S, c.y * S, (c.width || 22) * S, (c.length || 46) * S, 1.4); // SUN-TREE: bayangan mobil berarah ikut matahari (traffic/parkir/polisi/bangkai)
   };
   for (const c of state.traffic.cars || []) drawCar(c, false);

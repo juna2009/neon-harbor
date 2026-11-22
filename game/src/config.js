@@ -40,7 +40,7 @@ export const CAR = {
   brake: 760,
   maxSpeed: 540,
   maxReverse: 170,
-  turnRate: 2.7,
+  turnRate: 3.0,
   grip: 3.2,
   health: 100,
 };

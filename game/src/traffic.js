@@ -23,7 +23,7 @@ export function createTraffic(city, rng) {
     let car;
     if (vertical) {
       const rx = rng.pick(city.roadsV);
-      // R34: lane matches direction — else two cars spawn head-on.
+      // R34: lane matches direction — else two cars spawn head-on
       const dir = rng.chance(0.5) ? 1 : -1;
       car = makeCar(rx + (dir > 0 ? 14 : -14), rng.range(40, WORLD_H - 40), dir > 0 ? PI2 : -PI2, color, 'traffic', body);
       car.axis = 'v';
@@ -315,7 +315,7 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
       const dx = ped.x - danger.x;
       const dy = ped.y - danger.y;
       const d = Math.hypot(dx, dy);
-      if (d < 260) {
+      if (d < 180) {
         ped.flee = 2.5;
         fleeX = dx / (d || 1);
         fleeY = dy / (d || 1);
@@ -323,13 +323,13 @@ export function stepPedestrians(peds, dt, city, danger, chase) {
     }
     if (ped.flee > 0) {
       ped.flee -= dt;
-      ped.x += fleeX * 150 * dt;
-      ped.y += fleeY * 150 * dt;
+      ped.x += fleeX * 90 * dt;
+      ped.y += fleeY * 90 * dt;
       ped.angle = Math.atan2(fleeY, fleeX);
     } else {
       ped.x += Math.cos(ped.angle) * ped.speed * dt;
       ped.y += Math.sin(ped.angle) * ped.speed * dt;
-      if (ped.x < 40 || ped.x > WATER_X - 40 || ped.y < 40 || ped.y > WORLD_H - 40 || !onRoad(city, ped.x, ped.y, 14)) {
+      if (ped.x < 40 || ped.x > WATER_X - 40 || ped.y < 40 || ped.y > WORLD_H - 40 || !onRoad(city, ped.x, ped.y, 20)) {
         ped.angle += Math.PI;
         ped.x += Math.cos(ped.angle) * 4;
         ped.y += Math.sin(ped.angle) * 4;
