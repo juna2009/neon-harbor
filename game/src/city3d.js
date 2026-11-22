@@ -2432,6 +2432,10 @@ export function drawChase3D(ctx, state) {
   // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44;
   // A-LITE (wave 2): ROAD_W 72->80, asphalt 44->48, sidewalk 58->60;
   // TROTOAR: sidewalk 60->80, so the strip is 32 px, not 12 px.
+  // TREE-VERGE (22 Nov, koreksi Juna: pohon jangan di trotoar): pita
+  // 48..80px DIBELAH — strip tanam rumput 48..60px (hijau taman #3f8f4f)
+  // + trotoar 60..80px; palem tepi jalan pindah ke palmLat 5.4 (54px =
+  // tengah strip), jalur NPC (60px) = tepi dalam trotoar.
   // cars sit clearly clear of the flanking buildings. VISUAL ONLY
   // (drawChase3D paint): ROAD_W/gameplay/collision untouched. Building
   // faces stay at 80 (city.js), so a 32 px sidewalk strip remains;
@@ -2484,8 +2488,11 @@ export function drawChase3D(ctx, state) {
       if (!inRange(rx, gy + 160, 175, 135)) continue;
       const rd = Math.hypot(rx * CS - ccX, (gy + 160) * CS - ccZ);
       for (const [s0, s1] of clipWalk(gy, gy + 320, city.roadsH)) {
-        flatQuad(rx - 80, s0, rx - 48, s1, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
-        flatQuad(rx + 48, s0, rx + 80, s1, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
+        // TREE-VERGE: strip tanam rumput 48..60px + trotoar 60..80px (dulu satu pita abu 48..80px)
+        flatQuad(rx - 60, s0, rx - 48, s1, 0.05, sh(hx3('#3f8f4f'), shadeK, hz(rd)));
+        flatQuad(rx - 80, s0, rx - 60, s1, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
+        flatQuad(rx + 48, s0, rx + 60, s1, 0.05, sh(hx3('#3f8f4f'), shadeK, hz(rd)));
+        flatQuad(rx + 60, s0, rx + 80, s1, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
       }
       flatQuad(rx - 48, gy, rx + 48, gy + 320, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
       for (let d0 = gy + 24; d0 < gy + 320; d0 += 128) {
@@ -2510,8 +2517,11 @@ export function drawChase3D(ctx, state) {
       const x1 = clip ? Math.min(gx + 320, WATER_X) : gx + 320;
       if (x1 <= gx) continue;
       for (const [s0, s1] of clipWalk(gx, x1, city.roadsV)) {
-        flatQuad(s0, ry - 80, s1, ry - 48, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
-        flatQuad(s0, ry + 48, s1, ry + 80, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
+        // TREE-VERGE: strip tanam rumput 48..60px + trotoar 60..80px (dulu satu pita abu 48..80px)
+        flatQuad(s0, ry - 60, s1, ry - 48, 0.05, sh(hx3('#3f8f4f'), shadeK, hz(rd)));
+        flatQuad(s0, ry - 80, s1, ry - 60, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
+        flatQuad(s0, ry + 48, s1, ry + 60, 0.05, sh(hx3('#3f8f4f'), shadeK, hz(rd)));
+        flatQuad(s0, ry + 60, s1, ry + 80, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
       }
       flatQuad(gx, ry - 48, x1, ry + 48, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
       for (let d0 = gx + 24; d0 < gx + 320 && (!clip || d0 < WATER_X); d0 += 128) {
@@ -3019,7 +3029,12 @@ export function drawChase3D(ctx, state) {
   // Palms use EXACTLY walkLat now (JF4's +h2*0.3 drifted them to 5.1,
   // inside the wall). Fronds shortened 3.4 -> 2.0 so the canopy's inner
   // tip (42px) clears the 40px road edge instead of overhanging it.
+  // TREE-VERGE (22 Nov): koreksi Juna — palem di walkLat 7.5 BERDIRI DI
+  // ATAS TROTOAR (pita trotoar 48..80px). Palem pindah ke palmLat 5.4 =
+  // tengah strip tanam rumput 48..60px. Lampu/bangku/tong TETAP di
+  // walkLat — tiang lampu + bangku memang milik trotoar.
   const walkLat = 7.5; // sidewalk outer edge, in 3D units (75px from road centre)
+  const palmLat = 5.4; // TREE-VERGE: tengah strip tanam rumput 48..60px (54px dr sumbu jalan), bukan trotoar
   // R36-ROADS (fallback Canvas): tekstur jalan dekat kamera + prop trotoar.
   // VISUAL ONLY — padanan versi WebGL2 di webgl2.js (roadSeg/atFU).
   const fwdU = (f, lat) => [ccX + cfX * f + (-cfZ) * lat, ccZ + cfZ * f + cfX * lat]; // (maju, lateral) unit -> [x, z] 3D
@@ -3053,7 +3068,7 @@ export function drawChase3D(ctx, state) {
       QW([[ht[0], 0.11, ht[1]], [hb[0] - 0.8, 0.11, hb[1]], [hb[0] + 0.8, 0.11, hb[1]], [ht[0], 0.11, ht[1]]], '#e8e8e6', 30); }
     }
   }
-  for (let a = snapGrid(camAlong - 6, 12, 0); a <= camAlong + 66; a += 12) for (const lat of [roadLat - 6.4, roadLat + 6.4]) { // sambungan ubin trotoar — grid 12 unit (dulu fwd -6..66 tetap); lateral ±6.4 (tengah trotoar baru) Street 2
+  for (let a = snapGrid(camAlong - 6, 12, 0); a <= camAlong + 66; a += 12) for (const lat of [roadLat - 7.0, roadLat + 7.0]) { // sambungan ubin trotoar — grid 12 unit (dulu fwd -6..66 tetap); lateral ±7.0 (tengah trotoar 60..80px — TREE-VERGE: pita baru, tengahnya 7.0u bukan 6.4u) Street 2
     const j = slotWorldP(a, lat);
     if (ewRoad) flatQuad(j[0] - 0.7, j[1] - 3.5, j[0] + 0.7, j[1] + 3.5, 0.08, 'rgba(20,20,24,0.5)');
     else flatQuad(j[0] - 3.5, j[1] - 0.7, j[0] + 3.5, j[1] + 0.7, 0.08, 'rgba(20,20,24,0.5)');
@@ -3086,7 +3101,7 @@ export function drawChase3D(ctx, state) {
   // WORLD-SNAP (DIAG-A): slots are snapped to a WORLD grid along the road
   // axis — they no longer sit at fixed offsets from the camera. All
   // variation is h2-gated, no randomness, no wall clock.
-  // Lamp/palm laterals use roadLat ± walkLat (JF4, defined above).
+  // Lamp/palm laterals use roadLat ± walkLat (JF4, defined above) — TREE-VERGE: palem pakai palmLat, bukan walkLat.
   if (p.inCar) {
     const lampBase = snapGrid(camAlong + 26, 45, 0);
     for (let k = 0; k < 4; k += 1) {
@@ -3119,11 +3134,15 @@ export function drawChase3D(ctx, state) {
       const along = palmBase + k * 55, fwd = along - camAlong;
       if (fwd < 12 || fwd >= 175) continue;
       const wi = Math.round(along / 55); // indeks DUNIA — sisi + variasi stabil saat slot masuk/keluar
-      const lat = roadLat + (wi % 2 === 0 ? -1 : 1) * walkLat;
+      const lat = roadLat + (wi % 2 === 0 ? -1 : 1) * palmLat; // TREE-VERGE: palem di strip rumput (54px), bukan trotoar
       const [pxp, pzp] = slotWorld(along, lat);
     const wxp = pxp / CS, wzp = pzp / CS;
     if (!inRange(wxp, wzp, 175, 135)) continue;
     if (slotInBldg(city, wxp, wzp)) continue; // 1A-TREES: palem di dalam gedung (saat belok) -> lewati
+    // TREE-VERGE: palem tidak boleh di jalan/zebra/garis stop — cermin guard
+    // WebGL2 (<49px dr garis tengah jalan mana pun). Jalan jangkar sendiri
+    // 54px, jadi lolos; palem yg terseret <49px dr jalan melintang dilewati.
+    if (city.roadsV.some((rx) => Math.abs(wxp - rx) < 49) || city.roadsH.some((ry) => Math.abs(wzp - ry) < 49)) continue;
     // R36: palem ke-3 (fwd 140) mendarat di laut (x~2837 > WATER_X 2448) —
     // lewati palem di luar daratan.
     if (wxp > 2420 || wxp < 30 || wzp < 30 || wzp > 1890) continue;
@@ -3133,7 +3152,7 @@ export function drawChase3D(ctx, state) {
     // into ONE horizontal bar on screen = the "T". Now 8 separate fronds,
     // each a 3-segment ribbon arcing out and drooping down (same curve as
     // the takeoff3d palm, proven there), green like the reference palms,
-    // tapering .34->.14. Trunk position UNCHANGED (POLEFIX2 walkLat 4.8).
+    // tapering .34->.14. Trunk di palmLat 5.4 (TREE-VERGE: tengah strip rumput).
     // Reach shortens toward the road (1.0) so no tip overhangs the
     // asphalt: tip stays >=38px from the centreline (POLEFIX2 rule);
     // full 1.9 toward the sidewalk/buildings. Coconut cluster anchors

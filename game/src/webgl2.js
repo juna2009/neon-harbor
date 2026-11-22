@@ -1620,7 +1620,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   }
 
   // Jalan: segmen di sekitar hero (u = sepanjang jalan, v = melintang, untuk marka).
-  const roadCol = [0.10, 0.09, 0.11], walkCol = [0.32, 0.32, 0.32];
+  const roadCol = [0.10, 0.09, 0.11], walkCol = [0.32, 0.32, 0.32], grassCol = [0.12, 0.30, 0.16]; // TREE-VERGE: grassCol = hijau rumput taman (sama dgn park flat di bawah) — strip tanam, BUKAN ubin
   // ZEBRA: trotoar/curb tidak boleh menyeberang persimpangan — pita
   // dibelah di sekitar tiap jalan melintang (|along| < 4.8u = 48px dari
   // pusatnya). Corner pad (|along| 48..80px) TETAP: potongan di kedua
@@ -1646,9 +1646,13 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     // R33-MERGE (Juna #6): chase road WIDER — asphalt half-width 36->44;
     // A-LITE (wave 2): ROAD_W 72->80, asphalt half-width 44->48 (same as
     // the Canvas fallback in city3d.js). VISUAL ONLY: this is paint
-    // (roadSeg); ROAD_W/gameplay/collision untouched. Sidewalk strips
-    // span hw..hw+3.2u (48..80px, full band to the facades); lamps at
-    // +-72 stay clear of the asphalt (edge 48, facades at 80).
+    // (roadSeg); ROAD_W/gameplay/collision untouched.
+    // TREE-VERGE (22 Nov, koreksi Juna: pohon jangan di trotoar): pita
+    // 48..80px DIBELAH — strip tanam rumput hw..hw+1.2u (48..60px, mat 5
+    // hijau taman) + trotoar hw+1.2u..hw+3.2u (60..80px, mat 14 ubin).
+    // Pohon tepi jalan (lateral 54px) = TENGAH strip rumput; jalur NPC
+    // (60px, SIDE traffic.js) = tepi dalam trotoar; lampu ±72, bangku/
+    // tong ±75 tetap di trotoar. Curb 48..51px tetap di atas tepi strip.
     const hw = 48 * S;
     if (vertical) {
       const X = x0 * S, z0 = y0 * S, z1 = y1 * S;
@@ -1658,11 +1662,13 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       quad(OP, [X - hw, -0.05, z0], [X + hw, -0.05, z0], [X + hw, -0.05, z1], [X - hw, -0.05, z1],
         [0, 1, 0], [[z0, 0], [z0, 1], [z1, 1], [z1, 0]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
       for (const [s0, s1] of clipWalkSpans(z0, z1, city.roadsH)) {
-        flat(OP, X - (hw + 1.6), 0.02, (s0 + s1) / 2, 3.2, (s1 - s0), walkCol, 14, // TROTOAR: pita hw..hw+3.2u (48..80px) + UV dunia (u = lebar 3.2, v = panjang, offset s0-z0)
-          [[0, s0 - z0], [3.2, s0 - z0], [3.2, s1 - z0], [0, s1 - z0]]);
+        flat(OP, X - (hw + 0.6), 0.02, (s0 + s1) / 2, 1.2, (s1 - s0), grassCol, 5); // TREE-VERGE: strip tanam rumput hw..hw+1.2u (48..60px) — pohon lateral 54px berdiri DI SINI
+        flat(OP, X - (hw + 2.2), 0.02, (s0 + s1) / 2, 2.0, (s1 - s0), walkCol, 14, // TROTOAR: pita hw+1.2u..hw+3.2u (60..80px) + UV dunia (u = lebar 2.0, v = panjang, offset s0-z0)
+          [[0, s0 - z0], [2.0, s0 - z0], [2.0, s1 - z0], [0, s1 - z0]]);
         flat(OP, X - (hw + 0.15), 0.03, (s0 + s1) / 2, 0.3, (s1 - s0), [0.07, 0.07, 0.08], 5); // TROTOAR: curb — garis gelap tepi jalan (48..51px); quad, bukan tekstur (u tercermin antar sisi, tepi-tekstur tak simetris)
-        flat(OP, X + (hw + 1.6), 0.02, (s0 + s1) / 2, 3.2, (s1 - s0), walkCol, 14,
-          [[0, s0 - z0], [3.2, s0 - z0], [3.2, s1 - z0], [0, s1 - z0]]);
+        flat(OP, X + (hw + 0.6), 0.02, (s0 + s1) / 2, 1.2, (s1 - s0), grassCol, 5); // TREE-VERGE: strip tanam rumput (48..60px)
+        flat(OP, X + (hw + 2.2), 0.02, (s0 + s1) / 2, 2.0, (s1 - s0), walkCol, 14,
+          [[0, s0 - z0], [2.0, s0 - z0], [2.0, s1 - z0], [0, s1 - z0]]);
         flat(OP, X + (hw + 0.15), 0.03, (s0 + s1) / 2, 0.3, (s1 - s0), [0.07, 0.07, 0.08], 5);
       }
     } else {
@@ -1670,11 +1676,13 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       quad(OP, [x0u, -0.05, Z - hw], [x1u, -0.05, Z - hw], [x1u, -0.05, Z + hw], [x0u, -0.05, Z + hw],
         [0, 1, 0], [[x0u, 0], [x1u, 0], [x1u, 1], [x0u, 1]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
       for (const [s0, s1] of clipWalkSpans(x0u, x1u, city.roadsV)) {
-        flat(OP, (s0 + s1) / 2, 0.02, Z - (hw + 1.6), (s1 - s0), 3.2, walkCol, 14, // TROTOAR: pita hw..hw+3.2u (48..80px) + UV dunia (u = panjang, offset s0-x0u, v = lebar 3.2)
-          [[s0 - x0u, 0], [s1 - x0u, 0], [s1 - x0u, 3.2], [s0 - x0u, 3.2]]);
+        flat(OP, (s0 + s1) / 2, 0.02, Z - (hw + 0.6), (s1 - s0), 1.2, grassCol, 5); // TREE-VERGE: strip tanam rumput (48..60px) — pohon lateral 54px berdiri DI SINI
+        flat(OP, (s0 + s1) / 2, 0.02, Z - (hw + 2.2), (s1 - s0), 2.0, walkCol, 14, // TROTOAR: pita (60..80px) + UV dunia (u = panjang, offset s0-x0u, v = lebar 2.0)
+          [[s0 - x0u, 0], [s1 - x0u, 0], [s1 - x0u, 2.0], [s0 - x0u, 2.0]]);
         flat(OP, (s0 + s1) / 2, 0.03, Z - (hw + 0.15), (s1 - s0), 0.3, [0.07, 0.07, 0.08], 5);
-        flat(OP, (s0 + s1) / 2, 0.02, Z + (hw + 1.6), (s1 - s0), 3.2, walkCol, 14,
-          [[s0 - x0u, 0], [s1 - x0u, 0], [s1 - x0u, 3.2], [s0 - x0u, 3.2]]);
+        flat(OP, (s0 + s1) / 2, 0.02, Z + (hw + 0.6), (s1 - s0), 1.2, grassCol, 5); // TREE-VERGE: strip tanam rumput (48..60px)
+        flat(OP, (s0 + s1) / 2, 0.02, Z + (hw + 2.2), (s1 - s0), 2.0, walkCol, 14,
+          [[s0 - x0u, 0], [s1 - x0u, 0], [s1 - x0u, 2.0], [s0 - x0u, 2.0]]);
         flat(OP, (s0 + s1) / 2, 0.03, Z + (hw + 0.15), (s1 - s0), 0.3, [0.07, 0.07, 0.08], 5);
       }
     }
@@ -1749,11 +1757,14 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // WORLD-SNAP grid 12u (pola Canvas): joint diam di dunia (dulu fwd -6..66
   // tetap -> ubin ikut bergeser bersama kamera). R36-ROADS item 17: dari
   // fwd -6 (dasar layar, di belakang hero).
+  // TREE-VERGE: lateral ±7.0u = TENGAH trotoar baru 60..80px (dulu ±6.4u =
+  // tengah pita lama 48..80px; di 6.4u joint masih di trotoar tapi mepet
+  // tepi dalam 60px, jadi digeser ke tengah pita).
   // ZEBRA: joint yang jatuh di kotak aspal persimpangan (|along| < 48px
   // dari pusat jalan melintang) dilewati — kalau tidak, garis joint
   // gelap melayang di atas aspal (trotoar di sana sudah di-clip).
   const jCross = hEW ? city.roadsV : city.roadsH;
-  for (let f = snapG(camAlong - 6, 12, 0) - camAlong; f <= 66; f += 12) for (const lat of [-6.4, 6.4]) {
+  for (let f = snapG(camAlong - 6, 12, 0) - camAlong; f <= 66; f += 12) for (const lat of [-7.0, 7.0]) {
     const j = atFU(f, lat);
     const jAlongPx = (hEW ? j[0] : j[1]) / S;
     if (jCross.some((c) => Math.abs(jAlongPx - c) < 48)) continue;
@@ -1892,10 +1903,12 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // satu pohon tidak pernah ganti sisi/jenis/ukuran saat kamera maju
   // (bug Juna 22 Nov: matahari + pohon ngikutin kamera).
   // PENEMPATAN (koreksi Juna 11:51 WIB — BUKAN di trotoar, itu jalur
-  // NPC): batang di STRIP TEPI JALAN, lateral ±5.4 unit (54px) dari
-  // garis tengah — di luar aspal (48px, + garis curb 48..51px), di
-  // luar jalur jalan NPC (60px, SIDE traffic.js) — lubang tanam di tepi
-  // trotoar, bukan tengah trotoar (dulu 7.5u = tengah trotoar).
+  // NPC; TREE-VERGE 22 Nov — "verge" 54px sun-tree ternyata MASIH di
+  // atas trotoar, karena pita trotoar 48..80px, bukan 48..62px): batang
+  // di STRIP TANAM RUMPUT 48..60px (roadSeg/city3d.js), lateral ±5.4
+  // unit (54px) = TENGAH strip; di luar aspal (48px, + garis curb
+  // 48..51px), di luar jalur jalan NPC (60px, SIDE traffic.js) — NPC
+  // jalan di tepi dalam trotoar (60..80px), batang 6px dari jalurnya.
   // PENJAGA ZEBRA (Juna 11:48 WIB — palm mendarat di atas zebra):
   // kandidat DITOLAK bila <49px dari garis tengah jalan mana pun —
   // pita zebra + garis stop semuanya di dalam 48px dari suatu jalan,
@@ -1935,7 +1948,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       return false;
     };
     const bad = (wx, wy) => wx < 30 || wx > 2420 || wy < 30 || wy > 1890 || onRoad(wx, wy) || clash(wx, wy);
-    const TREE_LAT = 54; // verge: strip tepi jalan (px), bukan trotoar
+    const TREE_LAT = 54; // TREE-VERGE: tengah strip tanam rumput 48..60px (px), bukan trotoar
     const pos = (g, side) => eRoad ? [g, hRoad + side * TREE_LAT] : [hRoad + side * TREE_LAT, g];
     const grid0 = heroAlong - 1100 + ((80 - (heroAlong - 1100)) % 160 + 160) % 160; // grid pertama ≥ hero-1100 (rentang simetris — hero bisa jalan ke -along, culling fwdD yang memilih yang terlihat)
     for (let g = grid0; g <= heroAlong + 1100; g += 160) {
