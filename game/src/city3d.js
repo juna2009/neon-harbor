@@ -2016,6 +2016,7 @@ function bld3(b, nightF, t) {
   }
 }
 export function drawChase3D(ctx, state) {
+  state.camera.fwd = [0, -1]; // CHARFIX: 2D fallback — arah pandang tetap utara.
   tickJobs(state, 1 / 60); // R35-F7: jobs tick (canvas fallback; see webgl2.js buildFrame)
   x = ctx; W = ctx.canvas.width; H = ctx.canvas.height; CX = W / 2; HOR = H * .46;
   camZ = 0;

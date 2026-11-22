@@ -1319,7 +1319,7 @@ export function createRenderer(canvas) {
     // tickJobs runs per frame in either mode: no double-tick, no double
     // cash. The toast timer runs here too, so it no longer freezes in 2D.
     if (chaseOn(state)) cine.chase3D(ctx, state);
-    else { if (jobsMod) jobsMod.tickJobs(state, 1 / 60); drawWorld(state); }
+    else { state.camera.fwd = [0, -1]; if (jobsMod) jobsMod.tickJobs(state, 1 / 60); drawWorld(state); }
     cine.drawBars(ctx, view.w, view.h);
     drawHud(state, best, ui);
     if (screen === SCREEN_PLAY) {

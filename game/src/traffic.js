@@ -224,7 +224,7 @@ export function createPedestrians(city, rng) {
     }
     peds.push({
       x, y, angle,
-      speed: rng.range(28, 52),
+      speed: rng.range(12, 18),
       color: rng.pick(SHIRTS),
       skin: rng.pick(SKINS),
       pants: rng.pick(PANTS),

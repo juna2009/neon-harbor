@@ -151,10 +151,14 @@ export function resetOnFootState() { prevF = false; prevPos = null; prevInCar = 
 // posisi akhir-ke-akhir (sesudah SEMUA dorong-keluar), fase hanya maju kalau
 // badan Jax BENAR-BENAR berpindah. Teleport (>60 px sekali update —
 // checkpoint/restore/keluar-masuk mobil) tidak dihitung sebagai jalan.
-function advanceWalkPhase(p) {
+function advanceWalkPhase(p, dt) {
   if (!prevPos) { prevPos = { x: p.x, y: p.y }; return; }
   const d = Math.hypot(p.x - prevPos.x, p.y - prevPos.y);
-  if (d > 0 && d <= 60) p.walkPhase = (p.walkPhase || 0) + d * WALK_PHASE_PER_PX;
+  if (d > 0 && d <= 60) {
+    const v = dt > 0 ? d / dt : 0;
+    const rate = v <= 25 ? 0.31 : Math.max(0.16, 0.31 - (v - 25) * (0.31 - 0.16) / 35);
+    p.walkPhase = (p.walkPhase || 0) + d * rate;
+  }
   prevPos = { x: p.x, y: p.y };
 }
 
@@ -207,6 +211,7 @@ export function updateOnFoot(state, input, dt) {
   if (fDown && !prevF && st.active) {
     st.mode = (st.mode + 1) % CAM_MODES.length;
     msg = `On-foot camera: ${CAM_LABELS[st.mode]} (F to cycle)`;
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nh-orbit-reset'));
   }
   prevF = fDown;
   if (!st.active) { prevPos = null; return msg; }
@@ -221,6 +226,6 @@ export function updateOnFoot(state, input, dt) {
   for (const c of cars) pushOutOfCar(p, c, city);
   // R41: fase jalan dari jarak BERSIH sesudah dorong-keluar (lihat
   // advanceWalkPhase) — bukan dari walkPlayer, supaya tidak treadmill.
-  advanceWalkPhase(p);
+  advanceWalkPhase(p, dt);
   return msg;
 }

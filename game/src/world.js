@@ -98,7 +98,7 @@ export function createWorld(rng, savedMission, sp) {
       shotgun: { ammo: 0, reserve: 0 },
     };
     state.player.fireTimer = 0;
-    state.player.walkPhase = 0; // R41
+    state.player.walkPhase = 0;
     walkV = 0;
     state.player.inCar = false;
     state.player.car = null;
@@ -615,7 +615,8 @@ export function createWorld(rng, savedMission, sp) {
     const target = (mx || my) ? (input.run() ? PLAYER.runSpeed : PLAYER.walkSpeed) : 0;
     walkV += (target - walkV) * Math.min(1, dt * 10);
     p.runPhase += dt * walkV * 0.06;
-    if (mx !== 0 || my !== 0) { walkDX = mx / len; walkDY = my / len; }
+    const fw = state.camera.fwd || [0, -1], wx = fw[0] * -my - fw[1] * mx, wy = fw[1] * -my + fw[0] * mx;
+    if (mx !== 0 || my !== 0) { walkDX = wx / len; walkDY = wy / len; }
     if (walkV > 0.01) {
       const ox = p.x, oy = p.y;
       moveCircle(city, p, walkDX * walkV * dt, walkDY * walkV * dt, PLAYER.radius);
@@ -623,7 +624,7 @@ export function createWorld(rng, savedMission, sp) {
       if (dx * dx + dy * dy > 3600) walkV = 0;
       else if (Math.hypot(dx, dy) < walkV * dt * 0.1) walkV *= 0.5;
     }
-    let d = aimAngle - p.angle;
+    let d = (input.shootHeld() ? aimAngle : Math.atan2(walkDY, walkDX)) - p.angle;
     d = ((d + 3.14159265) % 6.2831853 + 6.2831853) % 6.2831853 - 3.14159265;
     p.angle += d * Math.min(1, dt * 12);
   }

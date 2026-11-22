@@ -47,6 +47,11 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 // cache hit terus; invalidasi bila array buildings berganti (seed/load baru).
 const _bldHitCache = new Map();
 let _bldHitCity = null;
+let _orbit = 0; // CHARFIX: swipe-orbit offset (rad) — decays in updateCamera.
+if (typeof window !== 'undefined') {
+  window.addEventListener('nh-orbit', (e) => { _orbit += (e.detail.dx || 0) * 0.005; });
+  window.addEventListener('nh-orbit-reset', () => { _orbit = 0; });
+}
 function slotInBuilding(city, wx, wy) { // true bila titik (px game) di dalam footprint gedung
   if (city.buildings !== _bldHitCity) { _bldHitCache.clear(); _bldHitCity = city.buildings; }
   const key = Math.round(wx) + ',' + Math.round(wy);
@@ -1413,7 +1418,7 @@ function personSprite(SP, B, x, z, yaw, col, opt, camFwd, t) {
   // SMOOTH-WALK (crossfade pose Jax): 4 pose diskrit = kaki "snap" tiap ganti
   // frame (terukur atlas: lompat s.d. 14 px sel ~19 px layar @1280x800, 5,6 Hz).
   // Paruh pertama tiap frame (u<0,5): gambar pose SEBELUMNYA sebagai ghost
-  // yang memudar + pose sekarang yang muncul — dissolve ~0,1 dtk, bukan snap.
+  // yang memudar + pose sekarang yang muncul — dissolve ~0,18 dtk, bukan snap.
   // Hanya Jax (kind player): ped kecil di layar, pop-nya tak terbaca. Ghost
   // HANYA saat fase maju (Jax jalan); kalau diam fase beku -> tanpa ghost
   // (kalau tidak, double-image beku saat berhenti di tengah blend). Alpha
@@ -1424,12 +1429,12 @@ function personSprite(SP, B, x, z, yaw, col, opt, camFwd, t) {
     const u = (((ph % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2)) / (Math.PI / 2);
     const advanced = _playerLastPhase !== null && ph !== _playerLastPhase;
     _playerLastPhase = ph;
-    if (advanced && u < 0.5) {
+    if (advanced && u < 0.7) {
       const ccPrev = angle + ((phase + 3) % 4) * 8;
       const pu0 = (ccPrev * PED_CELL_W) / PED_AW, pu1 = ((ccPrev + 1) * PED_CELL_W) / PED_AW;
-      const g = 1 - u * 2;
+      const g = 1 - u / 0.7;
       quad(SP, P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), n, [[pu0, v0], [pu1, v0], [pu1, v1], [pu0, v1]], [g, g, g], 12);
-      curCol = [u * 2, u * 2, u * 2];
+      curCol = [u / 0.7, u / 0.7, u / 0.7];
     }
   }
   quad(SP, P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), n, [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], curCol, 12);
@@ -2577,8 +2582,8 @@ function updateCamera(state, dt, cam) {
     // lompat. cam.fwd = arah pandang (dipakai culling + matahari).
     const a = hero.angle || 0;
     const snap = !cam.init || Math.hypot(hero.x - cam.hx, hero.y - cam.hy) > 600;
-    if (snap) cam.yaw = a;
-    else cam.yaw += angDiff(a, cam.yaw) * Math.min(1, dt * 4.0);
+    if (snap) cam.yaw = a + _orbit;
+    else cam.yaw += angDiff(a + _orbit, cam.yaw) * Math.min(1, dt * 4.0);
     const yx = Math.cos(cam.yaw), yz = Math.sin(cam.yaw);
     const hx = hero.x * S, hz = hero.y * S;
     let ex, ey, ez, tx, ty, tz, fx, fz;
@@ -2601,6 +2606,14 @@ function updateCamera(state, dt, cam) {
     cam.eye = [cam.x, cam.ey, cam.z];
     cam.target = [tx, ty, tz];
     cam.fwd = [fx, fz];
+    // CHARFIX FRONT (mode 2): kamera di DEPAN Jax (fx = -facing) — kalau fwd
+    // yang dipublish = arah pandang, W = lawan arah hadap -> hadap mengejar
+    // antipode-nya sendiri -> Jax berputar di tempat (~1,5 putaran/dtk,
+    // terukur: +429° dalam 3 dtk tahan-W). Publish arah HADAP (yx,yz) supaya
+    // W = arah hadap (perilaku depan Minecraft F5: jalan mendekati kamera),
+    // stabil; BEHIND/POV tidak berubah (di sana fx sudah = arah hadap).
+    state.camera.fwd = of.mode === 2 ? [yx, yz] : cam.fwd;
+    _orbit *= Math.max(0, 1 - dt * 1.2);
     return;
   }
   const a = hero.angle || 0;
@@ -2608,8 +2621,8 @@ function updateCamera(state, dt, cam) {
   const dist = 13 + Math.min(1, speed / 540) * 3;
   const latOff = -2.0;
   const snap = !cam.init || Math.hypot(hero.x - cam.hx, hero.y - cam.hy) > 600;
-  if (snap) cam.yaw = a;
-  else cam.yaw += angDiff(a, cam.yaw) * Math.min(1, dt * 4.0);
+  if (snap) cam.yaw = a + _orbit;
+  else cam.yaw += angDiff(a + _orbit, cam.yaw) * Math.min(1, dt * 4.0);
   const fx = Math.cos(cam.yaw), fz = Math.sin(cam.yaw);
   const tx = hero.x * S - fx * dist - fz * latOff;
   const tz = hero.y * S - fz * dist + fx * latOff;
@@ -2630,6 +2643,8 @@ function updateCamera(state, dt, cam) {
   cam.eye = [cam.x, 4.4 + altU, cam.z];
   cam.target = [hero.x * S + fx * 40, 2.2 + altU, hero.y * S + fz * 40];
   cam.fwd = [fx, fz];
+  state.camera.fwd = cam.fwd;
+  _orbit *= Math.max(0, 1 - dt * 1.2);
 }
 
 

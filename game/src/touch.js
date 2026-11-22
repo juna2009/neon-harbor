@@ -141,6 +141,39 @@ function initTouch() {
     });
   });
 
+  // ---- CHARFIX swipe orbit: geser horizontal di canvas #game -> orbit kamera.
+  // Ambang 12 px (B4): gerak >12 px membatalkan tembakan yang sempat dimulai
+  // mousedown sintetis touch — dispatch mouseup sintetis pada window (input.js
+  // mendengarkan mouseup di window) + abaikan mousedown kompatibel berikutnya
+  // (klik susulan sesudah swipe) via capture-phase stopImmediatePropagation.
+  // Geser vertikal diabaikan. Canvas sudah touch-action:none (index.html).
+  const gameCanvas = document.getElementById('game');
+  if (gameCanvas) {
+    let swId = null, swX = 0, swMoved = false, swSuppressDown = false;
+    gameCanvas.addEventListener('mousedown', (e) => {
+      if (swSuppressDown) { swSuppressDown = false; e.stopImmediatePropagation(); e.preventDefault(); }
+    }, true);
+    gameCanvas.addEventListener('pointerdown', (e) => {
+      swId = e.pointerId; swX = e.clientX; swMoved = false;
+    });
+    gameCanvas.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== swId) return;
+      const dx = e.clientX - swX;
+      if (Math.abs(dx) >= 12) {
+        window.dispatchEvent(new CustomEvent('nh-orbit', { detail: { dx } }));
+        swX = e.clientX;
+        if (!swMoved) {
+          swMoved = true;
+          window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+          swSuppressDown = true;
+        }
+      }
+    });
+    const swEnd = (e) => { if (e.pointerId === swId) swId = null; };
+    gameCanvas.addEventListener('pointerup', swEnd);
+    gameCanvas.addEventListener('pointercancel', swEnd);
+  }
+
   window.addEventListener('blur', releaseAll);
   window.__nhTouch = true; // trace for smoke tests: controls mounted
 }

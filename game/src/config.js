@@ -9,17 +9,15 @@ export const CHECKPOINT_KEY = 'neon-harbor-checkpoint';
 export const SETTINGS_KEY = 'neon-harbor-settings';
 export const PLAYER = {
   radius: 14,
-  walkSpeed: 80,
-  runSpeed: 130,
+  walkSpeed: 20,
+  runSpeed: 60,
   health: 100,
   pistolAmmo: 24,
   pistolReserve: 120,
   bulletSpeed: 760,
   fireInterval: 0.22,
 };
-// R41: radian fase jalan per px jarak tempuh (Jax + semua NPC).
-// 1 langkah = π rad → ~39 px/langkah: jalan Jax 80 px/dtk ≈ 2,04 langkah/dtk
-export const WALK_PHASE_PER_PX = 0.08;
+export const WALK_PHASE_PER_PX = 0.31;
 export const WEAPONS = {
   pistol: {
     name: 'Pistol', damage: 1, pellets: 1, spread: 0.03,
