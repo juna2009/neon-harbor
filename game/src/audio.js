@@ -8,6 +8,7 @@ export function createAudio() {
   let master = null;
   let sirenNodes = null;
   let engineNodes = null;
+  let fireNodes = null; // VEHICLE-DAMAGE-P1: loop crackle api (Heavily)
   let stationIndex = 0;
   let music = null;
   let sfx = null;
@@ -191,7 +192,7 @@ export function createAudio() {
       noise(1.4, 0.35, 160);
       tone(70, 1.1, 'sine', 0.16, 38);
     },
-    engine(speed01) {
+    engine(speed01, dmg01) { // VEHICLE-DAMAGE-P1: dmg01 0 Normal / 0,5 Damaged / 1 Heavily
       if (muted) return;
       const c = ensure();
       if (!c) return;
@@ -206,8 +207,39 @@ export function createAudio() {
           osc.start();
           engineNodes = { osc, gain };
         }
-        engineNodes.osc.frequency.value = 55 + speed01 * 140;
-        engineNodes.gain.gain.value = 0.03 + speed01 * 0.04;
+        const d = dmg01 || 0;
+        const t = c.currentTime;
+        const wob = d >= 1 ? 1 + 0.08 * Math.sin(t * 31) : 1; // tersendat: wobble frekuensi ±8%
+        const sput = d >= 1 ? (t % 0.13 < 0.07 ? 1 : 0.35) : 1; // gate persegi 7-8 Hz
+        engineNodes.osc.frequency.value = (55 + speed01 * 140) * (1 - 0.15 * d) * wob;
+        engineNodes.gain.gain.value = (0.03 + speed01 * 0.04) * (1 - 0.2 * d) * sput;
+      } catch {
+      }
+    },
+    fireLoop(on) { // VEHICLE-DAMAGE-P1: crackle api — noise loop lowpass 800 Hz, lewat master (ikut volume/mute)
+      if (!on) {
+        if (fireNodes) { try { fireNodes.src.stop(); } catch { } fireNodes = null; }
+        return;
+      }
+      if (muted || fireNodes) return;
+      const c = ensure();
+      if (!c) return;
+      try {
+        const len = c.sampleRate;
+        const buffer = c.createBuffer(1, len, c.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < len; i += 1) data[i] = Math.random() * 2 - 1;
+        const src = c.createBufferSource();
+        src.buffer = buffer;
+        src.loop = true;
+        const filter = c.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 800;
+        const gain = c.createGain();
+        gain.gain.value = 0.05;
+        src.connect(filter).connect(gain).connect(master);
+        src.start();
+        fireNodes = { src, gain };
       } catch {
       }
     },

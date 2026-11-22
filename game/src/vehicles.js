@@ -85,6 +85,27 @@ export function carVariant(car) {
   }
   return null;
 }
+// VEHICLE-DAMAGE-P1: hp -> stage visual (0 Normal / 1 Damaged / 2 Heavily /
+// 3 Wrecked), % dari max supaya armor (max 150) tidak mengubah bacaan.
+// Dipakai ketiga renderer + 2D. File pre-cut (world.js) TIDAK BOLEH import
+// dari sini (dossier) — world.js punya salinan satu-barisnya sendiri.
+export function dmgStage(hp, max) {
+  if (hp === undefined || hp === null) return 0;
+  if (hp <= 0) return 3;
+  const r = hp / (max || 100);
+  return r > 0.7 ? 0 : r > 0.4 ? 1 : 2;
+}
+// Stage dari objek mobil apa pun: wreck flag dulu, lalu hp (pemain maxHp /
+// truk maxHp) atau health traffic (max 2). Visual SELALU di-derive dari
+// sini tiap frame — tidak ada flag visual yang disimpan (repair otomatis
+// menghapus semua kerusakan karena hp kembali penuh).
+export function carDmgStage(car) {
+  if (!car) return 0;
+  if (car.wreck) return 3;
+  if (car.hp !== undefined) return dmgStage(car.hp, car.maxHp || 100);
+  if (car.health !== undefined) return dmgStage(car.health, car.maxHealth || 2);
+  return 0;
+}
 
 // ---------------------------------------------------------------------------
 // 2D top-down drawing (same conventions as assets.js drawCarShape:
@@ -118,7 +139,7 @@ function base2d(c, car, night) {
   c.ellipse(2, 3, L / 2 + 2, W / 2 + 2, 0, 0, Math.PI * 2);
   c.fill();
   c.rotate(car.angle);
-  if (night > 0.3) {
+  if (night > 0.3 && !car.wreck) { // VEHICLE-DAMAGE-P1: bangkai tidak menyala
     c.fillStyle = `rgba(255,240,170,${(0.10 * night).toFixed(3)})`;
     c.beginPath();
     c.moveTo(L / 2, -W / 2 + 3);

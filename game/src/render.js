@@ -6,7 +6,7 @@ import { drawBuildingShadow, drawDayTint, drawLightPool, drawLightning, drawWetR
 import { drawBuoy, drawBuilding, drawCargoShip, drawContainer, drawCrane, drawCrosswalk, drawHydrant, drawLamp, drawPier, drawSign, drawTree } from './props.js';
 import { drawDirectionArrow, drawMenuFrame, drawTargetRing } from './ui-art.js';
 import { drawArmoredTruck, drawBoatWake, drawCarShape, drawExplosionSprite, drawHarborSkyline, drawPedPhone, drawPedestrian, drawPerson, drawPinkTaxi, drawPoliceCar, drawSpeedboat, drawSportCar, drawTireSmoke, drawVan, drawWaterJet, rr } from './assets.js';
-import { carVariant, drawVehicleBody } from './vehicles.js'; // FOLLOW-UP v18: varian top-down (SUV/race/delivery) — render.js TIDAK ada di teks dossier (cut berakhir di audio.js, terverifikasi dari out/dossier.json yang diregenerasi), dan vehicles.js sudah terjangkau lewat assets.js di sub-pohon yang sama, jadi import ini 0 byte dossier (dossier diregenerasi + dibuktikan identik setelah edit).
+import { carDmgStage, carVariant, drawVehicleBody } from './vehicles.js'; // FOLLOW-UP v18: varian top-down (SUV/race/delivery) — render.js TIDAK ada di teks dossier (cut berakhir di audio.js, terverifikasi dari out/dossier.json yang diregenerasi), dan vehicles.js sudah terjangkau lewat assets.js di sub-pohon yang sama, jadi import ini 0 byte dossier (dossier diregenerasi + dibuktikan identik setelah edit).
 import { drawJaxPortrait, drawMaraPortrait } from './portraits.js';
 import { drawBridge } from './drawbridge.js';
 import { drawHud2, drawPause2, drawShop2, drawTitle2, hudCluster, hudScaleFor } from './ui2.js';
@@ -42,6 +42,42 @@ function drawTrafficCar(ctx, car, night) {
   else if (car.body === 'van') drawVan(ctx, car.x, car.y, car.angle, car.color);
   else if (car.body === 'sedan' || car.body === 'hatch') drawSportCar(ctx, car.x, car.y, car.angle, car.color);
   else drawCarShape(ctx, car, night);
+  drawDamageOverlay2d(ctx, car); // VEHICLE-DAMAGE-P1: paritas 2D (semua jalur di atas)
+}
+// VEHICLE-DAMAGE-P1: overlay top-down — penyok (bercak gelap di kap) +
+// retak kaca depan (garis terang) + jelaga Heavily + bodi hangus Wrecked.
+// Di-derive dari hp/health/wreck tiap frame; mobil depan = +L/2.
+function drawDamageOverlay2d(ctx, car) {
+  const st = carDmgStage(car);
+  if (st < 1) return;
+  const L = car.length, W = car.width;
+  ctx.save();
+  ctx.translate(car.x, car.y);
+  ctx.rotate(car.angle);
+  ctx.fillStyle = 'rgba(12,10,10,0.55)';
+  ctx.beginPath();
+  ctx.ellipse(L * 0.22, 0, 9, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(235,240,250,0.9)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(L / 2 - 15, -W / 2 + 4);
+  ctx.lineTo(L / 2 - 8, 0);
+  ctx.lineTo(L / 2 - 15, W / 2 - 4);
+  ctx.stroke();
+  if (st >= 2) {
+    ctx.fillStyle = 'rgba(10,9,9,0.6)';
+    ctx.fillRect(L * 0.1, -W / 2 + 2, 12, W - 4);
+    ctx.fillStyle = 'rgba(10,9,9,0.7)';
+    ctx.fillRect(L / 2 - 3, -W / 2 + 1, 3, W - 2);
+  }
+  if (st === 3) {
+    ctx.fillStyle = 'rgba(15,12,11,0.55)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, L / 2, W / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 function drawPlayer(ctx, p, state) {
   const bob = Math.sin(p.runPhase) * 1.5;
@@ -542,6 +578,10 @@ export function createRenderer(canvas) {
     for (const car of state.traffic.cars) {
       if (car.alive && inView(car.x, car.y, 60)) drawTrafficCar(ctx, car, night);
     }
+    // VEHICLE-DAMAGE-P1: bangkai (alive=false, wreck=true) digambar terpisah.
+    for (const car of state.traffic.parked.concat(state.traffic.cars)) {
+      if (car.wreck && inView(car.x, car.y, 60)) drawTrafficCar(ctx, car, night);
+    }
     if (state.armored && state.armored.truck) {
       const truck = state.armored.truck;
       if (truck.alive && inView(truck.x, truck.y, 60)) {
@@ -755,6 +795,15 @@ export function createRenderer(canvas) {
         ctx.beginPath();
         ctx.arc(pt.x, pt.y, pt.size * (1.6 - alpha * 0.6), 0, Math.PI * 2);
         ctx.fill();
+      } else if (pt.kind === 'bsmoke') { // VEHICLE-DAMAGE-P1: asap hitam pekat
+        ctx.fillStyle = `rgba(30,28,26,${(alpha * 0.6).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.size * (1.6 - alpha * 0.6), 0, Math.PI * 2);
+        ctx.fill();
+      } else if (pt.kind === 'glow') { // VEHICLE-DAMAGE-P1: cahaya hangat api
+        ctx.globalAlpha = alpha * 0.3;
+        ctx.drawImage(glowSprite, pt.x - 24, pt.y - 24, 48, 48);
+        ctx.globalAlpha = 1;
       } else {
         ctx.strokeStyle = pt.color;
         ctx.globalAlpha = alpha;
@@ -794,6 +843,7 @@ export function createRenderer(canvas) {
     if (p.inCar && p.car) {
       const car = { ...p.car, color: p.car.paint || COLORS.playerCar, kind: 'player' };
       drawCarShape(ctx, car, night);
+      drawDamageOverlay2d(ctx, car); // VEHICLE-DAMAGE-P1: hero 2D
       if (p.car.paint) {
         ctx.save();
         ctx.translate(p.car.x, p.car.y);

@@ -5,7 +5,7 @@
 
 import { PRESETS, webglUniforms } from './timeofday.js';
 import { drawCarRealistic } from './cars3d.js'; // R26: cars3d v15d di game/src/
-import { carVariant } from './vehicles.js'; // CARS v18: varian visual (suv/race/delivery)
+import { carDmgStage, carVariant, dmgStage } from './vehicles.js'; // CARS v18: varian visual (suv/race/delivery)
 import { drawCruiseShips } from './ships3d.js'; // R27b: kapal pesiar + yacht (statis, visual saja)
 import { marketSite, marketStalls } from './market.js'; // R35-F9: night market (Pasar Malam) — geometri dari market.js
 import { activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
@@ -320,6 +320,13 @@ void main(){
   if (vM > 20.5 && vM < 21.5) { // EXPLOSION-VFX S2: debu tan #c9b18a, ground-hugging; alpha = radial x vC.r x 0.45 (Stage 1: 0.3) — TAN GELAP DICOBA + DIBATALKAN: ROI debu 15.3% (vs 16.6% tan terang) + billboard tinggi mengotori langit; tan terang dipertahankan, perbaikan debu = ukuran/jendela/alpha
     float al = smoothstep(0.5, 0.08, length(vU - 0.5)) * vC.r;
     gl_FragColor = vec4(vec3(0.788, 0.694, 0.541), al * 0.45);
+    return;
+  }
+  if (vM > 21.5 && vM < 22.5) { // VEHICLE-DAMAGE-P1: asap HITAM pekat (Heavily) — mat 20 = flash disc + mat 21 = debu (S2 sudah pakai), jadi hitam = mat 22 BARU. Mat 17 JANGAN diubah (milik VFX ledakan). Warna [0.12,0.11,0.10], alpha maks 0.65; tepi lembut seperti mat 17 supaya tidak jadi kartu solid di malam.
+    float r = length(vU - 0.5);
+    float al = smoothstep(0.5, 0.30, r) * vC.r;
+    float rimK = mix(1.0, 0.85, smoothstep(0.40, 0.44, r) * (1.0 - smoothstep(0.46, 0.5, r)));
+    gl_FragColor = vec4(vec3(0.12, 0.11, 0.10) * rimK, al * 0.65);
     return;
   }
   if (vM > 7.5 && vM < 8.5) { // smear: memudar sepanjang v
@@ -2132,7 +2139,8 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   const yawOf = (o) => Math.PI / 2 - (o.angle || 0);
   if (p.inCar && p.car) {
     const c = p.car;
-    drawCarRealistic(OP, GL, 'hero', c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#e33e5f'), { t, tl: tlGain, door: c.doorAngle || 0, doorSide: c.doorSide || -1 }); // R26: hero selalu realistis v15d (gate heroReal dihapus)
+    const hSt = carDmgStage(c); // VEHICLE-DAMAGE-P1: visual di-derive dari hp tiap frame
+    drawCarRealistic(OP, GL, 'hero', c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#e33e5f'), { t, tl: tlGain, door: c.doorAngle || 0, doorSide: c.doorSide || -1, damage: hSt >= 1, heavy: hSt >= 2, charred: hSt === 2 ? 0.55 : 0 }); // R26: hero selalu realistis v15d (gate heroReal dihapus)
     if (tod.headlight > 0.02) { // TOD: kerucut lampu depan (malam) — trapesium mat 8,
       // v=0 di bemper (terang) -> v=1 jauh (memudar, ikut shader smear).
       const yaw = yawOf(c), fw = [Math.sin(yaw), Math.cos(yaw)], rg = [Math.cos(yaw), -Math.sin(yaw)];
@@ -2210,6 +2218,10 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
           // a=0.5 -> 0.55) — alpha akhir = radial x carrier x 0.45 (FS mat 17)
           const carrier = isBigSmoke ? a * (1.35 - 0.5 * a) : a;
           billDir(SH, pt.x * S, cy, pt.y * S, sz, sz, pn, [carrier, 0, 0], 17);
+        } else if (pt.kind === 'bsmoke') {
+          // VEHICLE-DAMAGE-P1: asap hitam (Heavily) — mat 22, carrier =
+          // life-fade polos (tanpa rumus asap besar).
+          billDir(SH, pt.x * S, cy, pt.y * S, sz, sz, pn, [a, 0, 0], 22);
         } else if (pt.kind === 'flame') {
           // Api ke SH mat 18 (blend NORMAL, oranye city3d) — BUKAN GL mat 7:
           // 14 flame aditif yang tumpang tindih menembus putih (terukur:
@@ -2222,16 +2234,21 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
         }
       };
       let n1 = 0;
+      let dmgSmokeN = 0; // VEHICLE-DAMAGE-P1: sub-cap asap kerusakan — 12 quad hidup (B2/B10: asap kerusakan tidak boleh mengusir asap ledakan dari pass 1)
       for (const pt of pts) {
         if (n1 >= 70) break;
-        if (pt.kind !== 'flame' && pt.kind !== 'spark' && pt.kind !== 'smoke') continue;
+        if (pt.kind !== 'flame' && pt.kind !== 'spark' && pt.kind !== 'smoke' && pt.kind !== 'bsmoke') continue;
         if (!vis(pt.x, pt.y, 60)) continue;
+        if (pt.dmg && (pt.kind === 'smoke' || pt.kind === 'bsmoke')) {
+          if (dmgSmokeN >= 12) continue;
+          dmgSmokeN += 1;
+        }
         emitPt(pt); n1 += 1;
       }
       let n2 = 0;
       for (const pt of pts) {
         if (n2 >= 8) break;
-        if (pt.kind !== 'jet' && pt.kind !== 'flash') continue;
+        if (pt.kind !== 'jet' && pt.kind !== 'flash' && pt.kind !== 'glow') continue; // VEHICLE-DAMAGE-P1: glow hangat (mat 7 aditif) ikut pass 2
         if (!vis(pt.x, pt.y, 60)) continue;
         emitPt(pt); n2 += 1;
       }
@@ -2249,6 +2266,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
         const sparkAge = []; // [age, x, y, vx, vy] spark, untuk ledakan biasa
         for (const pt of pts) {
           if (pt.kind !== 'flame' && pt.kind !== 'spark') continue;
+          if (pt.dmg) continue; // VEHICLE-DAMAGE-P1: api kerusakan (mesin terbakar kecil) BUKAN ledakan — jangan derive flash/ring/debu darinya (bisect: 2 flame staged + flame truk se-umur dikelompokkan jadi 1 "ledakan" -> flash disc di centroid + ring 10u = veil kuning)
           const age = (pt.maxLife || 1) - pt.life;
           if (age < 0 || age > 1.5) continue; // S2: 1.5 (bukan 1.0) — jendela debu diperpanjang ke 1.5 dtk; flash/ring tak terpengaruh (jendelanya sendiri <0.6)
           if (pt.kind === 'flame') {
@@ -2356,7 +2374,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   // carSpec('sedan') = hero, jadi JANGAN pakai 'sedan' mentah).
   const CAR_TYPE = { bus: 'bus', fire: 'fire', medic: 'medic', apc: 'apc', hatchback: 'hatchback', sedanL: 'sedanL', pickup: 'pickup', hatch: 'hatchback', sedan: 'sedanL', van: 'sedanL', taxi: 'sedanL' };
   const drawCar = (c, police, unit) => {
-    if (!c || c.alive === false) return;
+    if (!c || (c.alive === false && !c.wreck)) return; // VEHICLE-DAMAGE-P1: bangkai (alive=false, wreck=true) TETAP digambar — lewat sini, bukan loop terpisah
     // R36V2-DOUBLE: mobil pemain digambar 2x — sekali sebagai hero
     // (line 999, tipe 'hero') dan sekali lagi di sini sebagai traffic/
     // parked (CAR_TYPE[body], cat sama, bentuk nyaris sama). Sejak R26
@@ -2373,7 +2391,10 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     // polisi/militer, truk lapis baja. Type 'hero'/'armored' tak tersentuh.
     else type = carVariant(c) || CAR_TYPE[c.body] || 'sedanL';
     const lod = distPx(c.x, c.y, hx0, hy0) < 250 ? undefined : 'low';
-    drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, taxi: c.body === 'taxi', tl: tlGain, door: c.doorAngle || 0, doorSide: c.doorSide || -1 }); // R36V2-TAXI: papan TAXI + strip kotak (cars3d.js) — digabung R38 tlGain
+    // VEHICLE-DAMAGE-P1: polisi dari unit.health/3, traffic/parkir dari
+    // health/2, bangkai = stage 3 (damage + heavy + charred 0.35, pintu 0).
+    const st = c.wreck ? 3 : (police && unit ? dmgStage(unit.health, 3) : carDmgStage(c));
+    drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, taxi: c.body === 'taxi', tl: tlGain, door: c.wreck ? 0 : (c.doorAngle || 0), doorSide: c.doorSide || -1, damage: st >= 1, heavy: st >= 2, charred: st === 3 ? 0.35 : st === 2 ? 0.55 : 0, wreck: !!c.wreck }); // R36V2-TAXI: papan TAXI + strip kotak (cars3d.js) — digabung R38 tlGain
   };
   for (const c of state.traffic.cars || []) drawCar(c, false);
   for (const c of state.traffic.parked || []) drawCar(c, false);
@@ -2405,7 +2426,9 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   if (at && at.alive && near(at.x, at.y, R) && vis(at.x, at.y, 100)) { // R27c-TUNE: 60->100
     // R27c: truk lapis baja = drawCarRealistic 'armored' (kab + bak + 6 roda),
     // bukan car() lama (slab + kaca + spoiler) — temuan video #4.
-    drawCarRealistic(OP, GL, 'armored', at.x * S, at.y * S, yawOf(at), (at.length || 54) * S, (at.width || 24) * S, hx(at.color || '#4a5240'), { t, tl: tlGain });
+    // VEHICLE-DAMAGE-P1: stage dari at.hp/20 (maxHp di-set saat spawn).
+    const tSt = carDmgStage(at);
+    drawCarRealistic(OP, GL, 'armored', at.x * S, at.y * S, yawOf(at), (at.length || 54) * S, (at.width || 24) * S, hx(at.color || '#4a5240'), { t, tl: tlGain, damage: tSt >= 1, heavy: tSt >= 2, charred: tSt === 2 ? 0.55 : 0 });
   }
 
   // Helikopter polisi + kolam cahaya searchlight di hero.

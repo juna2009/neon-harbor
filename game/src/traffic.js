@@ -76,7 +76,7 @@ function blocked(car, others, gap) {
   const fx = Math.cos(car.angle);
   const fy = Math.sin(car.angle);
   for (const o of others) {
-    if (!o || o === car || o.alive === false) continue;
+    if (!o || o === car || (o.alive === false && !o.wreck)) continue; // VEHICLE-DAMAGE-P1: bangkai menghalangi (traffic yield)
     const dx = o.x - car.x;
     const dy = o.y - car.y;
     const along = dx * fx + dy * fy;
@@ -90,7 +90,7 @@ function blocked(car, others, gap) {
 function xBlock(car, others, ix, iy, g) {
   const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
   for (const o of others) {
-    if (!o || o === car || o.alive === false || o.kind !== 'traffic') continue;
+    if (!o || o === car || (o.alive === false && !o.wreck) || o.kind !== 'traffic') continue; // VEHICLE-DAMAGE-P1: bangkai di persimpangan menghalangi
     if (o.axis === car.axis && !o.turning && (!g || Math.abs(o.speed) >= 5 || Math.abs(o.x - ix) >= 52 || Math.abs(o.y - iy) >= 52)) continue;
     const dx = o.x - car.x, dy = o.y - car.y, al = dx * fx + dy * fy;
     if (al >= 0 && al <= 98 && Math.abs(dx * -fy + dy * fx) < 26) return true;
@@ -130,7 +130,7 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
           const iy = car.axis === 'v' ? p.at : car.road;
           let clear = true;
           for (const o of traffic.cars) {
-            if (o === car || !o.alive) continue;
+            if (o === car || (!o.alive && !o.wreck)) continue; // VEHICLE-DAMAGE-P1: bangkai di persimpangan = tidak clear
             if (Math.hypot(o.x - ix, o.y - iy) < 70) { clear = false; break; }
           }
           if (!clear) { car.turnPlan = undefined; car.noTurnAt = p.at; }
@@ -169,7 +169,7 @@ export function stepTraffic(traffic, dt, city, obstacles, bridge) {
     if (distToNext < 90 && blocked({ ...car, x: car.x + fx * 60, y: car.y + fy * 60 }, others, 60)) desired = 0;
     // A-01 box guard: don't ENTER an occupied box. Outside only, or both freeze.
     if (g) {
-      for (const o of others) if (o && o !== car && o.alive !== false && Math.abs(o.x - ix) < 52 && Math.abs(o.y - iy) < 52) { desired = 0; break; }
+      for (const o of others) if (o && o !== car && (o.alive !== false || o.wreck) && Math.abs(o.x - ix) < 52 && Math.abs(o.y - iy) < 52) { desired = 0; break; } // VEHICLE-DAMAGE-P1: bangkai menempati box
     }
     if (car.back > 0) desired = 0;
     car.speed = desired === 0 ? Math.max(0, car.speed - 420 * dt) : Math.min(desired, car.speed + 240 * dt);

@@ -569,6 +569,7 @@ function spawnArmoredTruck(world) {
   }
   const truck = makeCar(x, y, angle, '#4a5240', 'armored', 'van');
   truck.hp = ARMORED_HP;
+  truck.maxHp = ARMORED_HP; // VEHICLE-DAMAGE-P1: max untuk stage visual
   truck.speed = 55;
   truck.cruise = 55;
   truck.axis = vertical ? 'v' : 'h';

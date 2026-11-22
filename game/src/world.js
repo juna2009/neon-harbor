@@ -147,8 +147,8 @@ export function createWorld(rng, savedMission, sp) {
     for (const c of state.collectibles) c.taken = false;
     for (const pk of state.pickups) pk.taken = false;
     for (const ped of peds) ped.alive = true;
-    for (const car of traffic.cars) { car.alive = true; car.health = 2; }
-    for (const car of traffic.parked) { car.alive = true; car.health = 2; }
+    for (const car of traffic.cars) { car.alive = true; car.health = 2; car.wreck = false; car.wreckT = 0; }
+    for (const car of traffic.parked) { car.alive = true; car.health = 2; car.wreck = false; car.wreckT = 0; }
   }
   function restoreCheckpoint() {
     const cp = loadCheckpoint();
@@ -204,6 +204,7 @@ export function createWorld(rng, savedMission, sp) {
     p.car = car;
     car.kind = 'player';
     if (car.hp === undefined) car.hp = maxCarHp(state);
+    car.maxHp = maxCarHp(state); // VEHICLE-DAMAGE-P1: max untuk stage visual
     if (car.stolen === undefined) {
       car.stolen = true;
       if (!state.upgrades.ghost && (state.wanted > 0 || nearPolice(p.x, p.y, 300))) addWanted(state, 1);
@@ -354,7 +355,7 @@ export function createWorld(rng, savedMission, sp) {
       if (p.car.hp <= 0) {
         const car = p.car;
         spawnExplosion(car.x, car.y);
-        car.alive = false;
+        makeWreck(car); // VEHICLE-DAMAGE-P1: ledakan tetap, bangkai menetap (D1=A)
         p.inCar = false;
         p.car = null;
         p.x = car.x + 40;
@@ -368,7 +369,7 @@ export function createWorld(rng, savedMission, sp) {
       if (car.alive && Math.hypot(car.x - sx, car.y - sy) < 70) {
         car.health -= 2;
         if (car.health <= 0) {
-          car.alive = false;
+          makeWreck(car); // VEHICLE-DAMAGE-P1
           state.events.explosion = { x: car.x, y: car.y };
         }
       }
@@ -421,19 +422,31 @@ export function createWorld(rng, savedMission, sp) {
     const m = best.ov * (best.s >= 0 ? -1 : 1);
     return [best.ux * m, best.uy * m];
   }
+  // VEHICLE-DAMAGE-P1 (D1=A, D3): bangkai pasca-ledakan — alive=false
+  // (tidak bergerak, tidak bisa dimasuki/didorong) + wreck=true (tetap
+  // digambar + solid). Cap 3: bangkai ke-4 menghapus yang tertua.
+  function makeWreck(car) {
+    const all = state.traffic.cars.concat(state.traffic.parked);
+    const old = all.filter((c) => c.wreck);
+    if (old.length >= 3) old[0].wreck = false;
+    car.alive = false;
+    car.wreck = true;
+    car.wreckT = 0;
+  }
   function collideCars(car, dt) {
     const armoredTruck = state.armored && state.armored.truck ? [state.armored.truck] : [];
     const others = state.traffic.cars.concat(state.traffic.parked)
       .concat(state.police.units.filter((u) => u.kind === 'car').map((u) => u.car))
       .concat(armoredTruck);
     for (const other of others) {
-      if (other === car || !other.alive) continue;
+      if (other === car || (!other.alive && !other.wreck)) continue; // VEHICLE-DAMAGE-P1: bangkai solid (bukan hantu)
       const p = obbPush(car, other);
       if (!p) continue;
       const impact = Math.abs(car.speed);
-      car.x += p[0] / 2;
-      car.y += p[1] / 2;
-      if (other.kind !== 'parked' && !other.roadblock && !other.concrete && other.kind !== 'armored') {
+      const pk = other.wreck ? 1 : 0.5; // VEHICLE-DAMAGE-P1: bangkai diam — pemain terima dorongan penuh (setengah = masih menembus ~13 px)
+      car.x += p[0] * pk;
+      car.y += p[1] * pk;
+      if (!other.wreck && other.kind !== 'parked' && !other.roadblock && !other.concrete && other.kind !== 'armored') { // VEHICLE-DAMAGE-P1: bangkai tidak didorong
         other.x -= p[0] / 2 * 1.5;
         other.y -= p[1] / 2 * 1.5;
         if (other.kind === 'traffic') other.speed = Math.max(other.speed, impact * 0.6);
@@ -445,10 +458,19 @@ export function createWorld(rng, savedMission, sp) {
         state.shake = Math.max(state.shake, 4);
         addSkid(car.x, car.y, car.angle);
         if (car.hp !== undefined && impact > 350) {
+          // VEHICLE-DAMAGE-P1: percikan di titik kontak (depan mobil).
+          for (let i = 0; i < 4; i += 1) {
+            state.particles.push({
+              x: car.x + Math.cos(car.angle) * (car.length || 46) * 0.5 + state.rng.range(-4, 4),
+              y: car.y + Math.sin(car.angle) * (car.length || 46) * 0.5 + state.rng.range(-4, 4),
+              vx: state.rng.range(-120, 120), vy: state.rng.range(-120, 120),
+              life: 0.6, maxLife: 0.6, size: 4, color: '#ffd23e', kind: 'spark',
+            });
+          }
           car.hp -= impact * 0.03 * (state.upgrades.armor ? 0.5 : 1);
           if (car.hp <= 0) {
             spawnExplosion(car.x, car.y);
-            car.alive = false;
+            makeWreck(car); // VEHICLE-DAMAGE-P1: ledakan tetap, bangkai menetap (D1=A)
             if (state.player.car === car) {
               state.player.inCar = false;
               state.player.car = null;
@@ -610,6 +632,58 @@ export function createWorld(rng, savedMission, sp) {
     const sx = (p.x - camera.x) * state.zoom + viewW / 2;
     const sy = (p.y - camera.y) * state.zoom + viewH / 2;
     return Math.atan2(input.mouse.y - sy, input.mouse.x - sx);
+  }
+  // VEHICLE-DAMAGE-P1: emisi asap/api kerusakan — reuse state.particles
+  // (mat 17 abu, mat 22 hitam, mat 18 api, mat 7 glow). Salinan lokal
+  // dmgStage: world.js pre-cut TIDAK BOLEH import vehicles.js (dossier).
+  function dmgStageW(hp, max) { return hp <= 0 ? 3 : hp / (max || 100) > 0.7 ? 0 : hp / (max || 100) > 0.4 ? 1 : 2; }
+  function emitDmgSmoke(c, kind, size, life, hx, hy) {
+    state.particles.push({
+      x: hx, y: hy, vx: state.rng.range(-20, 20), vy: state.rng.range(-20, 20),
+      life, maxLife: life, size, color: kind === 'bsmoke' ? '#1e1c1a' : '#9aa0a8', kind, dmg: true,
+    });
+  }
+  function stepDamageFx(dt) {
+    const p = state.player;
+    const px = p.inCar && p.car ? p.car.x : p.x, py = p.inCar && p.car ? p.car.y : p.y;
+    const list = [];
+    if (p.inCar && p.car && p.car.alive) list.push({ c: p.car, st: dmgStageW(p.car.hp, p.car.maxHp || 100) });
+    for (const c of state.traffic.cars) if (c.alive && c.health === 1) list.push({ c, st: 1 });
+    for (const c of state.traffic.parked) if (c.alive && c.health === 1) list.push({ c, st: 1 });
+    const tr = state.armored && state.armored.truck;
+    if (tr && tr.alive && tr.hp < 20) list.push({ c: tr, st: dmgStageW(tr.hp, 20) });
+    for (const c of state.traffic.cars.concat(state.traffic.parked)) if (c.wreck) list.push({ c, st: 3 });
+    list.sort((a, b) => Math.hypot(a.c.x - px, a.c.y - py) - Math.hypot(b.c.x - px, b.c.y - py));
+    let dmgSmoke = 0;
+    for (const pt of state.particles) if (pt.dmg && (pt.kind === 'smoke' || pt.kind === 'bsmoke')) dmgSmoke += 1;
+    for (const e of list.slice(0, 4)) { // cap 4 emitter terdekat
+      const c = e.c, st = e.st;
+      if (Math.hypot(c.x - px, c.y - py) > 700) continue; // di luar jangkauan = hemat array
+      const hx = c.x + Math.cos(c.angle) * (c.length || 46) * 0.35; // kap mesin = 16 px di depan pusat
+      const hy = c.y + Math.sin(c.angle) * (c.length || 46) * 0.35;
+      c.smokeT = (c.smokeT || 0) - dt;
+      if (st === 3) { // asap sisa bangkai: tipis, 1/dtk, ~20 dtk
+        c.wreckT = (c.wreckT || 0) + dt;
+        if (c.wreckT < 20 && c.smokeT <= 0 && dmgSmoke < 12) { c.smokeT = 1; dmgSmoke += 1; emitDmgSmoke(c, 'smoke', 6, 1, hx, hy); }
+        continue;
+      }
+      if (st < 1) continue;
+      if (st === 1) { // Damaged: asap tipis 1/0,5 dtk
+        if (c.smokeT <= 0 && dmgSmoke < 12) { c.smokeT = 0.5; dmgSmoke += 1; emitDmgSmoke(c, 'smoke', state.rng.range(5, 7), state.rng.range(0.7, 1.2), hx, hy); }
+      } else { // Heavily: asap hitam 1/0,15 dtk + api kecil + glow hangat
+        if (c.smokeT <= 0 && dmgSmoke < 12) { c.smokeT = 0.15; dmgSmoke += 1; emitDmgSmoke(c, 'bsmoke', state.rng.range(9, 14), state.rng.range(1.5, 2.5), hx, hy); }
+        c.fireT = (c.fireT || 0) - dt;
+        if (c.fireT <= 0) {
+          c.fireT = 0.4;
+          state.particles.push({ x: hx, y: hy, vx: state.rng.range(-15, 15), vy: state.rng.range(-15, 15), life: 0.6, maxLife: 0.6, size: state.rng.range(6, 10), color: '#ff8c28', kind: 'flame', dmg: true }); // dmg:true = api kecil, bukan ledakan (webgl2.js jangan derive flash/ring)
+        }
+        c.glowT = (c.glowT || 0) - dt;
+        if (c.glowT <= 0) {
+          c.glowT = 0.12;
+          state.particles.push({ x: hx, y: hy, vx: 0, vy: 0, life: 0.15, maxLife: 0.15, size: 6, color: '#7a3c10', kind: 'glow' }); // glow kecil+redup (v1 18 = matahari kuning)
+        }
+      }
+    }
   }
   function stepParticles(dt) {
     for (let i = state.particles.length - 1; i >= 0; i -= 1) {
@@ -853,6 +927,7 @@ export function createWorld(rng, savedMission, sp) {
     for (const unit of state.police.units) {
       if (unit.kind === 'car') obstacles.push(unit.car);
     }
+    for (const q of traffic.parked) if (q.wreck) obstacles.push(q); // P1: bangkai parkir -> obstacles (parked bukan obstacles; traffic menembus bangkai)
     stepTraffic(traffic, dt, city, obstacles, state.bridge);
     for (const car of traffic.cars) if (car.kind !== 'player') hitScenery(car);
     const danger = events.shot
@@ -891,6 +966,7 @@ export function createWorld(rng, savedMission, sp) {
     updatePizza(state, dt);
     updatePickups(state);
     stepBoats(state, dt);
+    stepDamageFx(dt); // VEHICLE-DAMAGE-P1: emisi asap/api kerusakan
     stepParticles(dt);
     const heatGain = state.wanted - wantedBefore;
     if (heatGain > 0) {

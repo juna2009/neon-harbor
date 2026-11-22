@@ -480,6 +480,71 @@ export function stageShot(name, world) {
     state.mission.dialogueTimer = 30;
     state.wanted = 1;
     stageHeat(world);
+  } else if (name === 'damage' || name === 'damage-dmg' || name === 'damage-crit' || name === 'damage-2d' || name === 'damage-wreck') {
+    // VEHICLE-DAMAGE-P1: empat state dalam satu frame — hero (hp varian),
+    // traffic Damaged (health 1), truk Heavily (hp 5), bangkai (wreck).
+    // Varian: damage = hero hp 30 (Heavily, default); damage-dmg = hp 65
+    // (Damaged); damage-crit = hp 5 (Heavily dalam); damage-wreck = hero
+    // utuh + bangkai TEPAT di jalur depan (untuk gate clipping);
+    // damage-2d = sama, top-down 2D. TOD: damage-sore (18:30) /
+    // damage-malam (22:00) via sufiks umum (applyTod di akhir).
+    const heroHp = name === 'damage-dmg' ? 65 : name === 'damage-crit' ? 5 : 30;
+    setLight(world, 0.45);
+    state.zoom = 1.15;
+    state.zoomLock = true;
+    state.view3d = name !== 'damage-2d';
+    placePlayerInCar(world, 1400, 1120, 0);
+    const hc = world.state.player.car;
+    hc.hp = name === 'damage-wreck' ? 100 : heroHp;
+    hc.maxHp = 100;
+    state.mission.done = true;
+    state.mission.dialogueTimer = 0;
+    // Traffic Damaged di depan hero (jalur utara, terbaca di frame).
+    // Sudut -0,3 = mobil menyerong ke kiri supaya FLANK KIRI (sisi kawah
+    // drawDamage, dxR negatif) menghadap kamera chase di belakang — yaw
+    // +0,2 dulu malah memamerkan flank KANAN (tanpa kawah) ke kamera.
+    const dmgCar = state.traffic.cars.find((c) => c.alive && c !== hc);
+    if (dmgCar) {
+      dmgCar.x = 1500; dmgCar.y = 1100; dmgCar.angle = -0.3; dmgCar.speed = 0;
+      dmgCar.health = 1; dmgCar.staged = true;
+    }
+    // Truk Heavily (hp 5/20) di depan, jalur selatan — lebih jauh supaya
+    // tidak menutupi bangkai.
+    const truck = makeCar(1720, 1136, 0, '#4a5240', 'armored', 'van');
+    truck.hp = 5; truck.maxHp = 20; truck.speed = 0;
+    state.armored.truck = truck;
+    // Bangkai: tepi selatan jalan (default) atau tepat di jalur hero
+    // (damage-wreck). Shot mode tidak step dunia — hook emisi tidak jalan,
+    // jadi asap/api di-push langsung sebagai partikel beku.
+    const wk = state.traffic.parked.find((c) => c.alive && c !== hc);
+    if (wk) {
+      wk.x = name === 'damage-wreck' ? 1540 : 1560;
+      wk.y = name === 'damage-wreck' ? 1120 : 1150;
+      wk.angle = name === 'damage-wreck' ? 0 : 0.15; wk.speed = 0;
+      wk.alive = false; wk.wreck = true; wk.wreckT = 0; wk.staged = true;
+    }
+    // Pindahkan traffic lain dari jalan 1120 di depan hero supaya tidak
+    // menutupi staging (pola chase3d).
+    for (const c of state.traffic.cars) {
+      if (c !== dmgCar && c.alive && c.axis === 'h' && c.road === 1120 && c.x > 1300 && c.x < 1900) {
+        c.road = 800; c.y = 800 + (c.dir > 0 ? 14 : -14);
+      }
+    }
+    const hx = hc.x + 16, hy = hc.y;
+    if (name !== 'damage-wreck' && heroHp <= 40) { // Heavily: asap hitam + api + glow di kap hero — 8 puff (bukan 4): disebar sepanjang x + lateral y + umur beda, MENIRU akumulasi 1-2 dtk emisi live (frame live 5 dtk membuktikan plume terbaca; 4 puff beku terlalu kecil)
+      for (let i = 0; i < 8; i += 1) state.particles.push({ x: hx + (i - 3.5) * 10, y: hy + (i % 3 - 1) * 12, vx: 0, vy: 0, life: 1.0 + (i % 4) * 0.35, maxLife: 2.5, size: 9 + (i % 3) * 2, color: '#1e1c1a', kind: 'bsmoke', dmg: true });
+      state.particles.push({ x: hx, y: hy, vx: 0, vy: 0, life: 0.6, maxLife: 0.6, size: 6, color: '#ff8c28', kind: 'flame', dmg: true });
+      state.particles.push({ x: hx + 8, y: hy - 6, vx: 0, vy: 0, life: 0.5, maxLife: 0.6, size: 5, color: '#ff8c28', kind: 'flame', dmg: true });
+      state.particles.push({ x: hx, y: hy, vx: 0, vy: 0, life: 0.15, maxLife: 0.15, size: 6, color: '#7a3c10', kind: 'glow' }); // glow KECIL + redup (paritas world.js — v1 18 = matahari kuning)
+    } else if (name === 'damage-dmg') { // Damaged: asap tipis di kap hero — 4 puff disebar (bukan 2 menumpuk)
+      for (let i = 0; i < 4; i += 1) state.particles.push({ x: hx + (i - 1.5) * 9, y: hy + (i % 2 ? 7 : -7), vx: 0, vy: 0, life: 0.8 + (i % 2) * 0.3, maxLife: 1.2, size: 6, color: '#9aa0a8', kind: 'smoke', dmg: true });
+    }
+    // Traffic Damaged + truk Heavily juga berasap di frame (hook live tidak
+    // jalan di shot mode — push beku di kap masing-masing).
+    if (dmgCar) for (let i = 0; i < 3; i += 1) state.particles.push({ x: dmgCar.x + 16 + (i - 1) * 8, y: dmgCar.y + (i % 2 ? 6 : -6), vx: 0, vy: 0, life: 0.9, maxLife: 1.2, size: 6, color: '#9aa0a8', kind: 'smoke', dmg: true });
+    for (let i = 0; i < 5; i += 1) state.particles.push({ x: 1736 + (i - 2) * 9, y: 1136 + (i % 3 - 1) * 10, vx: 0, vy: 0, life: 1.2 + (i % 3) * 0.3, maxLife: 2.5, size: 10, color: '#1e1c1a', kind: 'bsmoke', dmg: true });
+    state.particles.push({ x: 1736, y: 1136, vx: 0, vy: 0, life: 0.6, maxLife: 0.6, size: 6, color: '#ff8c28', kind: 'flame', dmg: true });
+    if (wk) for (let i = 0; i < 3; i += 1) state.particles.push({ x: wk.x + 14 + (i - 1) * 9, y: wk.y + (i % 2 ? 7 : -7), vx: 0, vy: 0, life: 0.9 + (i % 2) * 0.2, maxLife: 1.2, size: 6, color: '#9aa0a8', kind: 'smoke', dmg: true }); // asap sisa bangkai
   } else if (name === 'pizza') {
     setLight(world, 0.85);
     state.zoom = 1.1;

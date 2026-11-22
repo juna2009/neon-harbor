@@ -58,7 +58,13 @@ export function stepBullets(world, dt) {
           dead = true;
           car.health -= b.damage;
           if (car.health <= 0) {
+            // VEHICLE-DAMAGE-P1: ledakan tetap + bangkai menetap, cap 3
+            // (salinan cap makeWreck — combat.js pre-cut, tanpa import baru).
             car.alive = false;
+            car.wreck = true;
+            car.wreckT = 0;
+            const ws = allCars.filter((c) => c.wreck);
+            if (ws.length > 3) ws[0].wreck = false;
             world.events.explosion = { x: car.x, y: car.y };
             addWanted(world, 1);
           }

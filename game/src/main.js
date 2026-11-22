@@ -316,8 +316,13 @@ function runGame() {
       }
       announce(`${state.events.missionComplete.title} complete. $${state.events.missionComplete.reward} earned.`);
     }
-    if (state.player.inCar && state.player.car) audio.engine(Math.abs(state.player.car.speed) / 540);
-    else audio.engineOff();
+    if (state.player.inCar && state.player.car) {
+      const hc = state.player.car; // VEHICLE-DAMAGE-P1: mesin ikut rusak
+      const hr = (hc.hp === undefined ? 100 : hc.hp) / (hc.maxHp || 100);
+      const dmg01 = hr > 0.7 ? 0 : hr > 0.4 ? 0.5 : 1;
+      audio.engine(Math.abs(hc.speed) / 540, dmg01);
+      audio.fireLoop(dmg01 >= 1);
+    } else { audio.engineOff(); audio.fireLoop(false); }
     if (state.wanted >= 2) audio.startSiren();
     else audio.stopSiren();
     input.endFrame();

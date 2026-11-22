@@ -68,7 +68,7 @@ export function drawCarShape(ctx, car, night) {
   ctx.ellipse(2, 3, L / 2 + 2, W / 2 + 2, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.rotate(car.angle);
-  if (night > 0.3) {
+  if (night > 0.3 && !car.wreck) { // VEHICLE-DAMAGE-P1: bangkai tidak menyala
     ctx.fillStyle = `rgba(255,240,170,${(0.10 * night).toFixed(3)})`;
     ctx.beginPath();
     ctx.moveTo(L / 2, -W / 2 + 3);

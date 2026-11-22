@@ -5,7 +5,7 @@ import { BRIDGE } from './drawbridge.js';
 import { PRESETS } from './timeofday.js';
 import { drawMarket3D } from './market.js'; // R35-F9: night market stalls + string lights (post-cut)
 import { activeJob, jobsState, tickJobs } from './jobs.js'; // R35-F7
-import { carVariant } from './vehicles.js'; // CARS v18: varian visual (suv/race/delivery)
+import { carDmgStage, carVariant, dmgStage } from './vehicles.js'; // CARS v18: varian visual (suv/race/delivery)
 // Neon Harbor 3D title-screen — software 3D engine, Canvas 2D only, no libs.
 // Perspective projection + painter's algorithm. Deterministic (seeded).
 let x, W = 1280, H = 800, CX = W / 2, HOR = H * .46;
@@ -1064,6 +1064,11 @@ function canvasCarType(car) {
 }
 function car3d(wx, wy, angle, len, wid, color, o) {
   let L = len * CS, Wd = wid * CS;
+  // VEHICLE-DAMAGE-P1: bangkai = cat hangus ×0,35 (paritas charred WebGL2);
+  // Heavily = cat hangus ×0,55 (paritas charred 0.55 WebGL2 — dulu hero
+  // Heavily tetap merah terang di Canvas 3D, padahal WebGL2 marun hangus).
+  if (o.wreck) color = sh(hx3(color), 0.35, 0);
+  else if (o.heavy) color = sh(hx3(color), 0.55, 0);
   const bodyH = o.hero ? 0.72 : 0.8;
   if (o.hero) Wd *= 1.08; // F2: hero car reads wider / lower
   // T2: vehicle-type recipes (T1 supplies o.type from traffic.js; default sedan).
@@ -1227,6 +1232,19 @@ function car3d(wx, wy, angle, len, wid, color, o) {
     const blink = Math.floor((o.t || 0) * 6) % 2 === 0;
     vQuad(cx, cz, angle, -L * 0.08, -Wd * 0.22, 0.5, 1.5, 1.78, blink ? '#ff4040' : '#2f6fd0');
     vQuad(cx, cz, angle, -L * 0.08, Wd * 0.22, 0.5, 1.5, 1.78, blink ? '#2f6fd0' : '#ff4040');
+  }
+  // VEHICLE-DAMAGE-P1: penyok (patch gelap di kap, y 0,97 = di atas
+  // permukaan bodi 0,95) + retak kaca belakang (hero saja — kaca belakang
+  // non-hero tidak digambar) + jelaga Heavily di hidung.
+  if (o.damage) {
+    topStrip(cx, cz, angle, L * 0.28, 0, Wd * 0.5, 0.3, 0.97, 'rgba(18,16,16,0.85)');
+    // retak kaca belakang hero: GELAP di atas kaca langit pucat (dulu
+    // (235,240,250) nyaris sama dgn kaca (150,195,235) -> tak terlihat) +
+    // dep eksplisit di depan kaca (dep kaca = dep-L/2-1.0; dep lbh kecil =
+    // lbh dekat = digambar belakangan = di atas).
+    if (o.hero) vQuad(cx, cz, angle, -L * 0.32 - 0.07, 0, Wd * 0.5, 1.14, 1.30, 'rgba(28,32,42,0.85)', dep - L / 2 - 1.5);
+    if (o.hero) vQuad(cx, cz, angle, -L * 0.32 - 0.07, 0, 0.06, 1.06, 1.38, 'rgba(28,32,42,0.8)', dep - L / 2 - 1.6);
+    if (o.heavy) topStrip(cx, cz, angle, L * 0.42, 0, Wd * 0.42, 0.26, 0.99, 'rgba(12,10,10,0.9)');
   }
 }
 function boat3d(wx, wy, angle, len, wid, color, o) {
@@ -2728,15 +2746,23 @@ export function drawChase3D(ctx, state) {
   // parked + moving traffic
   for (const car of state.traffic.parked) {
     if (!car.alive || !inRange(car.x, car.y, 150, 100)) continue;
-    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: canvasCarType(car) });
+    const st = carDmgStage(car); // VEHICLE-DAMAGE-P1
+    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: canvasCarType(car), damage: st >= 1, heavy: st >= 2 });
   }
   for (const car of state.traffic.cars) {
     if (!car.alive || !inRange(car.x, car.y, 150, 100)) continue;
-    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: canvasCarType(car) });
+    const st = carDmgStage(car); // VEHICLE-DAMAGE-P1
+    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: canvasCarType(car), damage: st >= 1, heavy: st >= 2 });
+  }
+  // VEHICLE-DAMAGE-P1: bangkai (alive=false, wreck=true) digambar terpisah.
+  for (const car of state.traffic.parked.concat(state.traffic.cars)) {
+    if (!car.wreck || !inRange(car.x, car.y, 150, 100)) continue;
+    car3d(car.x, car.y, car.angle, car.length, car.width, car.color, { t, type: canvasCarType(car), damage: true, heavy: true, wreck: true });
   }
   if (state.armored && state.armored.truck && state.armored.truck.alive && inRange(state.armored.truck.x, state.armored.truck.y, 150, 100)) {
     const tr = state.armored.truck;
-    car3d(tr.x, tr.y, tr.angle, tr.length, tr.width, '#4a5240', { t });
+    const tSt = carDmgStage(tr); // VEHICLE-DAMAGE-P1: stage dari tr.hp/20
+    car3d(tr.x, tr.y, tr.angle, tr.length, tr.width, '#4a5240', { t, damage: tSt >= 1, heavy: tSt >= 2 });
     const dp = cP(tr.x * CS, 4, tr.y * CS);
     if (dp) { x.save(); x.font = 'bold 20px sans-serif'; x.textAlign = 'center'; x.fillStyle = '#ffd23e'; x.fillText('$', dp[0], dp[1]); x.restore(); }
   }
@@ -2747,7 +2773,8 @@ export function drawChase3D(ctx, state) {
       if (unit.car.concrete) {
         box3(unit.car.x * CS, 0.15, unit.car.y * CS, unit.car.width * CS, 2.2, unit.car.length * CS, unit.car.angle, '#6b6f75', Math.hypot(unit.car.x * CS - ccX, unit.car.y * CS - ccZ));
       } else {
-        car3d(unit.car.x, unit.car.y, unit.car.angle, unit.car.length, unit.car.width, unit.car.color || '#2f6fd0', { pol: true, t, type: canvasCarType(unit.car) });
+        const uSt = dmgStage(unit.health, 3); // VEHICLE-DAMAGE-P1: polisi health 3
+        car3d(unit.car.x, unit.car.y, unit.car.angle, unit.car.length, unit.car.width, unit.car.color || '#2f6fd0', { pol: true, t, type: canvasCarType(unit.car), damage: uSt >= 1, heavy: uSt >= 2 });
       }
     } else if (unit.kind === 'boat') {
       if (!inRange(unit.x, unit.y, 150, 100)) continue;
@@ -2830,7 +2857,7 @@ export function drawChase3D(ctx, state) {
   let drawn = 0;
   for (const pt of state.particles) {
     if (drawn > 24) break;
-    if (pt.kind !== 'flame' && pt.kind !== 'smoke') continue;
+    if (pt.kind !== 'flame' && pt.kind !== 'smoke' && pt.kind !== 'bsmoke' && pt.kind !== 'glow') continue; // VEHICLE-DAMAGE-P1: bsmoke + glow
     if (!inRange(pt.x, pt.y, 120, 100)) continue;
     const a = Math.max(0, pt.life / pt.maxLife);
     // EXPLOSION-VFX S2 parity (mirror webgl2.js emitPt): asap besar tumbuh +
@@ -2840,7 +2867,13 @@ export function drawChase3D(ctx, state) {
     const sz = isBigSmoke ? pt.size * CS * (1.1 + (1 - a) * 1.3) * 2.2 : pt.size * CS * (1.6 - a * 0.6) * 2.2;
     const carrier = isBigSmoke ? a * (1.35 - 0.5 * a) : a;
     const y0 = Math.max(0.1, pt.size * CS * 0.4) + (isBigSmoke ? age * 0.8 : 0);
-    const col = pt.kind === 'flame' ? 'rgba(255,140,40,' + (a * 0.85).toFixed(3) + ')' : 'rgba(107,107,117,' + (carrier * 0.42).toFixed(3) + ')';
+    // VEHICLE-DAMAGE-P1: bsmoke = hitam pekat (paritas FS mat 22), glow =
+    // oranye hangat transparan (paritas mat 7 aditif — di Canvas tanpa
+    // additive, oranye redup biasa).
+    const col = pt.kind === 'flame' ? 'rgba(255,140,40,' + (a * 0.85).toFixed(3) + ')'
+      : pt.kind === 'bsmoke' ? 'rgba(30,28,26,' + (carrier * 0.6).toFixed(3) + ')'
+      : pt.kind === 'glow' ? 'rgba(255,150,50,' + (a * 0.3).toFixed(3) + ')'
+      : 'rgba(107,107,117,' + (carrier * 0.42).toFixed(3) + ')';
     vQuad(pt.x * CS, pt.y * CS, ccYaw, 0, 0, sz, y0, y0 + sz, col);
     drawn += 1;
   }
@@ -2853,6 +2886,7 @@ export function drawChase3D(ctx, state) {
     const sparkAge = [];
     for (const pt of state.particles) {
       if (pt.kind !== 'flame' && pt.kind !== 'spark') continue;
+      if (pt.dmg) continue; // VEHICLE-DAMAGE-P1: api kerusakan BUKAN ledakan — jangan derive flash/ring/debu (paritas webgl2.js; bisect: flame staged + flame truk se-umur = 1 "ledakan" -> ring 10u kuning = veil di Canvas 3D)
       const age = (pt.maxLife || 1) - pt.life;
       if (age < 0 || age > 1.5) continue; // S2: 1.5 (bukan 1.0) — jendela debu diperpanjang ke 1.5 dtk
       if (pt.kind === 'flame') {
@@ -2949,7 +2983,7 @@ export function drawChase3D(ctx, state) {
   }
   // hero last (nearest): plane / car / boat / on foot (R25: plane first)
   if (p.inPlane && p.plane) plane3d(p.plane.x, p.plane.y, p.plane.angle, p.plane, { hero: true, t });
-  else if (p.inCar && p.car) car3d(p.car.x, p.car.y, p.car.angle, p.car.length, p.car.width, p.car.paint || '#e33e5f', { hero: true, t });
+  else if (p.inCar && p.car) { const hSt = carDmgStage(p.car); car3d(p.car.x, p.car.y, p.car.angle, p.car.length, p.car.width, p.car.paint || '#e33e5f', { hero: true, t, damage: hSt >= 1, heavy: hSt >= 2 }); } // VEHICLE-DAMAGE-P1
   else if (p.inBoat && p.boat) boat3d(p.boat.x, p.boat.y, p.boat.angle, p.boat.length, p.boat.width, p.boat.color, { hero: true, t });
   else ped3d(p.x, p.y, p.angle, '#ffd23e');
   // JF4: lamps + palms sit on the SIDEWALK, 43px from the ROAD centreline

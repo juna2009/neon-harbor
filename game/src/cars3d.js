@@ -235,6 +235,9 @@ export function carSpec(type) { return CAR_SPECS[type] || CAR_SPECS.hero; }
 //   paint : [r,g,b] atau '#rrggbb' (kosongkan = warna spec)
 //   opts  : { brake:boolean, t:number (waktu — strobo), police:boolean,
 //           detail:'low'|'mid' (LOD), damage:boolean (penyok + kaca retak),
+//           heavy:boolean (level 2: lampu pecah + bumper + jelaga),
+//           charred:number (0 = utuh, 0.55 Heavily, 0.35 Wrecked — pengali cat),
+//           wreck:boolean (bangkai: kedua lampu mati, pintu selalu tertutup),
 //           tl:number (gain lampu rem ikut waktu — R38 Item 7, default 1),
 //           door:number (sudut pintu depan 0..1,2 rad — DOOR-ANIM, default 0),
 //           doorSide:number (-1 flank kiri | +1 kanan, default -1) }
@@ -254,9 +257,13 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   // tanah), pita atap lebih terang (clear-coat kena matahari).
   // v3: kontras diperkuat (×0,66 / ×1,35) — batch 5: flop sisi matahari
   // masih tipis, flank masih satu warna datar di sebagian besar bodi.
+  const o = opts || {};
+  // VEHICLE-DAMAGE-P1: cat hangus — pengali dihitung SEBELUM paintDark /
+  // paintLight turun dari col, jadi seluruh bodi (flank, kap, atap) ikut
+  // gelap seragam; kaca + lampu tidak ikut (punya warna sendiri).
+  if (o.charred) col = col.map((c) => c * o.charred);
   const paintDark = col.map((c) => c * 0.66);
   const paintLight = col.map((c) => Math.min(1, c * 1.35 + 0.06));
-  const o = opts || {};
   const blink = Math.floor((o.t || 0) * 6) % 2 === 0;
   const fwd = [Math.sin(yaw), Math.cos(yaw)];
   const rgt = [Math.cos(yaw), -Math.sin(yaw)];
@@ -1346,7 +1353,23 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       crack(0.22, 0.15); crack(-0.21, 0.11); crack(0.06, -0.24);
       crack(0.20, -0.10); crack(-0.08, -0.21); crack(-0.24, -0.06);
     }
+    // VEHICLE-DAMAGE-P1 level 2 (Heavily/Wrecked): jelaga di kap + patch
+    // bumper depan gelap. Kap miring 1,14 (cowl) -> 0,99 (hidung); quad
+    // diletakkan 0,03-0,04 di atas permukaan (tanpa z-fight, pola strip
+    // kap hitam hero) — di bus/apc (bodi kotak, tanpa kap) quad ini
+    // jatuh DI DALAM bodi = tidak terlihat, tidak merusak. +4 tris.
+    function drawDamageHeavy() {
+      // Jelaga kap: quad miring mengikuti kemiringan kap (depan lebih
+      // rendah), tepi tidak persegi (sisi depan lebih sempit).
+      quadOut(at(-0.42, 1.12, L * 0.26), at(0.42, 1.12, L * 0.26),
+        at(0.30, 1.05, L * 0.43), at(-0.30, 1.05, L * 0.43), [0, 1, 0.2], [0.07, 0.06, 0.06], 5);
+      // Patch bumper depan: gelap pekat di tengah bumper (di depan muka
+      // bumper, bukan menembus) + goresan kedua yang lebih kecil.
+      qF(0, 0.45, L / 2 + 0.13, W * 0.5, 0.16, [0.05, 0.05, 0.05], 5);
+      qF(-W * 0.2, 0.52, L / 2 + 0.13, W * 0.22, 0.07, [0.09, 0.08, 0.08], 5);
+    }
     if (o.damage) drawDamage();
+    if (o.heavy) drawDamageHeavy();
     drawFrontLights(0.183); // v15: lampu/grill miring mengikuti bevel hidung
     return finish();
   }
@@ -1423,9 +1446,12 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
       quadOut(at(-W * 0.30, 0.655, bevZ(0.655) + 0.075), at(W * 0.30, 0.655, bevZ(0.655) + 0.075),
         at(W * 0.30, 0.705, bevZ(0.705) + 0.075), at(-W * 0.30, 0.705, bevZ(0.705) + 0.075), [0, 0.9, 0.4], CHROME, 1);
     }
+    // VEHICLE-DAMAGE-P1: lampu pecah — Heavily: satu sisi (kiri, s<0)
+    // gelap + DRL-nya mati; Wrecked: kedua sisi mati (tidak ada cahaya).
+    const lampDead = (s) => o.wreck || (o.heavy && s < 0);
     for (const s of [-1, 1]) {
-      pitched(s * W * 0.3, 0.82, 0.55, 0.16, HEADLIGHT, 4);                       // headlight (v16: lebih besar — 0,45->0,55, 0,13->0,16)
-      if (hi) pitched(s * W * 0.3, 0.60, 0.55, 0.05, [1.0, 0.95, 0.8], 4);       // DRL
+      pitched(s * W * 0.3, 0.82, 0.55, 0.16, lampDead(s) ? [0.10, 0.09, 0.09] : HEADLIGHT, 4); // headlight (v16: lebih besar — 0,45->0,55, 0,13->0,16)
+      if (hi && !lampDead(s)) pitched(s * W * 0.3, 0.60, 0.55, 0.05, [1.0, 0.95, 0.8], 4); // DRL
     }
     if (spec.kind === 'sport' && hi) {
       // R36V2-HERO-LED: strip LED diagonal tajam di atas headlight
