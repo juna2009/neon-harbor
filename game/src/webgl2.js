@@ -371,6 +371,10 @@ void main(){
     float gr = h21(floor(vW.xz * 3.0));
     base *= mix(1.0, 0.55, ch) * (0.94 + 0.12 * gr);
   }
+  else if (vM > 5.5 && vM < 6.5) { // GRASS-TEXTURE: grain halus strip tanam (mat 6; vW = koordinat dunia) — pola sama dgn grain ramp FIX3-B di atas; memecah tepi blok sel kasar saat dilihat dekat (on-foot). SEBELUM lighting generik.
+    float gg = h21(floor(vW.xz * 3.0));
+    base *= 0.94 + 0.12 * gg;
+  }
   // Half-Lambert (bible §1.2): bayangan tidak pernah hitam pekat (Valorant)
   float ndl = max(dot(N, uSun), 0.0);
   float halfLam = ndl * 0.5 + 0.5;
@@ -1620,7 +1624,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   }
 
   // Jalan: segmen di sekitar hero (u = sepanjang jalan, v = melintang, untuk marka).
-  const roadCol = [0.10, 0.09, 0.11], walkCol = [0.32, 0.32, 0.32], grassCol = [0.12, 0.30, 0.16]; // TREE-VERGE: grassCol = hijau rumput taman (sama dgn park flat di bawah) — strip tanam, BUKAN ubin
+  const roadCol = [0.10, 0.09, 0.11], walkCol = [0.32, 0.32, 0.32], grassCol = [0.12, 0.30, 0.16], GRASS_L = [0.134, 0.336, 0.179], GRASS_D = [0.106, 0.264, 0.141]; // TREE-VERGE: grassCol = hijau rumput taman (sama dgn park flat di bawah) — strip tanam, BUKAN ubin. GRASS-TEXTURE: tone sel dua-tone mean-preserving ±12% (terang ×1,12 / gelap ×0,88)
   // ZEBRA: trotoar/curb tidak boleh menyeberang persimpangan — pita
   // dibelah di sekitar tiap jalan melintang (|along| < 4.8u = 48px dari
   // pusatnya). Corner pad (|along| 48..80px) TETAP: potongan di kedua
@@ -1654,6 +1658,16 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     // (60px, SIDE traffic.js) = tepi dalam trotoar; lampu ±72, bangku/
     // tong ±75 tetap di trotoar. Curb 48..51px tetap di atas tepi strip.
     const hw = 48 * S;
+    // GRASS-TEXTURE: strip dipecah jadi sel 1,2u (lebar penuh strip) x 4,8u (48px dunia) — FALLBACK dari 2,4u: gate G5 terkontrol menunjukkan L=24 menambah +3.000..4.100 tris (+13..16%) di titik ukur, bukan +918..1.320 seperti estimasi eval (jumlah span dihitung eval terlalu rendah: roadSeg membangun semua jalan dalam R=1700px, bukan hanya yang di frustum). L=48 = setengah biaya. Indeks sel dari koordinat dunia sepanjang jalan (stabil saat kamera bergerak / span terbelah, identik di Canvas). Sel MENGGANTIKAN quad strip (y tetap 0,02 — anti z-fight), mat 5 -> 6 (grain FS).
+    const grassCells = (s0, s1, roadPx, lat, vert) => {
+      for (let c = Math.floor(s0 * 10 / 48); c <= Math.floor((s1 - 1e-9) * 10 / 48); c++) {
+        const lo = Math.max(s0, c * 4.8), hi = Math.min(s1, (c + 1) * 4.8);
+        if (hi - lo <= 0.001) continue;
+        const col = hash2(c, roadPx) < 0.5 ? GRASS_L : GRASS_D;
+        if (vert) flat(OP, lat, 0.02, (lo + hi) / 2, 1.2, hi - lo, col, 6);
+        else flat(OP, (lo + hi) / 2, 0.02, lat, hi - lo, 1.2, col, 6);
+      }
+    };
     if (vertical) {
       const X = x0 * S, z0 = y0 * S, z1 = y1 * S;
       // ZEBRA-STRIPES: UV aspal ABSOLUT-DUNIA (u = koordinat dunia sepanjang
@@ -1662,11 +1676,11 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       quad(OP, [X - hw, -0.05, z0], [X + hw, -0.05, z0], [X + hw, -0.05, z1], [X - hw, -0.05, z1],
         [0, 1, 0], [[z0, 0], [z0, 1], [z1, 1], [z1, 0]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
       for (const [s0, s1] of clipWalkSpans(z0, z1, city.roadsH)) {
-        flat(OP, X - (hw + 0.6), 0.02, (s0 + s1) / 2, 1.2, (s1 - s0), grassCol, 5); // TREE-VERGE: strip tanam rumput hw..hw+1.2u (48..60px) — pohon lateral 54px berdiri DI SINI
+        grassCells(s0, s1, x0, X - (hw + 0.6), true); // GRASS-TEXTURE: sel dua-tone strip tanam rumput hw..hw+1.2u (48..60px) — pohon lateral 54px berdiri DI SINI
         flat(OP, X - (hw + 2.2), 0.02, (s0 + s1) / 2, 2.0, (s1 - s0), walkCol, 14, // TROTOAR: pita hw+1.2u..hw+3.2u (60..80px) + UV dunia (u = lebar 2.0, v = panjang, offset s0-z0)
           [[0, s0 - z0], [2.0, s0 - z0], [2.0, s1 - z0], [0, s1 - z0]]);
         flat(OP, X - (hw + 0.15), 0.03, (s0 + s1) / 2, 0.3, (s1 - s0), [0.07, 0.07, 0.08], 5); // TROTOAR: curb — garis gelap tepi jalan (48..51px); quad, bukan tekstur (u tercermin antar sisi, tepi-tekstur tak simetris)
-        flat(OP, X + (hw + 0.6), 0.02, (s0 + s1) / 2, 1.2, (s1 - s0), grassCol, 5); // TREE-VERGE: strip tanam rumput (48..60px)
+        grassCells(s0, s1, x0, X + (hw + 0.6), true); // GRASS-TEXTURE: sel dua-tone strip tanam rumput (48..60px)
         flat(OP, X + (hw + 2.2), 0.02, (s0 + s1) / 2, 2.0, (s1 - s0), walkCol, 14,
           [[0, s0 - z0], [2.0, s0 - z0], [2.0, s1 - z0], [0, s1 - z0]]);
         flat(OP, X + (hw + 0.15), 0.03, (s0 + s1) / 2, 0.3, (s1 - s0), [0.07, 0.07, 0.08], 5);
@@ -1676,11 +1690,11 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       quad(OP, [x0u, -0.05, Z - hw], [x1u, -0.05, Z - hw], [x1u, -0.05, Z + hw], [x0u, -0.05, Z + hw],
         [0, 1, 0], [[x0u, 0], [x1u, 0], [x1u, 1], [x0u, 1]], roadCol, 13); // R40: aspal 3 -> 13 (tekstur)
       for (const [s0, s1] of clipWalkSpans(x0u, x1u, city.roadsV)) {
-        flat(OP, (s0 + s1) / 2, 0.02, Z - (hw + 0.6), (s1 - s0), 1.2, grassCol, 5); // TREE-VERGE: strip tanam rumput (48..60px) — pohon lateral 54px berdiri DI SINI
+        grassCells(s0, s1, y0, Z - (hw + 0.6), false); // GRASS-TEXTURE: sel dua-tone strip tanam rumput (48..60px) — pohon lateral 54px berdiri DI SINI
         flat(OP, (s0 + s1) / 2, 0.02, Z - (hw + 2.2), (s1 - s0), 2.0, walkCol, 14, // TROTOAR: pita (60..80px) + UV dunia (u = panjang, offset s0-x0u, v = lebar 2.0)
           [[s0 - x0u, 0], [s1 - x0u, 0], [s1 - x0u, 2.0], [s0 - x0u, 2.0]]);
         flat(OP, (s0 + s1) / 2, 0.03, Z - (hw + 0.15), (s1 - s0), 0.3, [0.07, 0.07, 0.08], 5);
-        flat(OP, (s0 + s1) / 2, 0.02, Z + (hw + 0.6), (s1 - s0), 1.2, grassCol, 5); // TREE-VERGE: strip tanam rumput (48..60px)
+        grassCells(s0, s1, y0, Z + (hw + 0.6), false); // GRASS-TEXTURE: sel dua-tone strip tanam rumput (48..60px)
         flat(OP, (s0 + s1) / 2, 0.02, Z + (hw + 2.2), (s1 - s0), 2.0, walkCol, 14,
           [[s0 - x0u, 0], [s1 - x0u, 0], [s1 - x0u, 2.0], [s0 - x0u, 2.0]]);
         flat(OP, (s0 + s1) / 2, 0.03, Z + (hw + 0.15), (s1 - s0), 0.3, [0.07, 0.07, 0.08], 5);

@@ -2483,15 +2483,26 @@ export function drawChase3D(ctx, state) {
     }
     return spans;
   };
+  // GRASS-TEXTURE: strip rumput dipecah jadi sel 1,2u x 4,8u (48px dunia) — FALLBACK dari 2,4u (lihat webgl2.js grassCells: L=24 menambah +13..16% tris di titik ukur terkontrol). Tone dua-tone hash dunia — mekanisme, ukuran sel, hash (h2 == hash2 WebGL2) dan tone SAMA dgn WebGL2 (webgl2.js roadSeg/grassCells). Sel MENGGANTIKAN quad strip (bukan overlay). Tetap lewat sh(..., shadeK, hz(rd)) supaya haze jarak tetap bekerja.
+  const grassCellsC = (x0, y0, x1, y1, roadPx, vert, rd) => {
+    const a0 = vert ? y0 : x0, a1 = vert ? y1 : x1;
+    for (let c = Math.floor(a0 / 48); c <= Math.floor((a1 - 1e-9) / 48); c++) {
+      const lo = Math.max(a0, c * 48), hi = Math.min(a1, (c + 1) * 48);
+      if (hi - lo <= 0.01) continue;
+      const col = sh(hx3(h2(c, roadPx) < 0.5 ? '#47A059' : '#377E46'), shadeK, hz(rd));
+      if (vert) flatQuad(x0, lo, x1, hi, 0.05, col);
+      else flatQuad(lo, y0, hi, y1, 0.05, col);
+    }
+  };
   for (const rx of city.roadsV) {
     for (let gy = -320; gy < WORLD_H + 320; gy += 320) {
       if (!inRange(rx, gy + 160, 175, 135)) continue;
       const rd = Math.hypot(rx * CS - ccX, (gy + 160) * CS - ccZ);
       for (const [s0, s1] of clipWalk(gy, gy + 320, city.roadsH)) {
         // TREE-VERGE: strip tanam rumput 48..60px + trotoar 60..80px (dulu satu pita abu 48..80px)
-        flatQuad(rx - 60, s0, rx - 48, s1, 0.05, sh(hx3('#3f8f4f'), shadeK, hz(rd)));
+        grassCellsC(rx - 60, s0, rx - 48, s1, rx, true, rd); // GRASS-TEXTURE: sel dua-tone strip tanam (48..60px)
         flatQuad(rx - 80, s0, rx - 60, s1, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
-        flatQuad(rx + 48, s0, rx + 60, s1, 0.05, sh(hx3('#3f8f4f'), shadeK, hz(rd)));
+        grassCellsC(rx + 48, s0, rx + 60, s1, rx, true, rd); // GRASS-TEXTURE: sel dua-tone strip tanam (48..60px)
         flatQuad(rx + 60, s0, rx + 80, s1, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
       }
       flatQuad(rx - 48, gy, rx + 48, gy + 320, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
@@ -2518,9 +2529,9 @@ export function drawChase3D(ctx, state) {
       if (x1 <= gx) continue;
       for (const [s0, s1] of clipWalk(gx, x1, city.roadsV)) {
         // TREE-VERGE: strip tanam rumput 48..60px + trotoar 60..80px (dulu satu pita abu 48..80px)
-        flatQuad(s0, ry - 60, s1, ry - 48, 0.05, sh(hx3('#3f8f4f'), shadeK, hz(rd)));
+        grassCellsC(s0, ry - 60, s1, ry - 48, ry, false, rd); // GRASS-TEXTURE: sel dua-tone strip tanam (48..60px)
         flatQuad(s0, ry - 80, s1, ry - 60, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
-        flatQuad(s0, ry + 48, s1, ry + 60, 0.05, sh(hx3('#3f8f4f'), shadeK, hz(rd)));
+        grassCellsC(s0, ry + 48, s1, ry + 60, ry, false, rd); // GRASS-TEXTURE: sel dua-tone strip tanam (48..60px)
         flatQuad(s0, ry + 60, s1, ry + 80, 0.05, sh(hx3('#a6a6a6'), shadeK, hz(rd)));
       }
       flatQuad(gx, ry - 48, x1, ry + 48, 0.06, sh(hx3('#33373d'), shadeK, hz(rd)));
