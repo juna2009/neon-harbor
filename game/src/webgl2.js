@@ -1429,12 +1429,12 @@ function personSprite(SP, B, x, z, yaw, col, opt, camFwd, t) {
     const u = (((ph % (Math.PI / 2)) + Math.PI / 2) % (Math.PI / 2)) / (Math.PI / 2);
     const advanced = _playerLastPhase !== null && ph !== _playerLastPhase;
     _playerLastPhase = ph;
-    if (advanced && u < 0.7) {
+    if (advanced && u < 0.35) {
       const ccPrev = angle + ((phase + 3) % 4) * 8;
       const pu0 = (ccPrev * PED_CELL_W) / PED_AW, pu1 = ((ccPrev + 1) * PED_CELL_W) / PED_AW;
-      const g = 1 - u / 0.7;
+      const g = 1 - u / 0.35;
       quad(SP, P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), n, [[pu0, v0], [pu1, v0], [pu1, v1], [pu0, v1]], [g, g, g], 12);
-      curCol = [u / 0.7, u / 0.7, u / 0.7];
+      curCol = [u / 0.35, u / 0.35, u / 0.35];
     }
   }
   quad(SP, P(-1, -1), P(1, -1), P(1, 1), P(-1, 1), n, [[u0, v0], [u1, v0], [u1, v1], [u0, v1]], curCol, 12);
@@ -2664,9 +2664,9 @@ function updateCamera(state, dt, cam) {
 // ---- factory: webgl2 dulu, fallback webgl, lalu null (2D hidup) ----
 export function createRenderer(glCanvas) { // R26: tanpa HUD demo (HUD asli ui2.js)
   let gl = null, mode = null;
-  try { gl = glCanvas.getContext('webgl2', { antialias: true, preserveDrawingBuffer: true }); if (gl) mode = 'webgl2'; } catch (e) { /* lanjut fallback */ }
+  try { gl = glCanvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false }); if (gl) mode = 'webgl2'; } catch (e) { /* lanjut fallback */ }
   if (!gl) {
-    try { gl = glCanvas.getContext('webgl', { antialias: true, preserveDrawingBuffer: true }); if (gl) mode = 'webgl'; } catch (e) { /* null */ }
+    try { gl = glCanvas.getContext('webgl', { antialias: false, preserveDrawingBuffer: false }); if (gl) mode = 'webgl'; } catch (e) { /* null */ }
   }
   if (!gl) { console.warn('WEBGL2/WEBGL UNAVAILABLE — fallback ke Canvas 2D'); return null; }
   console.log('WEBGL RENDERER (' + mode + '): ' + gl.getParameter(gl.RENDERER));

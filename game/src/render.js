@@ -224,7 +224,7 @@ export function createRenderer(canvas) {
     return c;
   }
   function resize() {
-    const ratio = window.devicePixelRatio || 1;
+    const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
     view.w = window.innerWidth;
     view.h = window.innerHeight;
     canvas.width = Math.round(view.w * ratio);

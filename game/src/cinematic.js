@@ -95,7 +95,7 @@ export function createCinematic() {
     }
     if (!glR) return false;
     try {
-      const ratio = window.devicePixelRatio || 1;
+      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
       const w = ctx.canvas.clientWidth || ctx.canvas.width;
       const h = ctx.canvas.clientHeight || ctx.canvas.height;
       if (glCanvas.width !== Math.round(w * ratio) || glCanvas.height !== Math.round(h * ratio)) glR.resize(w, h, ratio);

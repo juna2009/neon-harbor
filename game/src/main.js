@@ -8,7 +8,7 @@ import { MISSION_DEFS, buyUpgrade, loadCheckpoint, nearGarage } from './missions
 import { stageShot } from './shots.js';
 import * as space from './space.js';
 MISSION_DEFS.push(space.SPACE_MISSION_DEF);
-const MAX_FRAME = 0.25;
+const MAX_FRAME = 0.10;
 const params = new URLSearchParams(window.location.search);
 const shot = params.get('shot');
 const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
