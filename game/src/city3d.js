@@ -2167,9 +2167,13 @@ export function drawChase3D(ctx, state) {
     }
     x.globalAlpha = 1;
   }
-  // sun / moon ahead, high when day, low at sunset
+  // SUN-TREE-WORLDSNAP: sun / moon di azimuth TETAP per TOD (bukan di
+  // depan kamera): sore barat, pagi timur, siang selatan, malam timur
+  // (bulan). Tinggi tetap: tinggi di siang, rendah saat sunset.
   const sunH = dl > 0.7 ? 42 : 10;
-  const sunP = cP(ccX + cfX * 280, sunH, ccZ + cfZ * 280);
+  const _tn = (state.timeOfDay && state.timeOfDay.name) || (dl > 0.7 ? 'siang' : dl > 0.3 ? 'sore' : dl > 0.15 ? 'pagi' : 'malam');
+  const _az = { pagi: [1, 0], siang: [0, 1], sore: [-1, 0], malam: [1, 0] }[_tn.split('->').pop()] || [-1, 0];
+  const sunP = cP(ccX + _az[0] * 280, sunH, ccZ + _az[1] * 280);
   // JETFIX Bug 5 (was: "drawn after 3D so the money shot is never occluded"):
   // the sun disc + glow + anamorphic streaks were painted AFTER the 3D ops,
   // so the disc sat on top of building facades and the horizontal streak

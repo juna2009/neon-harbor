@@ -460,7 +460,7 @@ export function drawCarRealistic(B, G, type, cx, cz, yaw, len, wid, paint, opts)
   // — v5a bayangan masih karpet gelap 1,8× lebar mobil di shot hero.
   // y 0.02–0.08: memotong tipis bagian bawah ban, tidak terlihat dari chase-cam.
   flatOct(G, cx, 0.05, cz, W + 0.7, L + 0.9, [0, 0, 0], 9);
-  flatOct(G, cx, 0.07, cz, W + 1.6, L + 1.8, [0, 0, 0], 9);
+  flatOct(G, cx, 0.07, cz, W + 0.9, L + 1.1, [0, 0, 0], 9); // SUN-TREE: lapis luar W+1.6/L+1.8 -> W+0.9/L+1.1 — dulu meluber jadi genangan hitam di luar jejak mobil (Juna 11:48); bayangan berarah kini dari groundShadow (webgl2.js)
   flatOct(B, cx, 0.02, cz, W + 1.2, L + 1.5, [0.16, 0.15, 0.16], 5); // v10: halo lebih lembut (batch 13 #3 — tepi oktagon jangan terlalu tegas; ukuran tetap seperti v9c2)
   flatOct(B, cx, 0.03, cz, W + 0.95, L + 1.2, [0.14, 0.135, 0.14], 5); // v10: halo lebih lembut
   flatOct(B, cx, 0.04, cz, W + 0.7, L + 0.95, [0.095, 0.09, 0.095], 5);

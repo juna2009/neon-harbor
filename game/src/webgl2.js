@@ -1438,6 +1438,13 @@ function personSprite(SP, B, x, z, yaw, col, opt, camFwd, t) {
 // ---- jembatan state: bangun geometri frame dari state game yang hidup ----
 const BRIDGE_POS = { x: 2400, y: 1680, top: 1640, bottom: 1720 }; // dari drawbridge.js
 const WATER_X = 2448;
+// SUN-TREE-WORLDSNAP: azimuth matahari/bulan TETAP per TOD (dunia, bukan
+// kamera): sore barat (-x, terbenam), pagi timur (+x, fajar), siang
+// selatan (+z, tengah hari), malam timur (bulan terbit). Satu sumber utk
+// shDir (bayangan), SUN (pencahayaan) + uSunPos (piringan langit) supaya
+// ketiganya konsisten. Blend ('blend:a->b') pakai target (sesudah '->').
+const SUNAZ = { pagi: [1, 0], siang: [0, 1], sore: [-1, 0], malam: [1, 0] };
+const sunAzOf = (tod) => SUNAZ[((tod && tod.name) || 'sore').split('->').pop()] || SUNAZ.sore;
 function heroOf(state) {
   const p = state.player;
   // JET R36: pesawat = kendaraan seperti mobil/perahu — kamera chase + pusat
@@ -1474,15 +1481,11 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
   const tlGain = TL_GAIN[tod.name] ?? 1;
   const SHB = tod.bldShadow ? SH : GL; // SIANG v2: bucket bayangan kontak — SH = blending normal (terlihat), G = lama (aditif, hitam = 0)
   // SIANG v2: bayangan gedung + palem (hanya bila preset minta — siang;
-  // sore/pagi/malam TIDAK berubah). Matahari mengikuti kamera: arah bayangan
-  // = -arah matahari horizontal; panjang = tinggi * |SUN.xz| / SUN.y.
-  const shDir = (() => {
-    const fx2 = cam.fwd[0], fz2 = cam.fwd[1];
-    const rx2 = fz2, rz2 = -fx2;
-    const sx2 = fx2 * 0.85 + rx2 * 0.18, sz2 = fz2 * 0.85 + rz2 * 0.18;
-    const sl2 = Math.hypot(sx2, sz2) || 1;
-    return { dx: -sx2 / sl2, dz: -sz2 / sl2, len: sl2 / tod.sun.y };
-  })();
+  // sore/pagi/malam TIDAK berubah). SUN-TREE-WORLDSNAP: matahari TETAP
+  // per TOD (sunAzOf) — arah bayangan = -azimuth matahari; panjang =
+  // tinggi / sun.y (dulu ikut kamera: fx*0.85+rx*0.18, bayangan ikut belok).
+  const _saz = sunAzOf(tod);
+  const shDir = { dx: -_saz[0], dz: -_saz[1], len: 1 / tod.sun.y };
   const sunA = { x: -shDir.dx, z: -shDir.dz, w: 1 - tod.sun.y / 1.5 }; // R27c PALM: azimuth + bobot matahari
   const DIRSH = tod.bldShadow || tod.sun.y < 0.6; // R36 POSTFX: bayangan tanah berarah juga saat matahari rendah (sore 0.30, pagi 0.18) — bukan cuma siang
   const groundShadow = (cx, cz, w, d, h) => {
@@ -1714,6 +1717,12 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     ? city.roadsH.reduce((a, b) => Math.abs(b - hy0) < Math.abs(a - hy0) ? b : a)
     : city.roadsV.reduce((a, b) => Math.abs(b - hx0) < Math.abs(a - hx0) ? b : a);
   const hLat = hEW ? (hRoad - hy0) * S * hFwdX : -(hRoad - hx0) * S * hFwdZ; // lateral sumbu jalan thd hero (kanan = (-fz, fx))
+  // SUN-TREE-WORLDSNAP (audit C): sumbu along kamera + snap grid dunia —
+  // panah lajur, joint trotoar + tempat sampah dulu fwd TETAP dari hero
+  // (melayang di depan hero selamanya); kini dijepit ke grid dunia (pola
+  // snapGrid Canvas) supaya diam di dunia seperti bangku (sudah snap).
+  const camAlong = cam.eye[0] * hFwdX + cam.eye[2] * hFwdZ;
+  const snapG = (a, sp, ph) => Math.floor((a - ph) / sp) * sp + ph;
   const atFU = (fwdU, latU) => [hx0 * S + hFwdX * fwdU + (-hFwdZ) * (hLat + latU), hy0 * S + hFwdZ * fwdU + hFwdX * (hLat + latU)]; // (maju, lateral) unit -> [x, z] unit
   const propClear = (fwdU, latU) => { // prop tidak boleh menutupi koin/hydrant (item 2)
     const q = atFU(fwdU, latU), px = q[0] / S, pz = q[1] / S;
@@ -1721,19 +1730,25 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     for (const hd of state.hydrants || []) if (Math.hypot(hd.x - px, hd.y - pz) < 50) return false;
     return true;
   };
-  // Panah lajur (putih, searah jalan).
+  // Panah lajur (putih, searah jalan) — WORLD-SNAP grid 128u (pola Canvas):
+  // panah diam di dunia, masuk dari jauh saat hero maju.
   { // panah lajur (putih, searah jalan): batang + kepala segitiga
-    const sc = atFU(28.4, 0), hb = atFU(30.4, 0), ht = atFU(32.0, 0);
+    const arAlong = snapG(camAlong + 28.4, 128, 0), arFwd = arAlong - camAlong;
+    if (arFwd >= 12 && arFwd < 62) {
+    const sc = atFU(arFwd, 0), hb = atFU(arFwd + 2.0, 0), ht = atFU(arFwd + 3.6, 0);
     if (hEW) { flat(OP, sc[0], 0.01, sc[1], 2.4, 0.5, MARK_W, 5); quad(OP, [ht[0], 0.01, ht[1]], [hb[0], 0.01, hb[1] - 0.8], [hb[0], 0.01, hb[1] + 0.8], [ht[0], 0.01, ht[1]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], MARK_W, 5); }
     else { flat(OP, sc[0], 0.01, sc[1], 0.5, 2.4, MARK_W, 5); quad(OP, [ht[0], 0.01, ht[1]], [hb[0] - 0.8, 0.01, hb[1]], [hb[0] + 0.8, 0.01, hb[1]], [ht[0], 0.01, ht[1]], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]], MARK_W, 5); }
+    }
   }
   // Ubin trotoar: sambungan melintang tiap ~12 unit di kedua trotoar.
-  // R36-ROADS item 17: dari fwd -6 (dasar layar, di belakang hero).
+  // WORLD-SNAP grid 12u (pola Canvas): joint diam di dunia (dulu fwd -6..66
+  // tetap -> ubin ikut bergeser bersama kamera). R36-ROADS item 17: dari
+  // fwd -6 (dasar layar, di belakang hero).
   // ZEBRA: joint yang jatuh di kotak aspal persimpangan (|along| < 48px
   // dari pusat jalan melintang) dilewati — kalau tidak, garis joint
   // gelap melayang di atas aspal (trotoar di sana sudah di-clip).
   const jCross = hEW ? city.roadsV : city.roadsH;
-  for (let f = -6; f <= 66; f += 12) for (const lat of [-6.4, 6.4]) {
+  for (let f = snapG(camAlong - 6, 12, 0) - camAlong; f <= 66; f += 12) for (const lat of [-6.4, 6.4]) {
     const j = atFU(f, lat);
     const jAlongPx = (hEW ? j[0] : j[1]) / S;
     if (jCross.some((c) => Math.abs(jAlongPx - c) < 48)) continue;
@@ -1765,8 +1780,11 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     if (hEW) box(OP, sg[0], 2.5, sg[1], 0.95, 0.65, 0.08, [0.12, 0.35, 0.85], 5);
     else box(OP, sg[0], 2.5, sg[1], 0.08, 0.65, 0.95, [0.12, 0.35, 0.85], 5); // panel biru halte
   }
-  if (propClear(24, -7.5)) {
-    const tb = atFU(24, -7.5);
+  // Tempat sampah hijau (trotoar kiri) — WORLD-SNAP grid 128u (pola Canvas):
+  // diam di dunia (dulu fwd 24 tetap -> tong melayang di depan hero).
+  const tbAlong = snapG(camAlong + 24, 128, 0), tbFwd = tbAlong - camAlong;
+  if (tbFwd >= 12 && tbFwd < 66 && propClear(tbFwd, -7.5)) {
+    const tb = atFU(tbFwd, -7.5);
     box(OP, tb[0], 0.48, tb[1], 0.55, 0.95, 0.55, [0.10, 0.28, 0.14], 5); // tempat sampah hijau
     box(OP, tb[0], 1.0, tb[1], 0.6, 0.1, 0.6, [0.08, 0.22, 0.11], 5); // tutup
   }
@@ -1858,74 +1876,85 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     palm(OP, tr.x * S, tr.y * S, sunA, scT);
     if (DIRSH) groundShadow(tr.x * S, tr.y * S, 1.2, 1.2, 5.1 * scT); // SIANG v2: bayangan palem (R36: mahkota naik 4.4->5.1)
   }
-  // R36 POHON TEPI JALAN: city.trees HANYA ada di dalam taman (16% blok) —
-  // dari chase-cam mereka sembunyi di balik gedung, jadi shot chase/title
-  // kelihatan tanpa pohon sama sekali (probe seed 7: 0 pohon di koridor
-  // x 1400..2400, y 960..1280). 5 pohon staged di trotoar jalan yang
-  // sedang dilalui hero, relatif-kamera seperti lampu city3d.js (JF4):
-  // batang di ±72 px dari garis tengah jalan (tepi trotoar; aspal 48,
-  // fasad 80), TIDAK di lajur. Posisi dijepit ke TENGAH BLOK (along ≡ 8
-  // mod 16 unit; persimpangan tiap 16 unit) supaya tidak menabrak tiang
-  // lampu di sudut persimpangan (±72,±72) — jarak min 32 px. Slot
-  // k=2 = pohon rindang, sisanya palem; sisi selang-seling, tapi kalau
-  // ada pejalan kaki / koin Harbor Token dalam 20 px dari titik rencana,
-  // GESER dulu sepanjang jalan (±4 unit, tetap di sisi yang sama) — balik
-  // sisi HANYA kalau dua geseran itu juga bentrok (v2: balik sisi bikin
-  // 4/5 pohon menumpuk di utara, di layar jadi 1 palem saja; probe kotak
-  // magenta membuktikan semua slot dirender, mereka cuma kolinear).
-  // Skala naik dgn slot (1.0 -> 1.28): palem jauh lebih tinggi supaya
-  // mahkotanya muncul di ATAS palem dekat. Lewati slot <12 unit dari
-  // kamera (batang di depan lensa) dan di luar daratan (x>2420 / x<30).
+  // R36 POHON TEPI JALAN — WORLD-SNAP (port pola Canvas DIAG-A):
+  // city.trees HANYA ada di dalam taman (16% blok) — dari chase-cam
+  // mereka sembunyi di balik gedung, jadi shot chase/title kelihatan
+  // tanpa pohon sama sekali (probe seed 7: 0 pohon di koridor
+  // x 1400..2400, y 960..1280). 5 pohon staged di tepi jalan yang
+  // sedang dilalui hero. Slot dijepit ke grid dunia (alongPx ≡ 80 mod
+  // 160px; 80px dari persimpangan) dan sisi/jenis/skala diambil dari
+  // INDEKS DUNIA wi = floor(alongPx/160) — BUKAN indeks layar k — jadi
+  // satu pohon tidak pernah ganti sisi/jenis/ukuran saat kamera maju
+  // (bug Juna 22 Nov: matahari + pohon ngikutin kamera).
+  // PENEMPATAN (koreksi Juna 11:51 WIB — BUKAN di trotoar, itu jalur
+  // NPC): batang di STRIP TEPI JALAN, lateral ±5.4 unit (54px) dari
+  // garis tengah — di luar aspal (48px, + garis curb 48..51px), di
+  // luar jalur jalan NPC (60px, SIDE traffic.js) — lubang tanam di tepi
+  // trotoar, bukan tengah trotoar (dulu 7.5u = tengah trotoar).
+  // PENJAGA ZEBRA (Juna 11:48 WIB — palm mendarat di atas zebra):
+  // kandidat DITOLAK bila <49px dari garis tengah jalan mana pun —
+  // pita zebra + garis stop semuanya di dalam 48px dari suatu jalan,
+  // jadi penjaga ini menutup jalan + zebra + stop sekaligus. Berlaku
+  // juga untuk geseran clash (±40px) dan saat belok (slot yang
+  // terseret ke jalan/zebra dilewati saja — TIDAK pernah balik sisi
+  // (balik sisi = pohon pindah sisi dunia).
+  // Skala per slot dunia: palem 1.0/1.12/1.24 (wi mod 3); pohon rindang
+  // tiap wi ≡ 2 mod 5, skala 1.0. Lewati slot <12 unit dari kamera
+  // (batang di depan lensa) dan di luar daratan (x>2420 / x<30).
+  // ROAD-ANCHOR (revisi 22 Nov — probe jalan kaki menemukan slot
+  // kamera-frame mendarat di sudut blok/interior (59..77px dari jalan)
+  // saat kamera belok & hero di luar jalan: posisi dihitung dari SUMBU
+  // KAMERA, bukan dari jalan. Sekarang slot dihitung LANGSUNG dari
+  // jalan: (alongPx, hRoad ± 54) utk jalan E-W, (hRoad ± 54, alongPx)
+  // utk N-S — lateral PASTI 54px (verge), tidak peduli arah kamera.
+  // alongPx di grid dunia ≡80 mod 160px (80px dari persimpangan);
+  // wi = floor(alongPx/160) = indeks dunia (sisi/jenis/skala stabil).
+  // Kamera HANYA dipakai utk culling: slot diambil bila jarak-maju
+  // dari kamera 12..84 unit (jendela pandang yang sama seperti dulu).
   {
     const fx2 = cam.fwd[0], fz2 = cam.fwd[1];
-    const rx2 = -fz2, rz2 = fx2; // kanan layar
-    const camAlong = cam.eye[0] * fx2 + cam.eye[2] * fz2;
-    const roadLat = (() => { // lateral garis tengah jalan terdekat hero
-      if (Math.abs(fx2) >= Math.abs(fz2)) {
-        const roadY = city.roadsH.reduce((a, b) => Math.abs(b - hy0) < Math.abs(a - hy0) ? b : a);
-        return (roadY * S - cam.eye[2]) * fx2 - (hx0 * S - cam.eye[0]) * fz2;
-      }
-      const roadX = city.roadsV.reduce((a, b) => Math.abs(b - hx0) < Math.abs(a - hx0) ? b : a);
-      return (hy0 * S - cam.eye[2]) * fx2 - (roadX * S - cam.eye[0]) * fz2;
-    })();
-    const mod16 = (a) => ((a % 16) + 16) % 16;
-    let a0 = camAlong + 20;
-    a0 += (8 - mod16(a0) + 16) % 16; // tengah blok pertama ≥20 unit di depan kamera
+    const eRoad = Math.abs(fx2) >= Math.abs(fz2); // sumbu jalan = sumbu kamera
+    const hRoad = eRoad
+      ? city.roadsH.reduce((a, b) => Math.abs(b - hy0) < Math.abs(a - hy0) ? b : a)
+      : city.roadsV.reduce((a, b) => Math.abs(b - hx0) < Math.abs(a - hx0) ? b : a);
+    const heroAlong = eRoad ? hx0 : hy0; // koordinat hero di sumbu jalan (px)
+    const onRoad = (wx, wy) => { // <49px dari garis tengah jalan mana pun = jalan/zebra/stop
+      for (const rx of city.roadsV) if (Math.abs(wx - rx) < 49) return true;
+      for (const ry of city.roadsH) if (Math.abs(wy - ry) < 49) return true;
+      return false;
+    };
     const clash = (wx, wy) => {
       if (slotInBuilding(city, wx, wy)) return true; // 1A-TREES: slot jatuh di dalam footprint gedung (saat belok) -> geser/lewati
       for (const pd of state.peds || []) if (pd.alive !== false && Math.hypot(pd.x - wx, pd.y - wy) < 20) return true;
       for (const cl of state.collectibles || []) if (!cl.taken && Math.hypot(cl.x - wx, cl.y - wy) < 25) return true;
       return false;
     };
-    const spot = (a, side) => { // posisi dunia (unit) utk along a & sisi side
-      const la = roadLat + side * 7.5;
-      return [(cam.eye[0] + fx2 * (a - camAlong) + rx2 * la) / S,
-              (cam.eye[2] + fz2 * (a - camAlong) + rz2 * la) / S];
-    };
-    for (let k = 0; k < 5; k += 1) {
-      let along = a0 + k * 16;
-      let side = k % 2 === 0 ? -1 : 1; // selang-seling kiri/kanan
-      let [wx, wy] = spot(along, side);
-      if (wx < 30 || wx > 2420 || wy < 30 || wy > 1890) continue;
-      if (clash(wx, wy)) { // geser dulu (+4 lalu -4 unit), baru balik sisi
+    const bad = (wx, wy) => wx < 30 || wx > 2420 || wy < 30 || wy > 1890 || onRoad(wx, wy) || clash(wx, wy);
+    const TREE_LAT = 54; // verge: strip tepi jalan (px), bukan trotoar
+    const pos = (g, side) => eRoad ? [g, hRoad + side * TREE_LAT] : [hRoad + side * TREE_LAT, g];
+    const grid0 = heroAlong - 1100 + ((80 - (heroAlong - 1100)) % 160 + 160) % 160; // grid pertama ≥ hero-1100 (rentang simetris — hero bisa jalan ke -along, culling fwdD yang memilih yang terlihat)
+    for (let g = grid0; g <= heroAlong + 1100; g += 160) {
+      const wi = Math.floor(g / 160); // indeks DUNIA — sisi/jenis/skala stabil saat slot masuk/keluar
+      const side = wi % 2 === 0 ? -1 : 1;
+      const shade = ((wi % 5) + 5) % 5 === 2; // tiap slot dunia ke-5 (mod matematis — stabil juga utk along negatif)
+      let [wx, wy] = pos(g, side);
+      const dxu = wx * S - cam.eye[0], dzu = wy * S - cam.eye[2];
+      const fwdD = dxu * fx2 + dzu * fz2; // jarak-maju dari kamera (unit)
+      if (fwdD < 12 || fwdD > 84) continue; // di luar jendela pandang
+      if (Math.hypot(dxu, dzu) < 12) continue; // batang di depan lensa
+      if (bad(wx, wy)) { // geser sepanjang jalan (±40px), tetap di sisi yang sama; gagal -> lewati slot
         let ok = false;
-        for (const da of [4, -4]) {
-          const [ax, ay] = spot(along + da, side);
-          if (!clash(ax, ay)) { along += da; wx = ax; wy = ay; ok = true; break; }
+        for (const dg of [40, -40]) {
+          const [ax, ay] = pos(g + dg, side);
+          if (!bad(ax, ay)) { wx = ax; wy = ay; ok = true; break; }
         }
-        if (!ok) {
-          side = -side;
-          [wx, wy] = spot(along, side);
-          if (clash(wx, wy)) continue; // dua sisi bentrok -> lewati slot
-        }
+        if (!ok) continue;
       }
-      const wxu = cam.eye[0] + fx2 * (along - camAlong) + rx2 * (roadLat + side * 7.5);
-      const wyu = cam.eye[2] + fz2 * (along - camAlong) + rz2 * (roadLat + side * 7.5);
-      if (Math.hypot(wxu - cam.eye[0], wyu - cam.eye[2]) < 12) continue;
-      const scK = k === 2 ? 1.0 : 1 + k * 0.12; // 1A-TREES: slot k=2 (shade tree) tanpa skala (dulu 1.24); R36 v4: jauh = lebih tinggi
-      if (k === 2) shadeTree(OP, wxu, wyu, sunA, scK);
-      else palm(OP, wxu, wyu, sunA, scK, [-side * rx2, -side * rz2]); // 1A-TREES: arah dr batang ke sumbu jalan, utk clamp pelepah (POLEFIX2)
-      if (DIRSH) groundShadow(wxu, wyu, 1.2, 1.2, (k === 2 ? 4.8 : 5.1) * scK);
+      const wxu = wx * S, wyu = wy * S;
+      const scK = shade ? 1.0 : 1 + (((wi % 3) + 3) % 3) * 0.12; // skala dari indeks dunia (1.0/1.12/1.24)
+      if (shade) shadeTree(OP, wxu, wyu, sunA, scK);
+      else palm(OP, wxu, wyu, sunA, scK, eRoad ? [0, -side] : [-side, 0]); // 1A-TREES: arah dr batang ke sumbu jalan, utk clamp pelepah (POLEFIX2)
+      if (DIRSH) groundShadow(wxu, wyu, 1.2, 1.2, (shade ? 4.8 : 5.1) * scK);
     }
   }
 
@@ -2141,6 +2170,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     const c = p.car;
     const hSt = carDmgStage(c); // VEHICLE-DAMAGE-P1: visual di-derive dari hp tiap frame
     drawCarRealistic(OP, GL, 'hero', c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#e33e5f'), { t, tl: tlGain, door: c.doorAngle || 0, doorSide: c.doorSide || -1, damage: hSt >= 1, heavy: hSt >= 2, charred: hSt === 2 ? 0.55 : 0 }); // R26: hero selalu realistis v15d (gate heroReal dihapus)
+    groundShadow(c.x * S, c.y * S, (c.width || 22) * S, (c.length || 46) * S, 1.4); // SUN-TREE: bayangan mobil berarah ikut matahari (dulu cuma contact shadow statis)
     if (tod.headlight > 0.02) { // TOD: kerucut lampu depan (malam) — trapesium mat 8,
       // v=0 di bemper (terang) -> v=1 jauh (memudar, ikut shader smear).
       const yaw = yawOf(c), fw = [Math.sin(yaw), Math.cos(yaw)], rg = [Math.cos(yaw), -Math.sin(yaw)];
@@ -2395,6 +2425,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     // health/2, bangkai = stage 3 (damage + heavy + charred 0.35, pintu 0).
     const st = c.wreck ? 3 : (police && unit ? dmgStage(unit.health, 3) : carDmgStage(c));
     drawCarRealistic(OP, GL, type, c.x * S, c.y * S, yawOf(c), (c.length || 46) * S, (c.width || 22) * S, hx(c.color || '#888888'), { t, detail: lod, taxi: c.body === 'taxi', tl: tlGain, door: c.wreck ? 0 : (c.doorAngle || 0), doorSide: c.doorSide || -1, damage: st >= 1, heavy: st >= 2, charred: st === 3 ? 0.35 : st === 2 ? 0.55 : 0, wreck: !!c.wreck }); // R36V2-TAXI: papan TAXI + strip kotak (cars3d.js) — digabung R38 tlGain
+    groundShadow(c.x * S, c.y * S, (c.width || 22) * S, (c.length || 46) * S, 1.4); // SUN-TREE: bayangan mobil berarah ikut matahari (traffic/parkir/polisi/bangkai)
   };
   for (const c of state.traffic.cars || []) drawCar(c, false);
   for (const c of state.traffic.parked || []) drawCar(c, false);
@@ -2406,7 +2437,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
       if (!near(u.car.x, u.car.y, R) || !vis(u.car.x, u.car.y, 100)) continue; // R27c-TUNE: 60->100
       if (u.military) {
         if (u.car.body === 'apc') drawCar(u.car, false); // APC v14 (turret + 6 roda); mtruck tetap car() lama (tak ada spec truk v14)
-        else car(OP, GL, u.car.x * S, u.car.y * S, yawOf(u.car), (u.car.length || 54) * S, (u.car.width || 24) * S, [0.35, 0.38, 0.20], false, SHB);
+        else { car(OP, GL, u.car.x * S, u.car.y * S, yawOf(u.car), (u.car.length || 54) * S, (u.car.width || 24) * S, [0.35, 0.38, 0.20], false, SHB); groundShadow(u.car.x * S, u.car.y * S, (u.car.width || 24) * S, (u.car.length || 54) * S, 2.0); } // SUN-TREE: bayangan mtruck berarah ikut matahari
       } else {
         drawCar(u.car, true, u);
       }
@@ -2429,6 +2460,7 @@ function buildFrame(state, cam, OP, SH, GL, t, SP) {
     // VEHICLE-DAMAGE-P1: stage dari at.hp/20 (maxHp di-set saat spawn).
     const tSt = carDmgStage(at);
     drawCarRealistic(OP, GL, 'armored', at.x * S, at.y * S, yawOf(at), (at.length || 54) * S, (at.width || 24) * S, hx(at.color || '#4a5240'), { t, tl: tlGain, damage: tSt >= 1, heavy: tSt >= 2, charred: tSt === 2 ? 0.55 : 0 });
+    groundShadow(at.x * S, at.y * S, (at.width || 24) * S, (at.length || 54) * S, 1.8); // SUN-TREE: bayangan armored berarah ikut matahari
   }
 
   // Helikopter polisi + kolam cahaya searchlight di hero.
@@ -2786,10 +2818,18 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo (HUD asli ui2.
     const dark = state.blackout && state.blackout.active ? 0.85 : 0;
     const tod = state.timeOfDay || PRESETS.sore; // TOD: tanpa preset = sore
     const U = webglUniforms(tod);
-    // matahari mengikuti arah kamera (golden hour selalu di depan)
+    // SUN-TREE-WORLDSNAP: matahari/bulan TETAP per TOD (sunAzOf) —
+    // elevasi ikut preset (U.sunY); dulu mengikuti kamera (fx*0.85+rx*0.18).
     const fx = cam.fwd[0], fz = cam.fwd[1];
     const rx = fz, rz = -fx; // right = up x fwd
-    const SUN = norm([fx * 0.85 + rx * 0.18, U.sunY, fz * 0.85 + rz * 0.18]); // TOD: elevasi ikut preset
+    const _az = sunAzOf(tod);
+    const SUN = norm([_az[0], U.sunY, _az[1]]);
+    // Piringan langit (uSunPos) ikut azimuth tetap: x bergeser dari anchor
+    // preset sebanding tan(sudut matahari thd sumbu pandang); di belakang
+    // kamera (fwd<=0.03) piringan disembunyikan di luar layar. y TETAP
+    // anchor preset (ketinggian cover yang sudah dikalibrasi).
+    const _fC = _az[0] * fx + _az[1] * fz, _rC = _az[0] * rx + _az[1] * rz;
+    const _sP = _fC > 0.03 ? [U.sunPos[0] + 0.5 * (_rC / _fC) / (0.5206 * (VW / VH)), U.sunPos[1]] : [-5, -5];
     const PVM = persp(55 * Math.PI / 180, VW / VH, 0.1, 400);
     const VVM = lookAt(cam.eye, cam.target, [0, 1, 0]);
     OP.p.length = 0; OP.n.length = 0; OP.u.length = 0; OP.c.length = 0; OP.m.length = 0; OP.i.length = 0;
@@ -2809,7 +2849,7 @@ export function createRenderer(glCanvas) { // R26: tanpa HUD demo (HUD asli ui2.
     gl.uniform1f(skyU.day, daylight);
     gl.uniform3fv(skyU.sky0, new Float32Array(U.sky0)); gl.uniform3fv(skyU.sky1, new Float32Array(U.sky1));
     gl.uniform3fv(skyU.sky2, new Float32Array(U.sky2)); gl.uniform3fv(skyU.sky3, new Float32Array(U.sky3));
-    gl.uniform3fv(skyU.sky4, new Float32Array(U.sky4)); gl.uniform2fv(skyU.sunPos, new Float32Array(U.sunPos));
+    gl.uniform3fv(skyU.sky4, new Float32Array(U.sky4)); gl.uniform2fv(skyU.sunPos, new Float32Array(_sP)); // SUN-TREE: piringan ikut azimuth tetap (_sP), bukan anchor preset
     gl.uniform3fv(skyU.sunDisc, new Float32Array(U.sunDisc)); gl.uniform3fv(skyU.sunGlow, new Float32Array(U.sunGlow));
     gl.uniform1f(skyU.moon, U.moon); gl.uniform1f(skyU.stars, U.stars);
     gl.uniform3fv(skyU.cloud, new Float32Array(U.cloud)); gl.uniform1f(skyU.cloudK, U.cloudK);
