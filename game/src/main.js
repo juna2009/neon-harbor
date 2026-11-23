@@ -44,7 +44,7 @@ function loadSettings() {
     return defaults;
   }
 }
-const savedMission = Math.min(11, Math.max(0, readNumber(PROGRESS_KEY)));
+const savedMission = Math.min(12, Math.max(0, readNumber(PROGRESS_KEY)));
 const world = createWorld(createRandom(seed), savedMission, space);
 const renderer = createRenderer(canvas);
 const settings = loadSettings();
@@ -98,7 +98,7 @@ function runGame() {
   }
   function startGame() {
     world.reset();
-    world.state.mission.index = Math.min(11, Math.max(0, readNumber(PROGRESS_KEY)));
+    world.state.mission.index = Math.min(12, Math.max(0, readNumber(PROGRESS_KEY)));
     if (window.__NHSaves) window.__NHSaves.applyStart(world); // R35-F6: load active save slot
     accumulator = 0;
     ts = 1;
