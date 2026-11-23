@@ -752,14 +752,6 @@ export function createWorld(rng, savedMission, sp) {
       w.reserve -= take;
       syncAmmo();
     }
-    if (input.wasPressed && input.wasPressed('weapon')) {
-      const order = ['fists', 'pistol', 'smg', 'shotgun', 'rifle'];
-      const owned = order.filter((k) => p.weapons[k].ammo + p.weapons[k].reserve > 0);
-      const idx = owned.indexOf(p.weapon);
-      p.weapon = owned[(idx + 1) % owned.length] || 'pistol';
-      syncAmmo();
-      events.weaponSwitch = p.weapon;
-    }
     if (input.wasPressed && input.wasPressed('repair')) {
       const result = repairAtGarage(state);
       if (result === 'ok') {

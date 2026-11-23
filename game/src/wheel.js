@@ -1,6 +1,7 @@
 // wheel.js — Neon Harbor weapon wheel (R35-F4, vs Karimbu's 5-weapon wheel).
 // Post-cut module: imported ONLY by ui2.js, so 0 bytes in the dossier text.
-// Behaviour: TAP Q cycles owned weapons (world.js, unchanged). HOLD Q >= 180ms
+// Behaviour: TAP Q cycles owned weapons (wheel.js onKeyUp, E-01 — the old
+// keydown cycle in world.js is deleted so a hold never cycles). HOLD Q >= 180ms
 // opens the radial wheel; hover a wedge (mouse), press 1-5, or click a wedge,
 // then RELEASE Q to equip. The wheel reads/writes the live game state through
 // window.__neonHarbor (exposed by main.js) — no counted file imports this.
@@ -95,6 +96,18 @@ function onKeyDown(e) {
     }
   }
 }
+// E-01: the tap-cycle lives here now (was a keydown cycle in world.js).
+// A Q tap must cycle only when the wheel never opened; a hold must not.
+// Load-bearing guard: wheel.js listeners are window-global, so without
+// this a Q tap on pause/shop/settings/over would newly cycle a weapon
+// (the old keydown cycle could only fire where world.step() runs: play).
+function screenIsPlay() {
+  try {
+    return typeof window !== 'undefined' && window.__neonHarbor && window.__neonHarbor.screen === 'play';
+  } catch {
+    return false;
+  }
+}
 function onKeyUp(e) {
   if (!e || e.code !== 'KeyQ') return;
   wheel.qDown = false;
@@ -103,6 +116,21 @@ function onKeyUp(e) {
     if (st && wheel.sel) applyWheelSelection(st, wheel.sel);
     wheel.open = false;
     wheel.sel = null;
+  } else if (now() - wheel.qDownAt < WHEEL_HOLD_MS) {
+    // TAP (<180 ms): cycle one owned weapon. The old keydown cycle in
+    // world.js is deleted — a hold must never cycle (E-01).
+    const st = gameState();
+    if (st && st.player && screenIsPlay()) {
+      const owned = WHEEL_ORDER.filter((k) => wheelOwned(st, k));
+      const idx = owned.indexOf(st.player.weapon);
+      applyWheelSelection(st, owned[(idx + 1) % owned.length] || 'pistol');
+      // A tap is not a wheel use: applyWheelSelection leaves wheel.sel set,
+      // and a stale sel would override the current weapon on the NEXT hold
+      // (drawWheel keeps an owned sel instead of defaulting to p.weapon —
+      // e.g. after a weapon pickup changed p.weapon meanwhile). Reset it so
+      // sel is null whenever the wheel is closed, as before E-01.
+      wheel.sel = null;
+    }
   }
 }
 function onMouseMove(e) {
